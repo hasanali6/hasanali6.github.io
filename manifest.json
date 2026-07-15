@@ -1,0 +1,24 @@
+{
+  "name": "Denge — Borç Takip & Finans",
+  "short_name": "Denge",
+  "description": "Kredi, kredi kartı, taksit ve gelir-gider takibi. Veriler yalnızca cihazda saklanır.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F6F9",
+  "theme_color": "#2E6BFF",
+  "lang": "tr",
+  "dir": "ltr",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Gider ekle", "short_name": "Gider", "url": "./index.html?add=out", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Gelir ekle", "short_name": "Gelir", "url": "./index.html?add=in", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Takvim", "short_name": "Takvim", "url": "./index.html?go=calendar", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+  ]
+}
