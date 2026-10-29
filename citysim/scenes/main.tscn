@@ -1,0 +1,31 @@
+[gd_scene load_steps=6 format=3 uid="uid://b8c1tymain001"]
+
+[ext_resource type="Script" path="res://scripts/world/day_night_cycle.gd" id="1_daynight"]
+[ext_resource type="Script" path="res://scripts/systems/terrain_system.gd" id="2_terrain"]
+[ext_resource type="Script" path="res://scripts/world/reference_scene.gd" id="3_reference"]
+[ext_resource type="Script" path="res://scripts/systems/camera_controller.gd" id="4_camera"]
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="5_hud"]
+
+[node name="Main" type="Node3D"]
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+script = ExtResource("1_daynight")
+sun_path = NodePath("../Sun")
+
+[node name="Terrain" type="Node3D" parent="."]
+script = ExtResource("2_terrain")
+
+[node name="ReferenceScene" type="Node3D" parent="."]
+script = ExtResource("3_reference")
+
+[node name="CameraRig" type="Node3D" parent="."]
+script = ExtResource("4_camera")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+current = true
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("5_hud")

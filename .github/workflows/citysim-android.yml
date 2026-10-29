@@ -1,0 +1,113 @@
+name: Şehir Simülasyonu - Android APK
+
+on:
+  push:
+    paths:
+      - "citysim/**"
+      - ".github/workflows/citysim-android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.7.2"
+  GODOT_RELEASE: "stable"
+  PROJECT_DIR: citysim
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache Godot + Android templates
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}-android
+
+      - name: Download Godot and Android export templates
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          TAG="${GODOT_VERSION}-${GODOT_RELEASE}"
+          BASE="https://github.com/godotengine/godot/releases/download/${TAG}"
+          mkdir -p ~/godot
+          curl -sSL -o /tmp/godot.zip "${BASE}/Godot_v${TAG}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d ~/godot
+          mv ~/godot/Godot_v${TAG}_linux.x86_64 ~/godot/godot
+          curl -sSL -o /tmp/templates.tpz "${BASE}/Godot_v${TAG}_export_templates.tpz"
+          DEST=~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}
+          mkdir -p "$DEST"
+          unzip -j -q /tmp/templates.tpz \
+            templates/android_debug.apk templates/android_release.apk templates/version.txt -d "$DEST"
+          rm /tmp/templates.tpz /tmp/godot.zip
+
+      - name: Import project (generates translations)
+        run: ~/godot/godot --headless --path "$PROJECT_DIR" --import
+
+      - name: Run headless unit tests
+        run: ~/godot/godot --headless --path "$PROJECT_DIR" -s res://tests/run_tests.gd
+
+      - name: Configure Android SDK, JDK and debug keystore
+        run: |
+          set -euo pipefail
+          SETTINGS=$(ls ~/.config/godot/editor_settings-*.tres | head -n1)
+          python3 - "$SETTINGS" "$ANDROID_HOME" "$JAVA_HOME" <<'PY'
+          import re, sys
+          path, sdk, jdk = sys.argv[1:4]
+          text = open(path).read()
+          for key, value in (("export/android/android_sdk_path", sdk), ("export/android/java_sdk_path", jdk)):
+              line = f'{key} = "{value}"'
+              if re.search(rf"^{re.escape(key)} = .*$", text, flags=re.M):
+                  text = re.sub(rf"^{re.escape(key)} = .*$", line, text, flags=re.M)
+              else:
+                  text = text.rstrip("\n") + "\n" + line + "\n"
+          open(path, "w").write(text)
+          PY
+          keytool -genkeypair -v -keystore "$RUNNER_TEMP/debug.keystore" -storepass android \
+            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Export debug APK (arm64-v8a)
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          set -euo pipefail
+          mkdir -p "$PROJECT_DIR/export"
+          ~/godot/godot --headless --path "$PROJECT_DIR" --export-debug "Android" "$GITHUB_WORKSPACE/$PROJECT_DIR/export/SehirSim.apk"
+          test -s "$PROJECT_DIR/export/SehirSim.apk"
+          ls -lh "$PROJECT_DIR/export/SehirSim.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SehirSim-apk
+          path: citysim/export/SehirSim.apk
+
+      - name: Publish rolling pre-release (direct phone download)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=citysim-latest
+          git tag -f "$TAG" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$TAG"
+          NOTES="Otomatik derleme: ${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}. Debug imzalı APK (arm64-v8a)."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --prerelease --notes "$NOTES"
+            gh release upload "$TAG" "$PROJECT_DIR/export/SehirSim.apk" --clobber
+          else
+            gh release create "$TAG" "$PROJECT_DIR/export/SehirSim.apk" --prerelease \
+              --title "Şehir Simülasyonu (son derleme)" --notes "$NOTES"
+          fi

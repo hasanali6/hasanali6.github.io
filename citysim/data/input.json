@@ -1,0 +1,10 @@
+{
+  "long_press_seconds": 0.55,
+  "tap_max_move_px": 14.0,
+  "two_finger_decide_px": 18.0,
+  "two_finger_decide_angle_deg": 6.0,
+  "velocity_smoothing": 0.35,
+  "mouse_wheel_zoom_step": 1.12,
+  "mouse_rotate_rad_per_px": 0.006,
+  "mouse_tilt_px_scale": 1.0
+}

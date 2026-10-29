@@ -1,0 +1,171 @@
+class_name GestureTracker
+extends RefCounted
+## Turns raw touch points into high-level camera gestures. Pure logic with no
+## engine input dependency, so it can be unit-tested headless.
+##   1 finger drag            -> pan (+ fling on release)
+##   1 finger tap / hold      -> tap / long press
+##   2 fingers pinch + twist  -> zoom + rotate (+ pan by centroid)
+##   2 fingers vertical slide -> tilt
+
+signal pan(screen_delta: Vector2)
+signal pan_released(screen_velocity: Vector2)
+signal zoom(factor: float, screen_center: Vector2)
+signal rotate(angle_rad: float)
+signal tilt(screen_delta_y: float)
+signal tap(screen_pos: Vector2)
+signal long_press(screen_pos: Vector2)
+
+enum Mode { NONE, PAN, TWO_UNDECIDED, PINCH_ROTATE, TILT }
+
+var long_press_seconds: float
+var tap_max_move_px: float
+var two_finger_decide_px: float
+var two_finger_decide_angle: float
+var velocity_smoothing: float
+
+var _touches: Dictionary = {}  # finger index -> Vector2
+var _mode: Mode = Mode.NONE
+var _clock: float = 0.0
+var _press_time: float = 0.0
+var _press_pos: Vector2 = Vector2.ZERO
+var _moved_far: bool = false
+var _long_press_fired: bool = false
+var _frame_pan: Vector2 = Vector2.ZERO
+var _velocity: Vector2 = Vector2.ZERO
+var _start_centroid: Vector2 = Vector2.ZERO
+var _start_dist: float = 0.0
+var _start_angle: float = 0.0
+var _last_centroid: Vector2 = Vector2.ZERO
+var _last_dist: float = 0.0
+var _last_angle: float = 0.0
+
+
+func _init(config: Dictionary) -> void:
+	long_press_seconds = float(config["long_press_seconds"])
+	tap_max_move_px = float(config["tap_max_move_px"])
+	two_finger_decide_px = float(config["two_finger_decide_px"])
+	two_finger_decide_angle = deg_to_rad(float(config["two_finger_decide_angle_deg"]))
+	velocity_smoothing = float(config["velocity_smoothing"])
+
+
+func reset() -> void:
+	_touches.clear()
+	_mode = Mode.NONE
+	_velocity = Vector2.ZERO
+	_frame_pan = Vector2.ZERO
+
+
+func touch_count() -> int:
+	return _touches.size()
+
+
+func touch_pressed(index: int, pos: Vector2) -> void:
+	_touches[index] = pos
+	match _touches.size():
+		1:
+			_mode = Mode.PAN
+			_press_time = _clock
+			_press_pos = pos
+			_moved_far = false
+			_long_press_fired = false
+			_velocity = Vector2.ZERO
+			_frame_pan = Vector2.ZERO
+		2:
+			_mode = Mode.TWO_UNDECIDED
+			_moved_far = true  # a second finger cancels tap / long press
+			_begin_two_finger()
+
+
+func touch_released(index: int, pos: Vector2) -> void:
+	if not _touches.has(index):
+		return
+	_touches.erase(index)
+	match _touches.size():
+		0:
+			if _mode == Mode.PAN:
+				if not _moved_far and not _long_press_fired and _clock - _press_time < long_press_seconds:
+					tap.emit(pos)
+				elif _moved_far:
+					pan_released.emit(_velocity)
+			_mode = Mode.NONE
+		1:
+			# Continue panning with the remaining finger, without a tap.
+			_mode = Mode.PAN
+			_moved_far = true
+			_velocity = Vector2.ZERO
+			_frame_pan = Vector2.ZERO
+		2:
+			_begin_two_finger()
+
+
+func touch_moved(index: int, pos: Vector2) -> void:
+	if not _touches.has(index):
+		return
+	var old_pos: Vector2 = _touches[index]
+	_touches[index] = pos
+	if _touches.size() == 1 and _mode == Mode.PAN:
+		if pos.distance_to(_press_pos) > tap_max_move_px:
+			_moved_far = true
+		if _moved_far:
+			var delta := pos - old_pos
+			_frame_pan += delta
+			pan.emit(delta)
+	elif _touches.size() == 2:
+		_update_two_finger()
+
+
+## Call every frame: long-press timing and fling velocity estimation.
+func update(delta: float) -> void:
+	_clock += delta
+	if _mode == Mode.PAN and _touches.size() == 1:
+		if not _moved_far and not _long_press_fired and _clock - _press_time >= long_press_seconds:
+			_long_press_fired = true
+			long_press.emit(_touches.values()[0])
+		if delta > 0.0:
+			_velocity = _velocity.lerp(_frame_pan / delta, clampf(1.0 - velocity_smoothing, 0.0, 1.0))
+		_frame_pan = Vector2.ZERO
+
+
+func _two_points() -> Array[Vector2]:
+	var keys := _touches.keys()
+	keys.sort()
+	return [_touches[keys[0]], _touches[keys[1]]]
+
+
+func _begin_two_finger() -> void:
+	var p := _two_points()
+	_start_centroid = (p[0] + p[1]) * 0.5
+	_start_dist = maxf(p[0].distance_to(p[1]), 1.0)
+	_start_angle = (p[1] - p[0]).angle()
+	_last_centroid = _start_centroid
+	_last_dist = _start_dist
+	_last_angle = _start_angle
+
+
+func _update_two_finger() -> void:
+	var p := _two_points()
+	var centroid := (p[0] + p[1]) * 0.5
+	var dist := maxf(p[0].distance_to(p[1]), 1.0)
+	var angle := (p[1] - p[0]).angle()
+
+	if _mode == Mode.TWO_UNDECIDED:
+		var spread := absf(dist - _start_dist)
+		var twist := absf(wrapf(angle - _start_angle, -PI, PI))
+		var slide_y := absf(centroid.y - _start_centroid.y)
+		if spread > two_finger_decide_px or twist > two_finger_decide_angle:
+			_mode = Mode.PINCH_ROTATE
+		elif slide_y > two_finger_decide_px:
+			_mode = Mode.TILT
+
+	match _mode:
+		Mode.PINCH_ROTATE:
+			zoom.emit(_last_dist / dist, centroid)
+			rotate.emit(wrapf(angle - _last_angle, -PI, PI))
+			pan.emit(centroid - _last_centroid)
+		Mode.TILT:
+			tilt.emit(centroid.y - _last_centroid.y)
+
+	if _mode != Mode.TWO_UNDECIDED:
+		_last_centroid = centroid
+		_last_dist = dist
+		_last_angle = angle

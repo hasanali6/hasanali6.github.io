@@ -1,0 +1,11 @@
+{
+  "tick_rate_hz": 10.0,
+  "real_seconds_per_day_at_1x": 360.0,
+  "speed_multipliers": [0.0, 1.0, 2.0, 3.0],
+  "default_speed_index": 1,
+  "max_ticks_per_frame": 8,
+  "start_hour": 9.0,
+  "start_month": 3,
+  "start_year": 2026,
+  "months_per_year": 12
+}

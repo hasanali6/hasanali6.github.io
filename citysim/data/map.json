@@ -1,0 +1,22 @@
+{
+  "cell_size_m": 8.0,
+  "playable_size_m": 4000.0,
+  "terrain_extent_m": 16000.0,
+  "noise_texture_size": 512,
+  "noise_seed": 1337,
+  "noise_frequency": 0.008,
+  "noise_octaves": 5,
+  "normal_bump_strength": 6.0,
+  "grass_color_a": "#5d6a45",
+  "grass_color_b": "#6f7350",
+  "dry_grass_color": "#8a7f5e",
+  "dirt_color": "#6b5a45",
+  "locked_area_darken": 0.78,
+  "locked_area_desaturate": 0.55,
+  "border_line_color": "#d8d2bf",
+  "grid_line_color": "#f2efe6",
+  "grid_line_strength": 0.35,
+  "grid_fade_distance_m": 900.0,
+  "roughness": 0.93,
+  "normal_strength": 0.55
+}

@@ -1,0 +1,47 @@
+{
+  "default_preset": "medium",
+  "max_fps": 60,
+  "preset_order": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "presets": {
+    "low": {
+      "render_scale": 0.75,
+      "msaa": 0,
+      "fxaa": true,
+      "shadow_atlas_size": 2048,
+      "shadow_max_distance_m": 500.0,
+      "shadow_filter_quality": 0,
+      "shadows_at_night": false,
+      "detail_draw_distance_m": 1800.0,
+      "tree_draw_distance_m": 700.0,
+      "glow": false
+    },
+    "medium": {
+      "render_scale": 0.85,
+      "msaa": 1,
+      "fxaa": false,
+      "shadow_atlas_size": 2048,
+      "shadow_max_distance_m": 900.0,
+      "shadow_filter_quality": 1,
+      "shadows_at_night": false,
+      "detail_draw_distance_m": 3000.0,
+      "tree_draw_distance_m": 1200.0,
+      "glow": true
+    },
+    "high": {
+      "render_scale": 1.0,
+      "msaa": 2,
+      "fxaa": false,
+      "shadow_atlas_size": 4096,
+      "shadow_max_distance_m": 1400.0,
+      "shadow_filter_quality": 2,
+      "shadows_at_night": true,
+      "detail_draw_distance_m": 4500.0,
+      "tree_draw_distance_m": 2000.0,
+      "glow": true
+    }
+  }
+}
