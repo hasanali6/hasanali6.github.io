@@ -6,7 +6,7 @@ SPEED_2,2x,2x
 SPEED_3,3x,3x
 LABEL_POPULATION,Nüfus,Population
 LABEL_MONEY,Para,Money
-LABEL_FPS,FPS: %d,FPS: %d
+LABEL_FPS,"FPS: %d · 3D %d%%","FPS: %d · 3D %d%%"
 TOOL_ROADS,Yollar,Roads
 TOOL_ZONING,İmar,Zoning
 TOOL_SERVICES,Hizmetler,Services

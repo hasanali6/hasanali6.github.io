@@ -71,10 +71,11 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	_date_label.text = TimeSystem.get_date_text()
-	_clock_label.text = TimeSystem.get_clock_text()
+	# Only touch label text when it changes; re-layout every frame is wasted work.
+	_set_text(_date_label, TimeSystem.get_date_text())
+	_set_text(_clock_label, TimeSystem.get_clock_text())
 	if _fps_label.visible:
-		_fps_label.text = tr("LABEL_FPS") % Engine.get_frames_per_second()
+		_set_text(_fps_label, tr("LABEL_FPS") % [Engine.get_frames_per_second(), roundi(GraphicsSettings.get_render_scale() * 100.0)])
 	if _toast_timer > 0.0:
 		_toast_timer -= delta
 		_toast_panel.modulate.a = clampf(_toast_timer / 0.4, 0.0, 1.0)
@@ -86,6 +87,11 @@ func _process(delta: float) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		_on_back_requested()
+
+
+func _set_text(label: Label, text: String) -> void:
+	if label.text != text:
+		label.text = text
 
 
 func show_toast(text: String) -> void:

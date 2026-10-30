@@ -14,9 +14,9 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 | Kamera | `scripts/systems/camera_controller.gd` | Harita görünümünden sokak seviyesine yumuşak geçiş; eğim zoom'a bağlı, sınırlı. |
 | Arazi | `scripts/systems/terrain_system.gd`, `assets/materials/terrain.gdshader` | 4 km × 4 km oynanabilir düz arazi + kilitli çevre, 8 m imar ızgarası (açılıp kapanır). |
 | Gün-gece | `scripts/world/day_night_cycle.gd` | Güneş/ay yönü, renk sıcaklığı (Kelvin), gökyüzü, sis, pozlama, global `night_factor`. |
-| Grafik kalitesi | `scripts/systems/graphics_settings.gd` | Düşük / Orta / Yüksek ön ayarlar (`data/graphics.json`). Seçim kaydedilir. |
+| Grafik kalitesi | `scripts/systems/graphics_settings.gd` | Düşük / Orta / Yüksek ön ayarlar (`data/graphics.json`). Seçim kaydedilir. 60 FPS altına düşünce 3D çözünürlüğü otomatik düşüren dinamik çözünürlük. |
 | Arayüz | `scripts/ui/hud.gd` | Üst çubuk (tarih, saat, hız, FPS), alt araç çubuğu, ayarlar, konum bilgisi, bildirim. |
-| Referans sahne (geçici) | `scripts/world/reference_scene.gd` + `assets/materials/*.gdshader` | Işık, gölge ve ölçeği telefonda değerlendirmek için bina blokları ve ağaçlar. Faz 2-3'te kalkacak. |
+| Referans sahne (kapalı) | `scripts/world/reference_scene.gd` + `assets/materials/*.gdshader` | Işık testi için bina blokları ve ağaçlar. Varsayılan **kapalı** — harita boş başlar. `data/reference_scene.json` → `"enabled": true` ile açılır. |
 | Testler | `tests/run_tests.gd` | Görselsiz (headless) birim testleri: saat, hız, ay geçişi, jestler, ızgara. |
 
 ## Kontroller
@@ -39,7 +39,7 @@ iki parmakla yukarı/aşağı kaydır = eğim · uzun bas = konum bilgisi · ger
 | 7 | Butona dokunmak kamerayı oynatmaz | Alt çubuktaki bir araca dokun → sadece bildirim çıkar, harita kaymaz. |
 | 8 | Kalite ayarları uygulanır | Ayarlar → Düşük/Orta/Yüksek. Gölge ve görüntü keskinliği değişir, uygulama yeniden açıldığında seçim hatırlanır. |
 | 9 | Uzun basma bilgi verir | Zemine uzun bas → konum (m), hücre (8 m) ve "oynanabilir alan / kilitli" bilgisi. |
-| 10 | APK telefonda açılır, yatay ekran, Türkçe arayüz | Aşağıdaki adımlarla kur. FPS sağ üstte görünür; orta segment cihazda 30+ FPS hedeflenir. |
+| 10 | APK telefonda açılır, yatay ekran, Türkçe arayüz, 60 FPS | Aşağıdaki adımlarla kur. Sağ üstte `FPS: 60 · 3D 75%` gibi görünür. FPS 60'ın altındaysa 3D yüzdesi kendiliğinden düşer; hâlâ düşükse Ayarlar → Düşük. |
 
 ## APK nasıl alınır
 
@@ -81,7 +81,8 @@ Telefondan: repo sayfası → Releases → `citysim-latest` → `SehirSim.apk` i
 - Mobile renderer'da FSR yok (yalnızca Forward+), bu yüzden düşük ayarlarda bilinear ölçekleme kullanılıyor.
 
 ## Bilinen eksikler / sonraki fazlara kalanlar
-- **Referans sahne geçicidir**: bina kutuları ve ağaçlar sadece ışık/ölçek testi için. `data/reference_scene.json` → `"enabled": false` ile kapanır. Faz 2 (yollar) ve Faz 3 (büyüyen binalar) bunun yerini alacak.
+- Harita boş başlar; inşa araçları (yol çizme) Faz 2'de gelir. Referans bloklar sadece ışık testi için ve varsayılan kapalı.
+- Dinamik çözünürlük GPU darboğazını çözer; FPS düşüklüğü CPU kaynaklıysa (ileride kalabalık simülasyon) çözünürlük düşürmek işe yaramaz — o iş Faz 6'daki simülasyon LOD'unun.
 - Ağaçlar düşük poligonlu yer tutucu; gerçek ağaçlar için LOD + uzakta billboard (impostor) gerekecek — 1000'lerce ağaçta bu şart.
 - Sokak lambaları, araçlar, yağmur/kar, mevsim renkleri yok (Faz 6, 8, 9).
 - Su kütleleri ve arazi yüksekliği yok. Fazlar listesinde de yok — **Faz 2 veya 3'e eklemeyi öneririm**, çünkü yol ve imar sistemi suyu/eğimi bilmeli.

@@ -19,6 +19,7 @@ var _night_full: float
 var _night_zero: float
 var _shadow_min_energy: float
 var _shadows_at_night: bool = false
+var _shadows_allowed: bool = true
 var _shadow_cap: float
 var _shadow_per_view: float
 var _shadow_min: float
@@ -126,7 +127,6 @@ func _build_environment(cfg: Dictionary) -> void:
 
 func _setup_sun(cfg: Dictionary) -> void:
 	_sun.shadow_enabled = true
-	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	_sun.directional_shadow_blend_splits = true
 	_sun.shadow_blur = float(cfg["shadow_blur"])
 	_sun.shadow_bias = float(cfg["shadow_bias"])
@@ -137,6 +137,11 @@ func _setup_sun(cfg: Dictionary) -> void:
 func _apply_graphics(_preset: String) -> void:
 	_shadow_cap = float(GraphicsSettings.get_value("shadow_max_distance_m"))
 	_shadows_at_night = bool(GraphicsSettings.get_value("shadows_at_night"))
+	_shadows_allowed = bool(GraphicsSettings.get_value("shadows"))
+	# One cascade is far cheaper on mobile; two give sharper shadows up close.
+	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS \
+		if int(GraphicsSettings.get_value("shadow_splits")) >= 2 else DirectionalLight3D.SHADOW_ORTHOGONAL
+	_last_sky_height = INF
 	environment.glow_enabled = bool(GraphicsSettings.get_value("glow"))
 
 
@@ -159,7 +164,7 @@ func _update_lighting(force: bool) -> void:
 	_sun.global_transform = Transform3D(Basis.looking_at(-light_dir, Vector3.FORWARD if absf(light_dir.y) > 0.99 else Vector3.UP), Vector3.ZERO)
 	_sun.light_color = kelvin_to_color(key["kelvin"])
 	_sun.light_energy = key["light"]
-	var want_shadow: bool = key["light"] > _shadow_min_energy and (is_day or _shadows_at_night)
+	var want_shadow: bool = _shadows_allowed and key["light"] > _shadow_min_energy and (is_day or _shadows_at_night)
 	if _sun.shadow_enabled != want_shadow:
 		_sun.shadow_enabled = want_shadow
 	_sky_mat.sun_angle_max = _sun_disk if is_day else _moon_disk

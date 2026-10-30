@@ -8,40 +8,57 @@
   ],
   "presets": {
     "low": {
-      "render_scale": 0.75,
+      "render_scale": 0.6,
       "msaa": 0,
-      "fxaa": true,
-      "shadow_atlas_size": 2048,
-      "shadow_max_distance_m": 500.0,
+      "fxaa": false,
+      "shadows": false,
+      "shadow_splits": 1,
+      "shadow_atlas_size": 1024,
+      "shadow_max_distance_m": 300.0,
       "shadow_filter_quality": 0,
       "shadows_at_night": false,
-      "detail_draw_distance_m": 1800.0,
-      "tree_draw_distance_m": 700.0,
-      "glow": false
+      "detail_draw_distance_m": 1500.0,
+      "tree_draw_distance_m": 500.0,
+      "glow": false,
+      "terrain_detail": false
     },
     "medium": {
-      "render_scale": 0.85,
+      "render_scale": 0.75,
       "msaa": 1,
       "fxaa": false,
+      "shadows": true,
+      "shadow_splits": 1,
       "shadow_atlas_size": 2048,
-      "shadow_max_distance_m": 900.0,
-      "shadow_filter_quality": 1,
+      "shadow_max_distance_m": 600.0,
+      "shadow_filter_quality": 0,
       "shadows_at_night": false,
-      "detail_draw_distance_m": 3000.0,
-      "tree_draw_distance_m": 1200.0,
-      "glow": true
+      "detail_draw_distance_m": 2500.0,
+      "tree_draw_distance_m": 900.0,
+      "glow": false,
+      "terrain_detail": true
     },
     "high": {
-      "render_scale": 1.0,
-      "msaa": 2,
+      "render_scale": 0.9,
+      "msaa": 1,
       "fxaa": false,
+      "shadows": true,
+      "shadow_splits": 2,
       "shadow_atlas_size": 4096,
-      "shadow_max_distance_m": 1400.0,
-      "shadow_filter_quality": 2,
+      "shadow_max_distance_m": 1200.0,
+      "shadow_filter_quality": 1,
       "shadows_at_night": true,
-      "detail_draw_distance_m": 4500.0,
-      "tree_draw_distance_m": 2000.0,
-      "glow": true
+      "detail_draw_distance_m": 4000.0,
+      "tree_draw_distance_m": 1600.0,
+      "glow": true,
+      "terrain_detail": true
     }
+  },
+  "dynamic_resolution": {
+    "enabled": true,
+    "target_fps": 57,
+    "check_interval_s": 1.0,
+    "raise_after_s": 4.0,
+    "min_scale": 0.5,
+    "step": 0.05
   }
 }

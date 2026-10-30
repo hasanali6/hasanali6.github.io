@@ -20,6 +20,7 @@ uniform float grid_strength = 0.0;
 uniform float grid_fade_distance = 900.0;
 uniform float base_roughness = 0.93;
 uniform float normal_strength = 0.55;
+uniform bool detail_enabled = true;
 
 varying vec3 world_pos;
 
@@ -38,15 +39,20 @@ float grid_line(vec2 p, float width_px) {
 
 void fragment() {
 	vec2 p = world_pos.xz;
-	float huge = texture(noise_tex, p / 2900.0).r;
-	float macro = texture(noise_tex, p / 731.0).r;
-	float mid = texture(noise_tex, p / 113.0 + vec2(0.37, 0.11)).r;
-	float fine = texture(noise_tex, p / 17.0 + vec2(0.71, 0.53)).r;
 	float dist = length(world_pos - CAMERA_POSITION_WORLD);
-	// Small-scale breakup fades out with distance so the map view stays calm.
-	float near = 1.0 - smoothstep(250.0, 1400.0, dist);
+	// Small-scale breakup fades out with distance so the map view stays calm;
+	// beyond that range the extra texture reads are skipped entirely.
+	float near = detail_enabled ? 1.0 - smoothstep(250.0, 1400.0, dist) : 0.0;
+	float macro = texture(noise_tex, p / 1300.0).r;
+	float mid = texture(noise_tex, p / 113.0 + vec2(0.37, 0.11)).r;
+	float fine = 0.5;
+	if (near > 0.0) {
+		fine = texture(noise_tex, p / 17.0 + vec2(0.71, 0.53)).r;
+		NORMAL_MAP = texture(noise_normal, p / 9.0).xyz;
+		NORMAL_MAP_DEPTH = normal_strength * near;
+	}
 
-	vec3 col = mix(grass_a, grass_b, smoothstep(0.25, 0.75, huge * 0.6 + macro * 0.4));
+	vec3 col = mix(grass_a, grass_b, smoothstep(0.25, 0.75, macro));
 	col = mix(col, dry_grass, smoothstep(0.62, 0.85, mid * 0.5 + macro * 0.5) * 0.45);
 	float dirt_mask = smoothstep(0.7, 0.84, mid * 0.55 + fine * 0.45) * near;
 	col = mix(col, dirt, dirt_mask * 0.6);
@@ -68,6 +74,4 @@ void fragment() {
 	ALBEDO = col;
 	ROUGHNESS = clamp(base_roughness - fine * 0.06 + dirt_mask * 0.03, 0.0, 1.0);
 	SPECULAR = 0.35;
-	NORMAL_MAP = texture(noise_normal, p / 9.0).xyz;
-	NORMAL_MAP_DEPTH = normal_strength;
 }

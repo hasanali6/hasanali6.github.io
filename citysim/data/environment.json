@@ -5,7 +5,7 @@
   "moon_disk_angle_deg": 0.9,
   "sky_curve": 0.12,
   "ground_curve": 0.03,
-  "sky_update_min_height_delta": 0.004,
+  "sky_update_min_height_delta": 0.02,
   "night_factor_full_at_height": -0.1,
   "night_factor_zero_at_height": 0.05,
   "shadow_min_light_energy": 0.06,

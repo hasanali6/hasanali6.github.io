@@ -26,6 +26,12 @@ func _ready() -> void:
 	add_child(ground)
 
 	EventBus.grid_overlay_toggled.connect(set_grid_visible)
+	EventBus.graphics_preset_changed.connect(_apply_graphics)
+	_apply_graphics(GraphicsSettings.current_preset)
+
+
+func _apply_graphics(_preset: String) -> void:
+	_material.set_shader_parameter("detail_enabled", bool(GraphicsSettings.get_value("terrain_detail")))
 
 
 func _build_material() -> ShaderMaterial:
