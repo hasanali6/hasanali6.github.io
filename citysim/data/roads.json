@@ -1,0 +1,124 @@
+{
+  "order": [
+    "street",
+    "street_oneway",
+    "avenue",
+    "avenue_oneway",
+    "boulevard"
+  ],
+  "types": {
+    "street": {
+      "name_key": "ROAD_STREET",
+      "lanes_per_dir": 1,
+      "oneway": false,
+      "lane_width_m": 3.0,
+      "median_width_m": 0.0,
+      "sidewalk_width_m": 1.0,
+      "speed_kmh": 40,
+      "cost_per_m": 10,
+      "lamp_spacing_m": 32,
+      "lamps_both_sides": false
+    },
+    "street_oneway": {
+      "name_key": "ROAD_STREET_ONEWAY",
+      "lanes_per_dir": 2,
+      "oneway": true,
+      "lane_width_m": 3.0,
+      "median_width_m": 0.0,
+      "sidewalk_width_m": 1.0,
+      "speed_kmh": 40,
+      "cost_per_m": 11,
+      "lamp_spacing_m": 32,
+      "lamps_both_sides": false
+    },
+    "avenue": {
+      "name_key": "ROAD_AVENUE",
+      "lanes_per_dir": 2,
+      "oneway": false,
+      "lane_width_m": 3.0,
+      "median_width_m": 0.0,
+      "sidewalk_width_m": 2.0,
+      "speed_kmh": 50,
+      "cost_per_m": 22,
+      "lamp_spacing_m": 28,
+      "lamps_both_sides": true
+    },
+    "avenue_oneway": {
+      "name_key": "ROAD_AVENUE_ONEWAY",
+      "lanes_per_dir": 4,
+      "oneway": true,
+      "lane_width_m": 3.0,
+      "median_width_m": 0.0,
+      "sidewalk_width_m": 2.0,
+      "speed_kmh": 50,
+      "cost_per_m": 24,
+      "lamp_spacing_m": 28,
+      "lamps_both_sides": true
+    },
+    "boulevard": {
+      "name_key": "ROAD_BOULEVARD",
+      "lanes_per_dir": 3,
+      "oneway": false,
+      "lane_width_m": 3.0,
+      "median_width_m": 2.0,
+      "sidewalk_width_m": 2.0,
+      "speed_kmh": 60,
+      "cost_per_m": 38,
+      "lamp_spacing_m": 26,
+      "lamps_both_sides": true
+    }
+  },
+  "graph": {
+    "sample_step_m": 2.0,
+    "merge_radius_m": 2.0,
+    "min_segment_m": 8.0,
+    "max_segment_m": 800.0,
+    "min_angle_deg": 25.0
+  },
+  "snap": {
+    "grid_m": 8.0,
+    "angle_step_deg": 15.0,
+    "angle_snap_tolerance_deg": 4.0,
+    "node_radius_px": 36.0,
+    "segment_radius_px": 28.0
+  },
+  "mesh": {
+    "sample_step_m": 3.0,
+    "max_angle_per_sample_deg": 6.0,
+    "curb_height_m": 0.18,
+    "asphalt_height_m": 0.03,
+    "junction_extra_m": 1.5,
+    "corner_radius_m": 4.0,
+    "corner_steps": 6,
+    "chunk_size_m": 256.0,
+    "marking_width_m": 0.16,
+    "dash_length_m": 3.0,
+    "dash_gap_m": 5.0,
+    "crosswalk_length_m": 3.2,
+    "crosswalk_stripe_m": 0.6,
+    "joint_max_deviation_deg": 20.0,
+    "sidewalk_tile_m": 1.6
+  },
+  "colors": {
+    "asphalt": "#3b3e46",
+    "asphalt_junction": "#3e414a",
+    "marking": "#f4f4ef",
+    "center_marking": "#f2c230",
+    "sidewalk": "#c9ccd3",
+    "curb": "#e3e5ea",
+    "median": "#5fbf5a"
+  },
+  "preview": {
+    "valid_color": "#4fd17a",
+    "invalid_color": "#ee5050",
+    "alpha": 0.55
+  },
+  "lamps": {
+    "pole_height_m": 6.5,
+    "inset_m": 0.4,
+    "light_color": "#ffd9a0",
+    "light_energy": 3.0,
+    "pool_radius_m": 7.0,
+    "pool_strength": 0.55
+  }
+}

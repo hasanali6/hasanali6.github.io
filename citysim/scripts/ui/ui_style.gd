@@ -153,6 +153,29 @@ static func round_button(icon_name: String, color: Color, size: float, toggle: b
 	return b
 
 
+## Rounded rectangular toggle with the same candy look as round buttons.
+static func chip_button(text: String, color: Color, on_color: Color, min_size: Vector2) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.toggle_mode = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = min_size
+	var lip := 4
+	var normal := circle_box(color, 32.0, lip, false)
+	var down := circle_box(on_color, 32.0, lip, true)
+	for box: StyleBoxFlat in [normal, down]:
+		box.content_margin_left = 14
+		box.content_margin_right = 14
+		box.content_margin_top = 6
+		box.content_margin_bottom = 8
+	b.add_theme_stylebox_override("normal", normal)
+	b.add_theme_stylebox_override("hover", normal)
+	b.add_theme_stylebox_override("pressed", down)
+	b.add_theme_stylebox_override("hover_pressed", down)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	return b
+
+
 ## Coloured circular icon badge used at the left end of a resource pill.
 static func badge(icon_name: String, color: Color, size: float) -> PanelContainer:
 	var panel := PanelContainer.new()

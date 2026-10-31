@@ -1,0 +1,325 @@
+extends Node3D
+## Road drawing tool. Active while the HUD's road panel is open; receives
+## single-finger strokes as EventBus.tool_pointer (two fingers keep moving the
+## camera). Modes:
+##   straight : press = start, drag = end, release = build
+##   curve    : first stroke start -> bend point, second stroke drags the end
+##   bulldoze : touch a road to select it, release to demolish (partial refund)
+## Points snap to existing junctions, onto existing roads, to 15° angle steps
+## with 8 m length steps from the start, or to the 8 m grid.
+
+@export var road_network_path: NodePath
+
+var _net: Node
+var _active: bool = false
+var _type: String = ""
+var _mode: String = "straight"
+var _start: Variant = null
+var _control: Variant = null
+var _end: Variant = null
+var _curve_stage: int = 0
+var _highlight: int = -1
+var _last_screen: Vector2 = Vector2.ZERO
+
+var _grid: float
+var _angle_step: float
+var _angle_tolerance: float
+var _node_radius_px: float
+var _segment_radius_px: float
+var _playable_half: float
+var _preview: MeshInstance3D
+var _marker: MeshInstance3D
+var _valid_mat: StandardMaterial3D
+var _invalid_mat: StandardMaterial3D
+
+
+func _ready() -> void:
+	_net = get_node(road_network_path)
+	var snap := GameData.section("roads/snap")
+	_grid = float(snap["grid_m"])
+	_angle_step = deg_to_rad(float(snap["angle_step_deg"]))
+	_angle_tolerance = deg_to_rad(float(snap["angle_snap_tolerance_deg"]))
+	_node_radius_px = float(snap["node_radius_px"])
+	_segment_radius_px = float(snap["segment_radius_px"])
+	_playable_half = GameData.num("map/playable_size_m") * 0.5
+	_type = str((GameData.value("roads/order") as Array)[0])
+
+	var prev := GameData.section("roads/preview")
+	_valid_mat = _preview_material(DataLoader.to_color(prev["valid_color"]), float(prev["alpha"]))
+	_invalid_mat = _preview_material(DataLoader.to_color(prev["invalid_color"]), float(prev["alpha"]))
+	_preview = MeshInstance3D.new()
+	_preview.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_preview)
+	_marker = MeshInstance3D.new()
+	var ring := CylinderMesh.new()
+	ring.top_radius = 1.4
+	ring.bottom_radius = 1.4
+	ring.height = 0.06
+	ring.radial_segments = 20
+	ring.rings = 1
+	_marker.mesh = ring
+	_marker.material_override = _valid_mat
+	_marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_marker)
+	_reset()
+
+	EventBus.build_tool_selected.connect(_on_tool_selected)
+	EventBus.tool_pointer.connect(_on_pointer)
+
+
+func _preview_material(color: Color, alpha: float) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(color, alpha)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.no_depth_test = false
+	return mat
+
+
+func _on_tool_selected(tool: String, options: Dictionary) -> void:
+	_active = tool == "road"
+	if _active:
+		_type = str(options.get("type", _type))
+		_mode = str(options.get("mode", _mode))
+	_reset()
+
+
+func _on_pointer(phase: int, screen_pos: Vector2) -> void:
+	if not _active:
+		return
+	_last_screen = screen_pos
+	match phase:
+		GestureTracker.Pointer.CANCEL:
+			_reset()
+		GestureTracker.Pointer.DOWN:
+			_on_down(screen_pos)
+		GestureTracker.Pointer.MOVE:
+			_on_move(screen_pos)
+		GestureTracker.Pointer.UP:
+			_on_up(screen_pos)
+
+
+func _on_down(screen_pos: Vector2) -> void:
+	match _mode:
+		"bulldoze":
+			_highlight = _segment_at(screen_pos)
+		"curve":
+			if _curve_stage == 0:
+				_start = _snap(screen_pos, null)
+				_control = _start
+			else:
+				_end = _snap(screen_pos, null)
+		_:
+			_start = _snap(screen_pos, null)
+			_end = _start
+	_refresh()
+
+
+func _on_move(screen_pos: Vector2) -> void:
+	match _mode:
+		"bulldoze":
+			_highlight = _segment_at(screen_pos)
+		"curve":
+			if _curve_stage == 0:
+				_control = _snap(screen_pos, _start)
+			else:
+				_end = _snap(screen_pos, null)
+		_:
+			if _start != null:
+				_end = _snap(screen_pos, _start)
+	_refresh()
+
+
+func _on_up(screen_pos: Vector2) -> void:
+	match _mode:
+		"bulldoze":
+			_highlight = _segment_at(screen_pos)
+			if _highlight >= 0:
+				var refund: int = _net.demolish(_highlight)
+				EventBus.notification_posted.emit("roads", tr("ROAD_REFUND") % UiStyle.format_int(refund))
+			_reset()
+		"curve":
+			if _curve_stage == 0:
+				if _start != null and _control != null and (_start as Vector2).distance_to(_control) >= _grid:
+					_curve_stage = 1
+					_end = _control
+					_refresh()
+				else:
+					_reset()
+			else:
+				_end = _snap(screen_pos, null)
+				_try_build(_start, _end, _control)
+		_:
+			if _start != null:
+				_end = _snap(screen_pos, _start)
+				_try_build(_start, _end, null)
+
+
+func _try_build(a: Vector2, b: Vector2, control: Variant) -> void:
+	var check := _evaluate(a, b, control)
+	if check["valid"]:
+		var result: Dictionary = _net.build_road(a, b, control, _type)
+		if not result["ok"]:
+			EventBus.notification_posted.emit("roads", tr(result["error"]))
+	elif a.distance_to(b) > 0.5:
+		EventBus.notification_posted.emit("roads", tr(check["error"]))
+	_reset()
+
+
+func _reset() -> void:
+	_start = null
+	_control = null
+	_end = null
+	_curve_stage = 0
+	_highlight = -1
+	_preview.visible = false
+	_marker.visible = false
+	EventBus.road_preview_changed.emit({"active": false})
+
+
+# --- Evaluation and preview ------------------------------------------------------
+
+func _evaluate(a: Vector2, b: Vector2, control: Variant) -> Dictionary:
+	var pts: Array[Vector2] = [a, b]
+	if control != null:
+		pts.append(control)
+	for p in pts:
+		if not MapGrid.is_inside(Vector3(p.x, 0, p.y), _playable_half):
+			return {"valid": false, "error": "ROAD_ERR_OUTSIDE", "cost": 0, "length": 0.0}
+	var plan: Dictionary = (_net.graph as RoadGraph).plan_road(a, b, control)
+	if not plan["ok"]:
+		return {"valid": false, "error": plan["error"], "cost": 0, "length": 0.0}
+	var cost: int = _net.cost_of(plan["length"], _type)
+	if not EconomySystem.can_afford(cost):
+		return {"valid": false, "error": "ROAD_ERR_MONEY", "cost": cost, "length": plan["length"]}
+	return {"valid": true, "error": "", "cost": cost, "length": plan["length"]}
+
+
+func _refresh() -> void:
+	if _mode == "bulldoze":
+		_show_bulldoze()
+		return
+	var a: Variant = _start
+	var b: Variant = _end
+	var control: Variant = null
+	if _mode == "curve":
+		if _curve_stage == 0:
+			b = _control
+		else:
+			control = _control
+	if a == null or b == null:
+		return
+	_marker.visible = true
+	_marker.position = Vector3((b as Vector2).x, 0.25, (b as Vector2).y)
+	if (a as Vector2).distance_to(b) < 0.5:
+		_preview.visible = false
+		EventBus.road_preview_changed.emit({"active": false})
+		return
+	var check := _evaluate(a, b, control)
+	var ctrl: Vector2 = control if control != null else ((a as Vector2) + (b as Vector2)) * 0.5
+	var width := RoadTypes.total_width(_net.type_config(_type))
+	_preview.mesh = _ribbon(a, ctrl, b, width)
+	_preview.material_override = _valid_mat if check["valid"] else _invalid_mat
+	_marker.material_override = _preview.material_override
+	_preview.visible = true
+	check["active"] = true
+	check["screen_pos"] = _last_screen
+	if _mode == "curve" and _curve_stage == 0:
+		check["hint"] = "ROAD_HINT_CURVE"
+	EventBus.road_preview_changed.emit(check)
+
+
+func _show_bulldoze() -> void:
+	if _highlight < 0 or not (_net.graph as RoadGraph).segments.has(_highlight):
+		_preview.visible = false
+		EventBus.road_preview_changed.emit({"active": false})
+		return
+	var graph: RoadGraph = _net.graph
+	var seg: RoadGraph.RoadSegment = graph.segments[_highlight]
+	var c := graph.curve_of(seg)
+	_preview.mesh = _ribbon(c[0], c[1], c[2], RoadTypes.total_width(_net.type_config(seg.type)) + 1.0)
+	_preview.material_override = _invalid_mat
+	_preview.visible = true
+	EventBus.road_preview_changed.emit({"active": true, "valid": true, "refund": _net.refund_of(_highlight),
+		"length": seg.length, "screen_pos": _last_screen})
+
+
+func _ribbon(a: Vector2, c: Vector2, b: Vector2, width: float) -> ArrayMesh:
+	var n := clampi(ceili((a.distance_to(c) + c.distance_to(b)) / 3.0), 1, 256)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+	st.set_normal(Vector3.UP)
+	for i in n + 1:
+		var t := float(i) / n
+		var p := RoadGraph.bezier(a, c, b, t)
+		var d := RoadGraph.bezier_tangent(a, c, b, t).normalized()
+		var l := Vector2(-d.y, d.x) * width * 0.5
+		st.add_vertex(Vector3(p.x + l.x, 0.3, p.y + l.y))
+		st.add_vertex(Vector3(p.x - l.x, 0.3, p.y - l.y))
+	return st.commit()
+
+
+# --- Snapping ------------------------------------------------------------------------
+
+func _ground(screen_pos: Vector2) -> Variant:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return null
+	var hit: Variant = Plane(Vector3.UP, 0.0).intersects_ray(cam.project_ray_origin(screen_pos), cam.project_ray_normal(screen_pos))
+	if hit == null:
+		return null
+	return Vector2((hit as Vector3).x, (hit as Vector3).z)
+
+
+func _metres_per_pixel(at: Vector2) -> float:
+	var cam := get_viewport().get_camera_3d()
+	var p0 := cam.unproject_position(Vector3(at.x, 0, at.y))
+	var p1 := cam.unproject_position(Vector3(at.x + 1.0, 0, at.y))
+	return 1.0 / maxf(p0.distance_to(p1), 0.001)
+
+
+func _snap(screen_pos: Vector2, anchor: Variant) -> Variant:
+	var g: Variant = _ground(screen_pos)
+	if g == null:
+		return anchor
+	var p: Vector2 = g
+	var graph: RoadGraph = _net.graph
+	var cam := get_viewport().get_camera_3d()
+	# 1. Existing junctions / road ends.
+	var best := -1
+	var best_px := _node_radius_px
+	for node: RoadGraph.RoadNode in graph.nodes.values():
+		var sp := cam.unproject_position(Vector3(node.pos.x, 0, node.pos.y))
+		var dpx := sp.distance_to(screen_pos)
+		if dpx < best_px:
+			best_px = dpx
+			best = node.id
+	if best >= 0:
+		return (graph.nodes[best] as RoadGraph.RoadNode).pos
+	# 2. Onto an existing road.
+	var hit := graph.find_segment_near(p, _segment_radius_px * _metres_per_pixel(p))
+	if not hit.is_empty():
+		return hit["point"]
+	# 3. Angle and length steps from the start point.
+	if anchor != null:
+		var a: Vector2 = anchor
+		var v := p - a
+		if v.length() > 0.01:
+			var ang := v.angle()
+			var snapped := roundf(ang / _angle_step) * _angle_step
+			if absf(angle_difference(ang, snapped)) <= _angle_tolerance:
+				ang = snapped
+			var length := maxf(roundf(v.length() / _grid) * _grid, _grid)
+			return a + Vector2.from_angle(ang) * length
+		return a
+	# 4. Grid.
+	return Vector2(roundf(p.x / _grid) * _grid, roundf(p.y / _grid) * _grid)
+
+
+func _segment_at(screen_pos: Vector2) -> int:
+	var g: Variant = _ground(screen_pos)
+	if g == null:
+		return -1
+	var hit := (_net.graph as RoadGraph).find_segment_near(g, _segment_radius_px * 1.5 * _metres_per_pixel(g))
+	return hit.get("segment", -1)

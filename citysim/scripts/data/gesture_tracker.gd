@@ -6,6 +6,8 @@ extends RefCounted
 ##   1 finger tap / hold      -> tap / long press
 ##   2 fingers pinch + twist  -> zoom + rotate (+ pan by centroid)
 ##   2 fingers vertical slide -> tilt
+## With capture_single on (a build tool is active) one finger produces tool
+## pointer events instead of pan/tap/long press; two fingers still navigate.
 
 signal pan(screen_delta: Vector2)
 signal pan_released(screen_velocity: Vector2)
@@ -14,8 +16,12 @@ signal rotate(angle_rad: float)
 signal tilt(screen_delta_y: float)
 signal tap(screen_pos: Vector2)
 signal long_press(screen_pos: Vector2)
+signal pointer(phase: int, screen_pos: Vector2)
 
-enum Mode { NONE, PAN, TWO_UNDECIDED, PINCH_ROTATE, TILT }
+enum Mode { NONE, PAN, CAPTURE, TWO_UNDECIDED, PINCH_ROTATE, TILT }
+enum Pointer { DOWN, MOVE, UP, CANCEL }
+
+var capture_single: bool = false
 
 var long_press_seconds: float
 var tap_max_move_px: float
@@ -63,6 +69,10 @@ func touch_pressed(index: int, pos: Vector2) -> void:
 	_touches[index] = pos
 	match _touches.size():
 		1:
+			if capture_single:
+				_mode = Mode.CAPTURE
+				pointer.emit(Pointer.DOWN, pos)
+				return
 			_mode = Mode.PAN
 			_press_time = _clock
 			_press_pos = pos
@@ -71,6 +81,8 @@ func touch_pressed(index: int, pos: Vector2) -> void:
 			_velocity = Vector2.ZERO
 			_frame_pan = Vector2.ZERO
 		2:
+			if _mode == Mode.CAPTURE:
+				pointer.emit(Pointer.CANCEL, pos)
 			_mode = Mode.TWO_UNDECIDED
 			_moved_far = true  # a second finger cancels tap / long press
 			_begin_two_finger()
@@ -82,7 +94,9 @@ func touch_released(index: int, pos: Vector2) -> void:
 	_touches.erase(index)
 	match _touches.size():
 		0:
-			if _mode == Mode.PAN:
+			if _mode == Mode.CAPTURE:
+				pointer.emit(Pointer.UP, pos)
+			elif _mode == Mode.PAN:
 				if not _moved_far and not _long_press_fired and _clock - _press_time < long_press_seconds:
 					tap.emit(pos)
 				elif _moved_far:
@@ -90,7 +104,8 @@ func touch_released(index: int, pos: Vector2) -> void:
 			_mode = Mode.NONE
 		1:
 			# Continue panning with the remaining finger, without a tap.
-			_mode = Mode.PAN
+			# While a tool is active the leftover finger does nothing.
+			_mode = Mode.NONE if capture_single else Mode.PAN
 			_moved_far = true
 			_velocity = Vector2.ZERO
 			_frame_pan = Vector2.ZERO
@@ -103,7 +118,9 @@ func touch_moved(index: int, pos: Vector2) -> void:
 		return
 	var old_pos: Vector2 = _touches[index]
 	_touches[index] = pos
-	if _touches.size() == 1 and _mode == Mode.PAN:
+	if _mode == Mode.CAPTURE:
+		pointer.emit(Pointer.MOVE, pos)
+	elif _touches.size() == 1 and _mode == Mode.PAN:
 		if pos.distance_to(_press_pos) > tap_max_move_px:
 			_moved_far = true
 		if _moved_far:

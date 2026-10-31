@@ -25,6 +25,7 @@ EventBus="*res://scripts/systems/event_bus.gd"
 TimeSystem="*res://scripts/systems/time_system.gd"
 GraphicsSettings="*res://scripts/systems/graphics_settings.gd"
 InputController="*res://scripts/systems/input_controller.gd"
+EconomySystem="*res://scripts/systems/economy_system.gd"
 
 [display]
 

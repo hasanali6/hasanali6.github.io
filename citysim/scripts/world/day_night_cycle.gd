@@ -103,7 +103,11 @@ func _build_environment(cfg: Dictionary) -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_sky_contribution = float(cfg["ambient_sky_contribution"])
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
-	env.tonemap_mode = Environment.TONE_MAPPER_AGX
+	var tonemappers := {
+		"linear": Environment.TONE_MAPPER_LINEAR, "reinhard": Environment.TONE_MAPPER_REINHARDT,
+		"filmic": Environment.TONE_MAPPER_FILMIC, "aces": Environment.TONE_MAPPER_ACES, "agx": Environment.TONE_MAPPER_AGX,
+	}
+	env.tonemap_mode = tonemappers[str(cfg["tonemapper"])]
 	env.tonemap_white = float(cfg["tonemap_white"])
 	env.adjustment_enabled = true
 	env.adjustment_saturation = float(cfg["saturation"])

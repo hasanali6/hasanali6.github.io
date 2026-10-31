@@ -18,6 +18,14 @@ func _initialize() -> void:
 	_test_gesture_pinch_rotate()
 	_test_gesture_tilt()
 	_test_map_grid()
+	_test_gesture_capture()
+	_test_road_types()
+	_test_road_straight()
+	_test_road_crossing()
+	_test_road_t_junction_and_snap()
+	_test_road_rejections()
+	_test_road_curve_and_remove()
+	_test_road_mesh()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -38,7 +46,7 @@ func _input_config() -> Dictionary:
 
 
 func _test_data_files() -> void:
-	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene"]:
+	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy"]:
 		_check(not DataLoader.load_json("res://data/%s.json" % f).is_empty(), "data file %s loads" % f)
 	var db := DataLoader.load_files(PackedStringArray(["graphics"]))
 	for preset: String in DataLoader.lookup(db, "graphics/preset_order"):
@@ -169,3 +177,132 @@ func _test_map_grid() -> void:
 	_check(MapGrid.world_to_cell(Vector3(-0.1, 0, 15.9), 8.0) == Vector2i(-1, 1), "world to cell floors negatives")
 	_check(MapGrid.is_inside(Vector3(1999, 0, -1999), 2000.0), "inside playable")
 	_check(not MapGrid.is_inside(Vector3(2001, 0, 0), 2000.0), "outside playable")
+
+
+func _test_gesture_capture() -> void:
+	var g := GestureTracker.new(_input_config())
+	var events := []
+	var pans := [0]
+	g.pointer.connect(func(phase: int, p: Vector2) -> void: events.append([phase, p]))
+	g.pan.connect(func(_d: Vector2) -> void: pans[0] += 1)
+	g.capture_single = true
+	g.touch_pressed(0, Vector2(10, 10))
+	g.touch_moved(0, Vector2(60, 10))
+	g.touch_released(0, Vector2(60, 10))
+	var phases := events.map(func(e: Array) -> int: return e[0])
+	_check(phases == [GestureTracker.Pointer.DOWN, GestureTracker.Pointer.MOVE, GestureTracker.Pointer.UP],
+		"captured single finger becomes tool pointer events (%s)" % str(phases))
+	_check(pans[0] == 0, "captured single finger does not pan the camera")
+	events.clear()
+	g.touch_pressed(0, Vector2(10, 10))
+	g.touch_pressed(1, Vector2(200, 10))
+	_check(events.size() == 2 and events[1][0] == GestureTracker.Pointer.CANCEL, "second finger cancels the tool stroke")
+
+
+func _roads() -> Dictionary:
+	return DataLoader.load_json("res://data/roads.json")
+
+
+func _graph() -> RoadGraph:
+	return RoadGraph.new(_roads()["graph"])
+
+
+func _test_road_types() -> void:
+	var types: Dictionary = _roads()["types"]
+	_check(is_equal_approx(RoadTypes.total_width(types["street"]), 8.0), "street is 8 m wide")
+	_check(is_equal_approx(RoadTypes.total_width(types["avenue"]), 16.0), "avenue is 16 m wide")
+	_check(is_equal_approx(RoadTypes.total_width(types["boulevard"]), 24.0), "boulevard is 24 m wide")
+	var lanes := RoadTypes.lanes(types["avenue"])
+	var fwd := lanes.filter(func(l: Dictionary) -> bool: return l["forward"])
+	_check(lanes.size() == 4 and fwd.size() == 2, "avenue has 2 lanes each way")
+	_check(fwd.all(func(l: Dictionary) -> bool: return l["offset"] < 0.0), "forward lanes drive on the right")
+	var one := RoadTypes.lanes(types["street_oneway"])
+	_check(one.size() == 2 and one.all(func(l: Dictionary) -> bool: return l["forward"]), "one-way lanes all forward")
+
+
+func _test_road_straight() -> void:
+	var g := _graph()
+	var plan := g.plan_road(Vector2(0, 0), Vector2(100, 0), null)
+	_check(plan["ok"], "straight road plans")
+	var made := g.commit_road(plan, "street")
+	_check(made.size() == 1 and g.nodes.size() == 2 and g.segments.size() == 1, "straight road: 2 nodes, 1 segment")
+	_check(is_equal_approx(snappedf((g.segments[made[0]] as RoadGraph.RoadSegment).length, 0.01), 100.0), "segment length is 100 m")
+
+
+func _test_road_crossing() -> void:
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(-50, 0), Vector2(50, 0), null), "street")
+	var plan := g.plan_road(Vector2(0, -50), Vector2(0, 50), null)
+	_check(plan["ok"] and (plan["hits"] as Array).size() == 1, "crossing road finds one intersection")
+	g.commit_road(plan, "avenue")
+	var centre := g.find_node_near(Vector2.ZERO, 0.5)
+	_check(centre >= 0 and (g.nodes[centre] as RoadGraph.RoadNode).segments.size() == 4, "crossing becomes a 4-way junction")
+	_check(g.segments.size() == 4 and g.nodes.size() == 5, "crossing: 5 nodes, 4 segments")
+
+
+func _test_road_t_junction_and_snap() -> void:
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(-50, 0), Vector2(50, 0), null), "street")
+	# End exactly on the existing road -> T junction, existing road split in two.
+	g.commit_road(g.plan_road(Vector2(10, 40), Vector2(10, 0.5), null), "street")
+	var t := g.find_node_near(Vector2(10, 0), 1.0)
+	_check(t >= 0 and (g.nodes[t] as RoadGraph.RoadNode).segments.size() == 3, "ending on a road makes a T junction")
+	# Start on an existing end node -> reuses it.
+	var before := g.nodes.size()
+	g.commit_road(g.plan_road(Vector2(50.8, 0.4), Vector2(50, 60), null), "street")
+	_check(g.nodes.size() == before + 1, "starting at an existing end node reuses it")
+
+
+func _test_road_rejections() -> void:
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(0, 0), Vector2(100, 0), null), "street")
+	_check(g.plan_road(Vector2(0, 0), Vector2(3, 0), null)["error"] == "ROAD_ERR_SHORT", "too short is rejected")
+	_check(g.plan_road(Vector2(0, 0), Vector2(100, 0), null)["error"] == "ROAD_ERR_EXISTS", "duplicate road is rejected")
+	_check(g.plan_road(Vector2(0, 0), Vector2(100, 8), null)["error"] == "ROAD_ERR_ANGLE", "road on top of another is rejected")
+	_check(g.plan_road(Vector2(-10, -40), Vector2(-10, 40), null)["ok"], "unrelated road is fine")
+
+
+func _test_road_curve_and_remove() -> void:
+	var g := _graph()
+	var plan := g.plan_road(Vector2(0, 0), Vector2(100, 0), Vector2(50, 50))
+	_check(plan["ok"] and float(plan["length"]) > 105.0, "curved road is longer than its chord")
+	var made := g.commit_road(plan, "street")
+	var mid := g.point_on(made[0], 0.5)
+	_check(mid.distance_to(Vector2(50, 25)) < 0.01, "quadratic curve passes through the expected midpoint")
+	g.commit_road(g.plan_road(Vector2(50, -20), Vector2(50, 60), null), "street")
+	_check(g.segments.size() == 4, "straight road splits the curve where it crosses")
+	for sid in g.segments.keys():
+		g.remove_segment(sid)
+	_check(g.segments.is_empty() and g.nodes.is_empty(), "removing every segment leaves no orphan nodes")
+
+
+func _test_road_mesh() -> void:
+	var cfg := _roads()
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(-60, 0), Vector2(60, 0), null), "avenue")
+	g.commit_road(g.plan_road(Vector2(0, -60), Vector2(0, 60), null), "street")
+	var centre := g.find_node_near(Vector2.ZERO, 0.5)
+	_check(RoadMeshBuilder.is_junction(g, centre, cfg["mesh"]), "4-way node is a junction")
+	var radius := RoadMeshBuilder.junction_radius(g, centre, cfg["types"], cfg["mesh"])
+	_check(radius > 8.0 and radius < 30.0, "junction radius is sensible (%.1f m)" % radius)
+	var junction := RoadMeshBuilder.build_junction(g, centre, cfg["types"], cfg["mesh"])
+	_check(junction.data.has("asphalt") and junction.data.has("sidewalk") and junction.data.has("curb"), "junction has asphalt, sidewalk and curbs")
+	var seg := g.find_segment_near(Vector2(30, 0), 1.0)["segment"] as int
+	var parts := RoadMeshBuilder.build_segment(g, seg, cfg["types"], cfg["mesh"])
+	_check(not parts.data.has("median"), "avenue has no median")
+	# Every top face must be front-facing from above (Godot: clockwise from the viewer).
+	var all_up := true
+	for key in ["asphalt", "sidewalk"]:
+		var v: PackedVector3Array = parts.data[key]["v"]
+		var idx: PackedInt32Array = parts.data[key]["i"]
+		for i in range(0, idx.size(), 3):
+			var gnorm := (v[idx[i + 1]] - v[idx[i]]).cross(v[idx[i + 2]] - v[idx[i]])
+			if gnorm.dot(Vector3.UP) >= 0.0:
+				all_up = false
+	_check(all_up, "road top faces wind front-facing upwards")
+	var v_count := (parts.data["asphalt"]["v"] as PackedVector3Array).size()
+	_check((parts.data["asphalt"]["custom"] as PackedFloat32Array).size() == v_count * 4, "asphalt carries lane data per vertex")
+	var boulevard := _graph()
+	boulevard.commit_road(boulevard.plan_road(Vector2(0, 0), Vector2(80, 0), null), "boulevard")
+	var bparts := RoadMeshBuilder.build_segment(boulevard, boulevard.segments.keys()[0], cfg["types"], cfg["mesh"])
+	_check(bparts.data.has("median"), "boulevard has a median")

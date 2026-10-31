@@ -1,10 +1,12 @@
-[gd_scene load_steps=6 format=3 uid="uid://b8c1tymain001"]
+[gd_scene load_steps=8 format=3 uid="uid://b8c1tymain001"]
 
 [ext_resource type="Script" path="res://scripts/world/day_night_cycle.gd" id="1_daynight"]
 [ext_resource type="Script" path="res://scripts/systems/terrain_system.gd" id="2_terrain"]
 [ext_resource type="Script" path="res://scripts/world/reference_scene.gd" id="3_reference"]
 [ext_resource type="Script" path="res://scripts/systems/camera_controller.gd" id="4_camera"]
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="5_hud"]
+[ext_resource type="Script" path="res://scripts/systems/road_network.gd" id="6_roads"]
+[ext_resource type="Script" path="res://scripts/world/road_tool.gd" id="7_roadtool"]
 
 [node name="Main" type="Node3D"]
 
@@ -17,6 +19,13 @@ sun_path = NodePath("../Sun")
 
 [node name="Terrain" type="Node3D" parent="."]
 script = ExtResource("2_terrain")
+
+[node name="RoadNetwork" type="Node3D" parent="."]
+script = ExtResource("6_roads")
+
+[node name="RoadTool" type="Node3D" parent="."]
+script = ExtResource("7_roadtool")
+road_network_path = NodePath("../RoadNetwork")
 
 [node name="ReferenceScene" type="Node3D" parent="."]
 script = ExtResource("3_reference")

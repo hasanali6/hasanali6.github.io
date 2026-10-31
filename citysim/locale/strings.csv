@@ -38,3 +38,23 @@ MONTH_9,Eylül,September
 MONTH_10,Ekim,October
 MONTH_11,Kasım,November
 MONTH_12,Aralık,December
+ROAD_STREET,Sokak,Street
+ROAD_STREET_ONEWAY,Tek yön sokak,One-way street
+ROAD_AVENUE,Cadde,Avenue
+ROAD_AVENUE_ONEWAY,Tek yön cadde,One-way avenue
+ROAD_BOULEVARD,Bulvar,Boulevard
+ROAD_TYPE_INFO,%d m · %d/m,%d m · %d/m
+MODE_STRAIGHT,Düz,Straight
+MODE_CURVE,Eğri,Curve
+MODE_BULLDOZE,Yık,Demolish
+ROAD_COST,%s · %d m,%s · %d m
+ROAD_REFUND,+%s iade,+%s refund
+ROAD_HINT_CURVE,şimdi bitişi çiz,now draw the end
+ROAD_ERR_SHORT,Yol çok kısa,Road too short
+ROAD_ERR_LONG,Yol çok uzun,Road too long
+ROAD_ERR_EXISTS,Bu yol zaten var,Road already exists
+ROAD_ERR_OVERLAP,Yollar üst üste biniyor,Roads overlap
+ROAD_ERR_ANGLE,Açı çok dar,Angle too sharp
+ROAD_ERR_TOO_CLOSE,Kavşaklar çok yakın,Junctions too close
+ROAD_ERR_MONEY,Para yetmiyor,Not enough money
+ROAD_ERR_OUTSIDE,Harita sınırı dışında,Outside the map

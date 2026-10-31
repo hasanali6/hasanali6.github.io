@@ -23,6 +23,9 @@ func _ready() -> void:
 	tracker.tilt.connect(EventBus.tilt_requested.emit)
 	tracker.tap.connect(EventBus.tapped.emit)
 	tracker.long_press.connect(EventBus.long_pressed.emit)
+	tracker.pointer.connect(EventBus.tool_pointer.emit)
+	EventBus.build_tool_selected.connect(func(tool: String, _options: Dictionary) -> void:
+		tracker.capture_single = tool != "")
 
 
 func _process(delta: float) -> void:

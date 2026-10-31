@@ -47,6 +47,16 @@ var _info_label: Label
 var _time_slider: HSlider
 var _time_dragging: bool = false
 var _quality_buttons: Dictionary = {}
+var _grid_check: CheckButton
+var _road_panel: PanelContainer
+var _road_type_buttons: Dictionary = {}
+var _road_mode_buttons: Dictionary = {}
+var _road_type: String = ""
+var _road_mode: String = "straight"
+var _cost_pill: PanelContainer
+var _cost_label: Label
+var _cost_ok_badge: Control
+var _cost_bad_badge: Control
 var _last_back_press: float = -INF
 var _cell_size: float
 var _playable_half: float
@@ -73,6 +83,10 @@ func _ready() -> void:
 	_place(_build_left_column(), Vector2(0, 0.5), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BOTH)
 	_place(_build_build_button(), Vector2(1, 1), Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_BEGIN)
 	_tray = _build_tray()
+	_road_panel = _build_road_panel()
+	_place(_road_panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
+	_cost_pill = _build_cost_pill()
+	_layer.add_child(_cost_pill)
 	_place(_tray, Vector2(1, 1), Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_BEGIN, Vector2(-BUILD_SIZE - 16, 0))
 	_perf_label = _build_perf_label()
 	_place(_perf_label, Vector2(0, 1), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BEGIN)
@@ -88,6 +102,8 @@ func _ready() -> void:
 	EventBus.notification_posted.connect(func(_c: String, text: String) -> void: show_toast(text))
 	EventBus.graphics_preset_changed.connect(_on_preset_changed)
 	EventBus.tapped.connect(func(_p: Vector2) -> void: _set_tray_open(false))
+	EventBus.money_changed.connect(func(balance: int) -> void: _money_label.text = UiStyle.format_int(balance))
+	EventBus.road_preview_changed.connect(_on_road_preview)
 	_on_speed_changed(TimeSystem.get_speed_index())
 	_on_preset_changed(GraphicsSettings.current_preset)
 
@@ -233,7 +249,7 @@ func _build_top_right() -> Control:
 	row.add_theme_constant_override("separation", 10)
 	var money := _pill("coins", UiStyle.GOLD, 120)
 	_money_label = money[1]
-	_money_label.text = UiStyle.format_int(GameData.integer("game/start_money"))
+	_money_label.text = UiStyle.format_int(EconomySystem.balance)
 	money[0].size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(money[0])
 	var settings := UiStyle.round_button("settings", UiStyle.SLATE, MIN_TOUCH)
@@ -286,7 +302,10 @@ func _build_tray() -> PanelContainer:
 		col.add_theme_constant_override("separation", 2)
 		var b := UiStyle.round_button(entry[1], entry[2], TRAY_BUTTON)
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		b.pressed.connect(func() -> void: show_toast(tr("TOOL_LOCKED") % tr(key)))
+		if key == "TOOL_ROADS":
+			b.pressed.connect(_open_road_panel)
+		else:
+			b.pressed.connect(func() -> void: show_toast(tr("TOOL_LOCKED") % tr(key)))
 		col.add_child(b)
 		var caption := _label(key, FONT_SIZE - 6)
 		caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -383,6 +402,7 @@ func _build_settings_panel() -> PanelContainer:
 	grid.custom_minimum_size.y = MIN_TOUCH * 0.8
 	grid.focus_mode = Control.FOCUS_NONE
 	grid.toggled.connect(EventBus.grid_overlay_toggled.emit)
+	_grid_check = grid
 	content.add_child(grid)
 
 	var perf := CheckButton.new()
@@ -413,6 +433,124 @@ func _build_info_panel() -> PanelContainer:
 	_info_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	(parts[1] as VBoxContainer).add_child(_info_label)
 	return parts[0]
+
+
+func _build_road_panel() -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.visible = false
+	var box := UiStyle.pill_box()
+	box.set_corner_radius_all(28)
+	box.set_content_margin_all(14)
+	panel.add_theme_stylebox_override("panel", box)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 12)
+	panel.add_child(col)
+
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 12)
+	var mode_group := ButtonGroup.new()
+	for entry: Array in [["straight", "slash", "MODE_STRAIGHT"], ["curve", "spline", "MODE_CURVE"], ["bulldoze", "trash-2", "MODE_BULLDOZE"]]:
+		var mode: String = entry[0]
+		var b := UiStyle.round_button(entry[1], UiStyle.SLATE, MIN_TOUCH, true,
+			UiStyle.RED if mode == "bulldoze" else UiStyle.GREEN)
+		b.button_group = mode_group
+		b.pressed.connect(func() -> void: _select_road(_road_type, mode))
+		_road_mode_buttons[mode] = b
+		top.add_child(b)
+		var caption := _label(entry[2], FONT_SIZE - 4)
+		top.add_child(caption)
+	var fill := Control.new()
+	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(fill)
+	var close := UiStyle.round_button("x", UiStyle.RED, MIN_TOUCH * 0.85)
+	close.pressed.connect(_close_road_panel)
+	top.add_child(close)
+	col.add_child(top)
+
+	var types_row := HBoxContainer.new()
+	types_row.add_theme_constant_override("separation", 10)
+	var type_group := ButtonGroup.new()
+	for type: String in GameData.value("roads/order"):
+		var cfg := GameData.section("roads/types/" + type)
+		var b := UiStyle.chip_button("", UiStyle.SLATE, UiStyle.BLUE, Vector2(150, MIN_TOUCH))
+		b.text = "%s\n%s" % [tr(cfg["name_key"]), tr("ROAD_TYPE_INFO") % [roundi(RoadTypes.total_width(cfg)), int(cfg["cost_per_m"])]]
+		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		b.add_theme_font_size_override("font_size", FONT_SIZE - 6)
+		b.button_group = type_group
+		b.pressed.connect(func() -> void: _select_road(type, _road_mode))
+		_road_type_buttons[type] = b
+		types_row.add_child(b)
+	col.add_child(types_row)
+	return panel
+
+
+func _build_cost_pill() -> PanelContainer:
+	var pill := PanelContainer.new()
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.visible = false
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	pill.add_child(row)
+	_cost_ok_badge = UiStyle.badge("coins", UiStyle.GOLD, BADGE * 0.8)
+	_cost_bad_badge = UiStyle.badge("ban", UiStyle.RED, BADGE * 0.8)
+	row.add_child(_cost_ok_badge)
+	row.add_child(_cost_bad_badge)
+	_cost_label = _label("", FONT_SIZE - 2)
+	_cost_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	row.add_child(_cost_label)
+	return pill
+
+
+func _open_road_panel() -> void:
+	_set_tray_open(false)
+	_settings_panel.visible = false
+	_info_panel.visible = false
+	_road_panel.visible = true
+	_build_button.get_parent().visible = false
+	EventBus.grid_overlay_toggled.emit(true)
+	if _road_type == "":
+		_road_type = str((GameData.value("roads/order") as Array)[0])
+	_select_road(_road_type, _road_mode)
+
+
+func _close_road_panel() -> void:
+	_road_panel.visible = false
+	_cost_pill.visible = false
+	_build_button.get_parent().visible = true
+	EventBus.grid_overlay_toggled.emit(_grid_check.button_pressed)
+	EventBus.build_tool_selected.emit("", {})
+
+
+func _select_road(type: String, mode: String) -> void:
+	_road_type = type
+	_road_mode = mode
+	for key: String in _road_type_buttons:
+		(_road_type_buttons[key] as Button).set_pressed_no_signal(key == type)
+	for key: String in _road_mode_buttons:
+		(_road_mode_buttons[key] as Button).set_pressed_no_signal(key == mode)
+	EventBus.build_tool_selected.emit("road", {"type": type, "mode": mode})
+
+
+func _on_road_preview(info: Dictionary) -> void:
+	if not info.get("active", false):
+		_cost_pill.visible = false
+		return
+	var valid: bool = info.get("valid", false)
+	_cost_ok_badge.visible = valid
+	_cost_bad_badge.visible = not valid
+	var length := roundi(float(info.get("length", 0.0)))
+	if info.has("refund"):
+		_cost_label.text = tr("ROAD_REFUND") % UiStyle.format_int(info["refund"])
+	elif not valid:
+		_cost_label.text = tr(info.get("error", ""))
+	elif info.has("hint"):
+		_cost_label.text = "%s · %s" % [UiStyle.format_int(info["cost"]), tr(info["hint"])]
+	else:
+		_cost_label.text = tr("ROAD_COST") % [UiStyle.format_int(info["cost"]), length]
+	_cost_pill.visible = true
+	_cost_pill.reset_size()
+	var local: Vector2 = info.get("screen_pos", Vector2.ZERO) - _layer.global_position
+	_cost_pill.position = local + Vector2(-_cost_pill.size.x * 0.5, -130.0)
 
 
 # --- Reactions --------------------------------------------------------------
@@ -476,6 +614,9 @@ func _on_ground_long_pressed(world_pos: Vector3) -> void:
 
 
 func _on_back_requested() -> void:
+	if _road_panel.visible:
+		_close_road_panel()
+		return
 	if _settings_panel.visible or _info_panel.visible or _tray.visible:
 		_settings_panel.visible = false
 		_info_panel.visible = false

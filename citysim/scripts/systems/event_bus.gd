@@ -17,6 +17,18 @@ signal tilt_requested(screen_delta_y: float)
 signal tapped(screen_pos: Vector2)
 signal long_pressed(screen_pos: Vector2)
 
+# --- Build tools ---
+## Single-finger stroke while a tool captures input (GestureTracker.Pointer phase).
+signal tool_pointer(phase: int, screen_pos: Vector2)
+## Tool or tool option chosen in the UI. tool == "" means no tool.
+signal build_tool_selected(tool: String, options: Dictionary)
+## Live info about the stroke in progress: {active, valid, cost, length, error, screen_pos}.
+signal road_preview_changed(info: Dictionary)
+signal roads_changed()
+
+# --- Economy ---
+signal money_changed(balance: int)
+
 # --- World queries resolved by the camera ---
 signal ground_long_pressed(world_pos: Vector3)
 
