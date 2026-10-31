@@ -1,4 +1,4 @@
-# Şehir Simülasyonu — Faz 1–4 (Temel, Yollar, İmar ve Binalar, Ekonomi)
+# Şehir Simülasyonu — Faz 1–5 (Temel, Yollar, İmar ve Binalar, Ekonomi, Hizmetler)
 
 Godot 4.7.2 (Mobile renderer, Vulkan) ile Android için şehir kurma simülasyonu.
 Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
@@ -19,6 +19,42 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 | Referans sahne (kapalı) | `scripts/world/reference_scene.gd` + `assets/materials/*.gdshader` | Işık testi için bina blokları ve ağaçlar. Varsayılan **kapalı** — harita boş başlar. `data/reference_scene.json` → `"enabled": true` ile açılır. |
 | Testler | `tests/run_tests.gd` | Görselsiz (headless) birim testleri: saat, hız, ay geçişi, jestler, ızgara. |
 
+## Faz 5: Hizmetler ve altyapı (+ grafik geçişi)
+
+| Parça | Dosya | Ne yapar |
+|---|---|---|
+| Elektrik | `data/services.json`, `scripts/systems/service_system.gd` | Kömür (60 MW), doğalgaz (40 MW), rüzgâr türbini (3 MW), güneş santrali (8 MW). Kablolar yolları izler: santral hangi yol ağına bağlıysa o ağı besler. Binalar en eskiden başlayarak sırayla beslenir; güç yetmezse kalanlar elektriksiz kalır. |
+| Su ve atık su | aynı | Su pompası ve atık su çıkışı / arıtma tesisi (üçü de nehir ya da göl kıyısına kurulur). Borular yolların altında, otomatik. Pompa arıtılmamış bir çıkışa 380 m'den yakınsa musluktan kirli su akar. |
+| Hizmetler | aynı + `scripts/data/service_rules.gd` | Sağlık ocağı, hastane, ilkokul, lise, üniversite, karakol, itfaiye, çöp depolama, çöp yakma, mezarlık, krematoryum. Her birinin yol ağı üzerinden ölçülen bir kapsama yarıçapı (Dijkstra), kapasitesi ve bakımı var. Kapasite aşılırsa verim ve kapsama düşer; çöp alanı ve mezarlık zamanla dolar. |
+| Etkiler | `citizen_system.gd`, `company_system.gd`, `building_system.gd` | Kapsama mutluluk verir; eksik hizmet şehir büyüdükçe (1.500 nüfusa kadar kademeli) mutluluğu düşürür. Sağlık ölümleri azaltır; lise ve üniversite, büyüyen çocukların eğitimini yükseltir. Elektriği/suyu olmayan şirket %30 kapasiteyle çalışır, binada uyarı ikonu çıkar, 6 ay sürerse bina terk edilir; göçmenler böyle evleri seçmez. Nüfus 800'ü geçince itfaiye olmayan yerde yangın çıkabilir. Santral, çöp yakma ve sanayi kirliliği mutluluğu düşürür. |
+| Bütçe ve ücretler | `scripts/systems/economy_system.gd`, `scripts/ui/economy_panel.gd` | Ekonomi → **Hizmetler**: her kategori için %50–150 bütçe (gider ve verim birlikte değişir), elektrik ve su ücreti (%50–150: yüksek ücret daha çok gelir, daha az mutluluk ve tüketim). Bütçe sekmesi iki sütun: ücret gelirleri ve kategori kategori hizmet giderleri. |
+| Katmanlar | `scripts/world/info_overlay.gd`, `assets/materials/info_overlay.gdshader` | Soldaki turkuaz düğme: elektrik, su, sağlık, eğitim, polis, itfaiye, çöp, defin, kirlilik ve mutluluk ısı haritaları. Arazi griye döner, hücreler ve binalar kırmızı → sarı → yeşil boyanır, hizmet binaları mavi. Hizmet yerleştirirken ilgili katman kendiliğinden açılır. |
+| Uyarı ikonları | `assets/materials/icon_billboard.gdshader` | Elektriksiz binada turuncu şimşek, susuz binada mavi damla; kameraya döner, uzaklaştıkça büyür. |
+| Modeller | `scripts/world/service_models.gd` + `rotor/solar_panel/smoke.gdshader` | Soğutma kulesi ve buhar, dönen rüzgâr pervaneleri, güneş paneli sıraları, hastane (kırmızı haç, helipad), okul (futbol sahası, bayrak), kubbeli ve sütunlu üniversite, karakol (araçlar), itfaiye (garaj kapıları, kule, itfaiye aracı), çöp tepeleri, mezarlık (mezar taşları, şapel, ağaçlar), nehre inen borular; fabrika bacaları da tüter. |
+
+**Grafik geçişi (aynı fazda):** nehir ve göller (dalga, kıyı köpüğü, kumsal), çevrede dağ halkası, ormanlar (~31 bin ağaç, rüzgârda sallanır), cadde ve bulvar ağaçları, bahçe / meydan / otopark / avlu zeminli arsalar, yumuşak temas gölgeleri, kademeli gökdelenler, çatı ekipmanları ve tenteler.
+
+**Kare süresi:** Kapsama her karede en fazla 1,5 ms çalışır (bir hizmet bir kerede); elektrik/su geçişi binaları 200'lük parçalar halinde ve saniyede en fazla bir kez dolaşır. 94 binalı test şehrinde tam geçiş 0,7 ms.
+
+**Faz 5 kabul kriterleri:**
+
+| # | Kriter | Nasıl test edilir |
+|---|---|---|
+| 1 | Elektrik/su yokken uyarı çıkar | Yol + konut imarı yap, binalar dolsun → çatılarda turuncu şimşek ikonu, "N binada elektrik yok" bildirimi. |
+| 2 | Elektrik yol ağıyla dağılır | İnşa Et → Altyapı → Rüzgâr türbini, aynı yola bağla → ikonlar kaybolur. Bağlantısız ayrı bir yoldaki evler elektriksiz kalır. |
+| 3 | Su tesisleri kıyıya kurulur | Pompayı nehirden uzağa koymaya çalış → kırmızı önizleme, "Nehir ya da göl kıyısına kur". |
+| 4 | Kirli su | Atık su çıkışını pompanın yanına kur → evin bilgi kartında "Musluktan kirli su akıyor!". Arıtma tesisi bunu yapmaz. |
+| 5 | Kapsama ısı haritası | Sağlık ocağı kur → Katmanlar → Sağlık: çevresi yeşil, yol boyunca uzaklaştıkça sarı ve kırmızı. |
+| 6 | Bütçe kaydırıcıları | Ekonomi → Hizmetler → Sağlık %50: gider düşer, yeşil alan daralır; %150: genişler. |
+| 7 | Ücretler | Elektrik ücretini %150 yap → ay sonunda "Elektrik ücretleri" geliri artar, mutluluk biraz düşer. |
+| 8 | Bütçe satırları | Ay sonunda Bütçe sekmesinde her hizmetin gideri ve ücret gelirleri görünür. |
+| 9 | Uzun süre elektriksiz/susuz kalan bina terk edilir | 6 oyun ayı elektrik/su kurma → "N bina terk edildi" bildirimi, binalar kararır. Bilgi kartı kalan süreyi gösterir. |
+| 10 | Hizmet bilgisi | Hizmet binasına uzun bas → bakım, hizmet verilen / kapasite, kapsama km'si, (varsa) doluluk ve üretim. |
+| 11 | Kayıt | Uygulamayı kapat-aç → hizmet binaları, bütçeler, ücretler ve çöp/mezarlık doluluğu yerinde. |
+| 12 | Testler | `godot --headless --path citysim -s res://tests/run_tests.gd` → `116 checks, 0 failed`. Tüm hizmetlerle 6 aylık entegrasyon testinde nüfus 0 → ~750, mutluluk ~%75. |
+
+**Önemli — eski şehir:** Faz 4'te kurduğun şehirde santral ve pompa yok. Güncellemeden sonra binalarda uyarı ikonları çıkar; 6 oyun ayı (1x hızda yaklaşık 36 dakika) içinde elektrik (ör. 1–2 rüzgâr türbini) ve su (pompa + atık su çıkışı) kurmazsan dolu binalar terk edilmeye başlar.
+
 ## Faz 4: Ekonomi çekirdeği (+ elle yerleştirme ve kayıt)
 
 | Parça | Dosya | Ne yapar |
@@ -38,7 +74,7 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 
 **Faz 4 kabul kriterleri:** konut imar edilince göçmen gelir, nüfus ve mutluluk görünür · iş yeri olmadan işsizlik artar, konut talebi düşer, sanayi/ticari talebi yükselir · vergi artınca gelir artar, talep ve mutluluk düşer · ay sonunda bütçe kesilir, para altında aylık net görünür · kredi alınır, taksit her ay düşer · zarar eden şirket işçi çıkarır, sonunda iflas edip bina terk edilir · uygulama kapanıp açılınca şehir yerinde durur. Otomatik testler: `93 checks, 0 failed`; 10 aylık entegrasyon testinde nüfus 0 → ~800, aylık net ~+11.000.
 
-**Bilinçli basitleştirmeler:** eğitim seviyesi göçle geliyor, okullar Faz 5'te yükseltecek · arsa değeri yok (kira bina seviyesine bağlı) · işe uzaklık kuş uçuşu (trafik süresi Faz 6) · sanayinin tek ürünü "mal", hammadde zinciri ve ürün tipine göre vergi daha sonra · hizmet bütçeleri ve elektrik/su ücretleri Faz 5. Tüm denge sayıları `data/economy.json`'da.
+**Bilinçli basitleştirmeler:** göçmenlerin eğitimi rastgele gelir (Faz 5'ten beri şehirde büyüyen çocuklar okullara göre eğitilir) · arsa değeri yok (kira bina seviyesine bağlı) · işe uzaklık kuş uçuşu (trafik süresi Faz 6) · sanayinin tek ürünü "mal", hammadde zinciri ve ürün tipine göre vergi daha sonra · hizmet bütçeleri ve elektrik/su ücretleri Faz 5'te geldi. Tüm denge sayıları `data/economy.json` ve `data/services.json`'da.
 
 ## Faz 3: İmar ve binalar
 
@@ -90,7 +126,7 @@ iki parmakla yukarı/aşağı kaydır = eğim · uzun bas = konum bilgisi · ger
 | # | Kriter | Nasıl test edilir |
 |---|---|---|
 | 1 | Proje hatasız açılır ve çalışır | Godot 4.7.2'de `citysim/project.godot` aç, F5. Çıktı panelinde hata olmamalı. |
-| 2 | Birim testleri geçer | `godot --headless --path citysim -s res://tests/run_tests.gd` → `31 checks, 0 failed` |
+| 2 | Birim testleri geçer | `godot --headless --path citysim -s res://tests/run_tests.gd` → `116 checks, 0 failed` |
 | 3 | Kamera tüm jestlere tepki verir, harita dışına çıkmaz | Kaydır, zoom yap, döndür, eğ. Odak noktası açık renkli sınır çizgisinin (4 km) dışına çıkmamalı. |
 | 4 | Zoom ile eğim yumuşakça değişir | En yakına zoom yap: kamera sokak seviyesine iner; en uzağa: harita görünümü. |
 | 5 | Gün-gece döngüsü çalışır | Ayarlar → "Günün saati" kaydırıcısı. Sabah/akşam ışığı sıcak, öğlen nötr, gece pencereler rastgele yanar. |
@@ -144,6 +180,7 @@ Aynı sayfada `SehirSim-GL.apk` da var: aynı oyunun OpenGL (Compatibility) sür
 - Mobile renderer'da FSR yok (yalnızca Forward+), bu yüzden düşük ayarlarda bilinear ölçekleme kullanılıyor.
 
 ## Bilinen eksikler / sonraki fazlara kalanlar
+- **Hizmetler (Faz 5):** ambulans, çöp kamyonu, itfaiye aracı gibi hizmet araçları yolda gezmiyor (araçlar ve trafik Faz 6); kapsama şimdilik yol mesafesiyle hesaplanıyor. Elektrik direkleri ve su boruları görünmüyor, yolları izledikleri varsayılıyor. Çöp alanı ve mezarlık boşaltılamıyor; dolunca yenisi gerekir. Yangın binayı anında harabeye çevirir (söndürme yok). Su kirliliği mesafeye bakar, nehrin akış yönü yok. Rüzgâr türbinleri yola bakar, rüzgâr yönü yok; güneş santrali gece de üretir (hava durumu ve gün-gece üretimi Faz 8).
 - **Yollar:** yol yükseltme (sokak → cadde) yok, şimdilik yık + yeniden çiz. Serbest el çizimi, köprü/tünel, çıkmaz sokak dönüş cebi ve trafik ışığı yok (ışıklar Faz 6). Kavşak köşeleri çok dar açılarda sadeleşir.
 - **Binalar:** Kenney kitinde sadece 5 bina modeli var; çeşitlilik kod ile üretilen binalarla sağlanıyor. Kenney'nin büyük ücretsiz şehir paketleri (kenney.nl) repoya eklenirse kolayca bağlanır. Binalar imarla kendiliğinden gelir; istersen katalogdan elle de yerleştirilir.
 - **Doku siteleri:** ambientCG ve Poly Haven bu geliştirme ortamından erişilemedi. Yol ve kaldırım dokuları shader ile üretildi, ek dosya yok. Kenney'nin ücretsiz (CC0) şehir modelleri Faz 3'te binalar için kullanılacak.
@@ -151,7 +188,7 @@ Aynı sayfada `SehirSim-GL.apk` da var: aynı oyunun OpenGL (Compatibility) sür
 - Dinamik çözünürlük GPU darboğazını çözer; FPS düşüklüğü CPU kaynaklıysa (ileride kalabalık simülasyon) çözünürlük düşürmek işe yaramaz — o iş Faz 6'daki simülasyon LOD'unun.
 - Ağaçlar düşük poligonlu yer tutucu; gerçek ağaçlar için LOD + uzakta billboard (impostor) gerekecek — 1000'lerce ağaçta bu şart.
 - Sokak lambaları, araçlar, yağmur/kar, mevsim renkleri yok (Faz 6, 8, 9).
-- Su kütleleri ve arazi yüksekliği yok. Fazlar listesinde de yok — **Faz 2 veya 3'e eklemeyi öneririm**, çünkü yol ve imar sistemi suyu/eğimi bilmeli.
-- Kayıt sistemi yok (Faz 8); sadece grafik ayarı `user://settings.cfg`'ye kaydediliyor.
+- Nehir ve göller var (yol ve imar suya girmez), ama arazi yüksekliği yok; şehir alanı düz.
+- Tek kayıt yuvası var (otomatik kayıt); birden çok şehir ve bulut kaydı yok.
 - Listedeki diğer sistemler (RoadNetwork, ZoneSystem, …) ilgili fazlarda eklenecek; boş taslak dosya bırakılmadı.
 - Gölge kalitesi kamera mesafesine göre otomatik ayarlanıyor; çok uzak harita görünümünde gölgeler yumuşar (bilinçli mobil tercih).

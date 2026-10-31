@@ -119,22 +119,24 @@ func _update_vacancy(bid: int) -> void:
 		_vacant.erase(bid)
 
 
-## Households, people and children per home onto the building records.
-func _write_occupancy() -> void:
+## Households per home onto the building records; with people = true also
+## residents and children (monthly, for the service load figures).
+func _write_occupancy(people_too: bool = false) -> void:
 	var records: Dictionary = _buildings.buildings
 	for bid: int in _homes:
 		if not records.has(bid):
 			continue
 		var residents: PackedInt32Array = _homes[bid]["residents"]
-		var people := 0
-		var children := 0
-		for i in residents:
-			people += data.members(i)
-			children += data.children[i]
 		var b: Dictionary = records[bid]
 		b["occupants"] = residents.size()
-		b["residents"] = people
-		b["children"] = children
+		if people_too:
+			var people := 0
+			var children := 0
+			for i in residents:
+				people += data.members(i)
+				children += data.children[i]
+			b["residents"] = people
+			b["children"] = children
 
 
 func _refresh_shops() -> void:
@@ -461,7 +463,7 @@ func _on_month(_m: int) -> void:
 		"goods_unmet_ratio": 0.0 if _acc["goods"] <= 0.0 else _acc["unmet"] / _acc["goods"],
 		"deaths": _acc["deaths"],
 	}
-	_write_occupancy()
+	_write_occupancy(true)
 	_write_building_happiness()
 	_reset_month()
 	EventBus.citizens_reported.emit(last_report)
@@ -539,4 +541,4 @@ func load_state(state: Dictionary) -> void:
 			if code != HouseholdData.NO_JOB and _companies.restore_worker(code):
 				_set_job(i, k, code)
 	_companies.refresh_vacancies()
-	_write_occupancy()
+	_write_occupancy(true)
