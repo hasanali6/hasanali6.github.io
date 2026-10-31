@@ -3,6 +3,7 @@ extends Node3D
 ## catalogue item is selected, dragging a finger previews the lot on the
 ## nearest road-facing cell (green = fits and affordable, red = not) and
 ## releasing builds it. Placed buildings join the economy like grown ones.
+## Pumps, sewage outlets and treatment plants must stand next to water.
 
 @export var building_system_path: NodePath
 @export var zone_system_path: NodePath
@@ -13,6 +14,8 @@ var _active: bool = false
 var _item: Dictionary = {}
 var _cell: int = -1
 var _snap_radius: float
+var _water_reach: float
+var _valid: bool = false
 var _preview: MeshInstance3D
 var _ok_mat: StandardMaterial3D
 var _bad_mat: StandardMaterial3D
@@ -22,6 +25,7 @@ func _ready() -> void:
 	_buildings = get_node(building_system_path)
 	_zones = get_node(zone_system_path)
 	_snap_radius = GameData.num("catalog/snap_radius_m")
+	_water_reach = GameData.num("services/effects/water_reach_m")
 	var prev := GameData.section("roads/preview")
 	_ok_mat = _material(DataLoader.to_color(prev["valid_color"]), float(prev["alpha"]))
 	_bad_mat = _material(DataLoader.to_color(prev["invalid_color"]), float(prev["alpha"]))
@@ -62,9 +66,17 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 			_preview.visible = false
 
 
+## Water-side buildings need their lot within reach of a river or lake.
+func _water_ok(centre: Vector2, w: float, d: float) -> bool:
+	if not _item.get("needs_water", false):
+		return true
+	return MapWater.shared().distance(centre) <= maxf(w, d) * 0.5 + _water_reach
+
+
 func _preview_at(screen_pos: Vector2) -> void:
 	var g: Variant = _ground(screen_pos)
 	_cell = -1
+	_valid = false
 	if g == null:
 		_preview.visible = false
 		return
@@ -85,12 +97,16 @@ func _preview_at(screen_pos: Vector2) -> void:
 	var dx := Vector3.UP.cross(fz)
 	_preview.transform = Transform3D(Basis(dx * w, Vector3.UP * 3.0, fz * d), Vector3(centre.x, 1.5, centre.y))
 	var cost := int(_item["cost"])
-	var valid: bool = not lot.is_empty() and EconomySystem.can_afford(cost)
+	var water_ok := _water_ok(centre, w, d)
+	var valid: bool = not lot.is_empty() and EconomySystem.can_afford(cost) and water_ok
+	_valid = valid
 	_preview.material_override = _ok_mat if valid else _bad_mat
 	_preview.visible = true
 	var error := ""
 	if lot.is_empty():
 		error = "BUILD_ERR_SPACE"
+	elif not water_ok:
+		error = "BUILD_ERR_WATER"
 	elif not EconomySystem.can_afford(cost):
 		error = "ROAD_ERR_MONEY"
 	EventBus.road_preview_changed.emit({"active": true, "valid": valid, "error": error, "cost": cost,
@@ -98,7 +114,7 @@ func _preview_at(screen_pos: Vector2) -> void:
 
 
 func _build() -> void:
-	if _cell < 0:
+	if _cell < 0 or not _valid:
 		EventBus.road_preview_changed.emit({"active": false})
 		return
 	var cost := int(_item["cost"])

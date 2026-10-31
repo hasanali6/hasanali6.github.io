@@ -24,6 +24,14 @@ const BUILD_TOOLS: Array = [
 	["TOOL_TRANSIT", "bus", UiStyle.BLUE],
 	["TOOL_DISTRICTS", "map", UiStyle.PURPLE],
 ]
+## Info overlay layers: [key, label key, colour].
+const OVERLAYS: Array = [
+	["power", "SVC_CAT_POWER", UiStyle.GOLD], ["water", "SVC_CAT_WATER", UiStyle.BLUE],
+	["health", "SVC_CAT_HEALTH", UiStyle.RED], ["education", "SVC_CAT_EDUCATION", UiStyle.PURPLE],
+	["police", "SVC_CAT_POLICE", UiStyle.BLUE], ["fire", "SVC_CAT_FIRE", UiStyle.ORANGE],
+	["garbage", "SVC_CAT_GARBAGE", UiStyle.GREEN], ["deathcare", "SVC_CAT_DEATHCARE", UiStyle.SLATE],
+	["pollution", "OVERLAY_POLLUTION", UiStyle.SLATE], ["happiness", "OVERLAY_HAPPINESS", UiStyle.GREEN],
+]
 ## Speed buttons: [icon, badge text].
 const SPEEDS: Array = [["pause", ""], ["play", ""], ["fast-forward", "2"], ["fast-forward", "3"]]
 
@@ -45,6 +53,7 @@ var _toast_timer: float = 0.0
 var _settings_panel: PanelContainer
 var _info_panel: PanelContainer
 var _info_label: Label
+var _info_title: Label
 var _time_slider: HSlider
 var _time_dragging: bool = false
 var _quality_buttons: Dictionary = {}
@@ -69,6 +78,10 @@ var _cost_label: Label
 var _cost_ok_badge: Control
 var _cost_bad_badge: Control
 var _last_back_press: float = -INF
+var _overlay_panel: PanelContainer
+var _overlay_buttons: Dictionary = {}
+var _overlay_legend: Label
+var _overlay_key: String = ""
 var _cell_size: float
 var _playable_half: float
 
@@ -99,6 +112,9 @@ func _ready() -> void:
 	_zone_panel = _build_zone_panel()
 	_place(_zone_panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
 	_catalog = CatalogPanel.new(FONT_SIZE, MIN_TOUCH, _close_catalog)
+	_overlay_panel = _build_overlay_panel()
+	# Beside the left buttons, so the city stays visible under the colours.
+	_place(_overlay_panel, Vector2(0, 0.5), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BOTH, Vector2(MIN_TOUCH + 26, 40))
 	_place(_catalog.panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
 	_rci = _build_rci()
 	_place(_rci.get_parent(), Vector2(0, 0), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_END, Vector2(0, 96))
@@ -127,6 +143,16 @@ func _ready() -> void:
 	EventBus.city_stats_changed.connect(_on_city_stats)
 	EventBus.demand_changed.connect(func(d: Dictionary) -> void: _rci.set_values(d))
 	EventBus.budget_settled.connect(_on_budget)
+	# While placing a service, show its coverage like city builders do.
+	EventBus.build_tool_selected.connect(func(tool: String, options: Dictionary) -> void:
+		var item: Dictionary = options.get("item", {})
+		if tool == "place" and item.has("category"):
+			_select_overlay(str(item["category"]))
+		elif tool == "place" and not _overlay_panel.visible:
+			_select_overlay(""))
+	EventBus.services_changed.connect(func() -> void:
+		if _overlay_panel.visible:
+			_refresh_overlay_legend())
 	_on_speed_changed(TimeSystem.get_speed_index())
 	_on_preset_changed(GraphicsSettings.current_preset)
 
@@ -299,7 +325,11 @@ func _build_left_column() -> Control:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_theme_constant_override("separation", 14)
 	var overlays := UiStyle.round_button("layers", UiStyle.TEAL, MIN_TOUCH)
-	overlays.pressed.connect(func() -> void: show_toast(tr("TOOL_LOCKED") % tr("TOOL_OVERLAYS")))
+	overlays.pressed.connect(func() -> void:
+		if _overlay_panel.visible:
+			_close_overlay_panel()
+		else:
+			_open_overlay_panel())
 	col.add_child(overlays)
 	var economy := UiStyle.round_button("chart-no-axes-column", UiStyle.GREEN, MIN_TOUCH)
 	economy.pressed.connect(func() -> void:
@@ -343,7 +373,11 @@ func _build_tray() -> PanelContainer:
 		if key == "TOOL_ROADS":
 			b.pressed.connect(_open_road_panel)
 		elif key == "TOOL_BUILDINGS":
-			b.pressed.connect(_open_catalog)
+			b.pressed.connect(_open_catalog.bind("buildings"))
+		elif key == "TOOL_SERVICES":
+			b.pressed.connect(_open_catalog.bind("services"))
+		elif key == "TOOL_UTILITIES":
+			b.pressed.connect(_open_catalog.bind("utilities"))
 		elif key == "TOOL_ZONING":
 			b.pressed.connect(_open_zone_panel)
 		else:
@@ -453,6 +487,8 @@ func _build_settings_panel() -> PanelContainer:
 
 func _build_info_panel() -> PanelContainer:
 	var parts := _card("INFO_TITLE", 440)
+	# Card -> column -> header -> header row -> title label.
+	_info_title = (parts[0] as Control).get_child(0).get_child(0).get_child(0).get_child(0) as Label
 	_info_label = _label("", FONT_SIZE - 2)
 	_info_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	(parts[1] as VBoxContainer).add_child(_info_label)
@@ -556,6 +592,7 @@ func _build_zone_panel() -> PanelContainer:
 
 
 func _open_zone_panel() -> void:
+	_close_overlay_panel()
 	_road_panel.visible = false
 	_catalog.panel.visible = false
 	_cost_pill.visible = false
@@ -588,7 +625,13 @@ func _select_zone(key: String, mode: String) -> void:
 func _on_building_inspected(info: Dictionary) -> void:
 	_building_shown_frame = Engine.get_process_frames()
 	var lines := PackedStringArray([tr(info["zone_key"])])
-	if info.get("abandoned", false):
+	if str(info.get("service", "")) != "":
+		_service_info(info, lines)
+		_show_info(lines)
+		return
+	if info.get("burned", false):
+		lines.append(tr("BUILDING_BURNED"))
+	elif info.get("abandoned", false):
 		lines.append(tr("BUILDING_ABANDONED"))
 	if info["zone_key"] != "BUILD_PARK":
 		lines.append(tr("BUILDING_LEVEL") % [info["level"], info["floors"]])
@@ -597,11 +640,59 @@ func _on_building_inspected(info: Dictionary) -> void:
 	if int(info.get("jobs", 0)) > 0:
 		lines.append(tr("BUILDING_JOBS") % [info["employees"], info["jobs"]])
 		lines.append(tr("BUILDING_PROFIT") % UiStyle.format_int(roundi(float(info["profit"]))))
+	if info["zone_key"] != "BUILD_PARK" and not info.get("abandoned", false):
+		if int(info.get("households_cap", 0)) > 0 and int(info.get("households", 0)) > 0:
+			lines.append(tr("BUILDING_PEOPLE") % [int(info.get("residents", 0)), roundi(float(info.get("happiness", 0.0)))])
+		lines.append(tr("BUILDING_UTILITIES") % [_yes_no(info.get("power", true)), _yes_no(info.get("water", true)),
+			_yes_no(info.get("sewage", true))])
+		if info.get("polluted_water", false):
+			lines.append(tr("BUILDING_POLLUTED_WATER"))
+		if int(info.get("no_utility_months", 0)) > 0:
+			lines.append(tr("BUILDING_UTILITY_WARNING") % maxi(GameData.integer("services/effects/abandon_without_utility_months")
+				- int(info["no_utility_months"]), 1))
+		var cov: Dictionary = info.get("coverage", {})
+		var pct := func(key: String) -> int: return roundi(ServiceRules.category_coverage(cov, key) * 100.0)
+		lines.append(tr("BUILDING_COVERAGE") % [pct.call("health"), pct.call("education"), pct.call("police"),
+			pct.call("fire"), pct.call("garbage"), pct.call("deathcare")])
+		if float(info.get("pollution", 0.0)) > 0.02:
+			lines.append(tr("BUILDING_POLLUTION") % roundi(float(info["pollution"]) * 100.0))
 	lines.append(tr("BUILDING_SIZE") % [roundi(info["width"]), roundi(info["depth"])])
+	_show_info(lines)
+
+
+func _show_info(lines: PackedStringArray) -> void:
+	_info_title.text = "BUILDING_INFO_TITLE"
 	_info_label.text = "\n".join(lines)
 	_settings_panel.visible = false
 	_set_tray_open(false)
 	_info_panel.visible = true
+
+
+func _yes_no(on: bool) -> String:
+	return tr("WORD_YES") if on else tr("WORD_NO")
+
+
+## Info card lines for a service or utility building.
+func _service_info(info: Dictionary, lines: PackedStringArray) -> void:
+	var d: Dictionary = _service_system().building_details(int(info.get("id", -1)))
+	if d.is_empty():
+		return
+	lines.append(tr("SVC_INFO_UPKEEP") % [UiStyle.format_int(roundi(float(d["upkeep"]))),
+		roundi(EconomySystem.service_budget(str(d["category"])) * 100.0)])
+	if float(d["power"]) > 0.0:
+		lines.append(tr("SVC_INFO_POWER") % float(d["power"]))
+	if float(d["water"]) > 0.0:
+		lines.append(tr("SVC_INFO_WATER") % UiStyle.format_int(roundi(float(d["water"]))))
+	if float(d["sewage"]) > 0.0:
+		lines.append(tr("SVC_INFO_SEWAGE") % UiStyle.format_int(roundi(float(d["sewage"]))))
+	if float(d["capacity"]) > 0.0:
+		lines.append(tr("SVC_INFO_CAPACITY") % [UiStyle.format_int(int(d["served"])), UiStyle.format_int(roundi(float(d["capacity"])))])
+	if float(d["radius"]) > 0.0:
+		lines.append(tr("SVC_INFO_RADIUS") % (float(d["radius"]) / 1000.0))
+	if float(d["storage_max"]) > 0.0:
+		lines.append(tr("SVC_INFO_STORAGE") % [UiStyle.format_int(roundi(float(d["storage"]))), UiStyle.format_int(roundi(float(d["storage_max"])))])
+	if float(d["load"]) < 0.99:
+		lines.append(tr("SVC_INFO_OVERLOADED") % roundi(float(d["load"]) * 100.0))
 
 
 func _build_rci() -> RciBars:
@@ -630,20 +721,116 @@ func _on_budget(ledger: Dictionary) -> void:
 	_money_delta.add_theme_color_override("font_color", Color(0.65, 1.0, 0.65) if net >= 0 else Color(1.0, 0.6, 0.6))
 
 
-func _open_catalog() -> void:
+func _open_catalog(group: String) -> void:
 	_road_panel.visible = false
 	_zone_panel.visible = false
+	_overlay_panel.visible = false
 	_cost_pill.visible = false
 	_set_tray_open(false)
 	_settings_panel.visible = false
 	_info_panel.visible = false
 	_build_button.get_parent().visible = false
-	_catalog.open()
+	if group == "buildings":
+		_catalog.open("BUILD_CATALOG", GameData.value("catalog/items"))
+	else:
+		_catalog.open("SVC_CATALOG_" + group.to_upper(), _service_system().catalog_items(group))
+
+
+func _service_system() -> Node:
+	return get_tree().current_scene.get_node("ServiceSystem")
+
+
+# --- Info overlays ---------------------------------------------------------------
+
+func _build_overlay_panel() -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.visible = false
+	var box := UiStyle.pill_box()
+	box.set_corner_radius_all(24)
+	box.set_content_margin_all(12)
+	panel.add_theme_stylebox_override("panel", box)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 8)
+	panel.add_child(col)
+	var top := HBoxContainer.new()
+	var title := _label("TOOL_OVERLAYS", FONT_SIZE - 3)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(title)
+	var close := UiStyle.round_button("x", UiStyle.RED, MIN_TOUCH * 0.7)
+	close.pressed.connect(_close_overlay_panel)
+	top.add_child(close)
+	col.add_child(top)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	var group := ButtonGroup.new()
+	group.allow_unpress = true
+	for entry: Array in OVERLAYS:
+		var key: String = entry[0]
+		var color: Color = entry[2]
+		var b := UiStyle.chip_button(entry[1], color.darkened(0.25), color.lightened(0.1), Vector2(132, MIN_TOUCH * 0.62))
+		b.add_theme_font_size_override("font_size", FONT_SIZE - 7)
+		b.button_group = group
+		b.pressed.connect(func() -> void: _select_overlay(key if _overlay_key != key else ""))
+		_overlay_buttons[key] = b
+		grid.add_child(b)
+	col.add_child(grid)
+	_overlay_legend = _label("", FONT_SIZE - 8)
+	_overlay_legend.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_overlay_legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_overlay_legend.custom_minimum_size.x = 270
+	col.add_child(_overlay_legend)
+	return panel
+
+
+func _open_overlay_panel() -> void:
+	_set_tray_open(false)
+	_settings_panel.visible = false
+	_info_panel.visible = false
+	_overlay_panel.visible = true
+	_select_overlay(_overlay_key if _overlay_key != "" else "power")
+
+
+func _close_overlay_panel() -> void:
+	_overlay_panel.visible = false
+	_select_overlay("")
+
+
+func _select_overlay(key: String) -> void:
+	_overlay_key = key
+	for k: String in _overlay_buttons:
+		(_overlay_buttons[k] as Button).set_pressed_no_signal(k == key)
+	EventBus.overlay_selected.emit(key)
+	_refresh_overlay_legend()
+
+
+func _refresh_overlay_legend() -> void:
+	var text := ""
+	match _overlay_key:
+		"":
+			text = ""
+		"power", "water":
+			var totals: Dictionary = _service_system().utility_totals()
+			var t: Array = totals[_overlay_key]
+			if _overlay_key == "power":
+				text = tr("OVERLAY_POWER_TOTAL") % [float(t[0]), float(t[1])]
+			else:
+				var sw: Array = totals["sewage"]
+				text = tr("OVERLAY_WATER_TOTAL") % [UiStyle.format_int(roundi(float(t[0]))), UiStyle.format_int(roundi(float(t[1]))),
+					UiStyle.format_int(roundi(float(sw[0]))), UiStyle.format_int(roundi(float(sw[1])))]
+		"pollution":
+			text = tr("OVERLAY_LEGEND_POLLUTION")
+		_:
+			text = tr("OVERLAY_LEGEND")
+	_overlay_legend.text = text
 
 
 func _close_catalog() -> void:
 	_catalog.panel.visible = false
 	_cost_pill.visible = false
+	if not _overlay_panel.visible:
+		_select_overlay("")
 	_build_button.get_parent().visible = true
 	EventBus.build_tool_selected.emit("", {})
 
@@ -683,6 +870,7 @@ func _build_cost_pill() -> PanelContainer:
 
 
 func _open_road_panel() -> void:
+	_close_overlay_panel()
 	_zone_panel.visible = false
 	_catalog.panel.visible = false
 	_set_tray_open(false)
@@ -790,6 +978,7 @@ func _on_ground_long_pressed(world_pos: Vector3) -> void:
 func _show_location(world_pos: Vector3) -> void:
 	if _building_shown_frame == Engine.get_process_frames():
 		return
+	_info_title.text = "INFO_TITLE"
 	var cell := MapGrid.world_to_cell(world_pos, _cell_size)
 	var inside := MapGrid.is_inside(world_pos, _playable_half)
 	_info_label.text = "%s\n%s\n%s" % [
@@ -811,6 +1000,9 @@ func _on_back_requested() -> void:
 		return
 	if _catalog.panel.visible:
 		_close_catalog()
+		return
+	if _overlay_panel.visible:
+		_close_overlay_panel()
 		return
 	if _economy.card.visible:
 		_economy.card.visible = false

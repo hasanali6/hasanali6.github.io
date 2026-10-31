@@ -13,6 +13,7 @@ const AUTOSAVE := "user://saves/autosave.save"
 @export var company_system_path: NodePath
 @export var citizen_system_path: NodePath
 @export var demand_system_path: NodePath
+@export var service_system_path: NodePath
 
 var _months_since_save: int = 0
 var _loading: bool = false
@@ -49,6 +50,7 @@ func save_game(path: String = AUTOSAVE) -> bool:
 		"companies": get_node(company_system_path).save_state(),
 		"citizens": get_node(citizen_system_path).save_state(),
 		"demand": get_node(demand_system_path).save_state(),
+		"services": get_node(service_system_path).save_state(),
 	}
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
@@ -77,6 +79,8 @@ func load_game(path: String = AUTOSAVE) -> bool:
 	get_node(company_system_path).load_state(state["companies"])
 	get_node(citizen_system_path).load_state(state["citizens"])
 	get_node(demand_system_path).load_state(state["demand"])
+	# Saves from before city services have no "services" entry.
+	get_node(service_system_path).load_state(state.get("services", {}))
 	_loading = false
 	EventBus.notification_posted.emit("save", tr("NOTIFY_LOADED"))
 	return true

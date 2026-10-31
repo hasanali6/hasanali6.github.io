@@ -141,3 +141,71 @@ NOTIFY_SAVED,Şehir kaydedildi,City saved
 NOTIFY_LOADED,Şehir yüklendi,City loaded
 NOTIFY_NEW_CITY_CONFIRM,Şehri silip baştan başlamak için tekrar bas,Tap again to wipe the city and start over
 ROAD_ERR_WATER,Su üstünden geçemez (köprü yok),Cannot cross water (no bridges yet)
+SVC_CAT_POWER,Elektrik,Electricity
+SVC_CAT_WATER,Su,Water
+SVC_CAT_HEALTH,Sağlık,Health
+SVC_CAT_EDUCATION,Eğitim,Education
+SVC_CAT_POLICE,Polis,Police
+SVC_CAT_FIRE,İtfaiye,Fire
+SVC_CAT_GARBAGE,Çöp,Garbage
+SVC_CAT_DEATHCARE,Defin,Deathcare
+SVC_COAL,Kömür santrali,Coal power plant
+SVC_GAS,Doğalgaz santrali,Gas power plant
+SVC_WIND,Rüzgâr türbini,Wind turbine
+SVC_SOLAR,Güneş santrali,Solar farm
+SVC_PUMP,Su pompası,Water pump
+SVC_OUTLET,Atık su çıkışı,Sewage outlet
+SVC_TREATMENT,Arıtma tesisi,Water treatment plant
+SVC_CLINIC,Sağlık ocağı,Clinic
+SVC_HOSPITAL,Hastane,Hospital
+SVC_ELEMENTARY,İlkokul,Elementary school
+SVC_HIGHSCHOOL,Lise,High school
+SVC_UNIVERSITY,Üniversite,University
+SVC_POLICE,Karakol,Police station
+SVC_FIRE,İtfaiye istasyonu,Fire station
+SVC_LANDFILL,Çöp depolama alanı,Landfill
+SVC_INCINERATOR,Çöp yakma tesisi,Incinerator
+SVC_CEMETERY,Mezarlık,Cemetery
+SVC_CREMATORIUM,Krematoryum,Crematorium
+SVC_CATALOG_SERVICES,Hizmet binası yerleştir,Place a service building
+SVC_CATALOG_UTILITIES,Elektrik ve su tesisi yerleştir,Place power and water facilities
+CAT_UPKEEP,%s/ay,%s/mo
+BUILD_ERR_WATER,Nehir ya da göl kıyısına kur,Build it on a river or lake shore
+NOTIFY_STORAGE_FULL,"%s doldu, yenisini kur","%s is full, build another one"
+NOTIFY_FIRE,Bir bina yandı! İtfaiye istasyonu kur.,A building burned down! Build a fire station.
+NOTIFY_NO_POWER,%d binada elektrik yok: santral kur,%d buildings have no electricity: build a power plant
+NOTIFY_NO_WATER,%d binada su yok: pompa ve atık su çıkışı kur,%d buildings have no water: build a pump and a sewage outlet
+NOTIFY_ABANDONED_UTILITIES,%d bina elektriksiz ya da susuz kaldığı için terk edildi,%d buildings were abandoned for lack of electricity or water
+OVERLAY_POLLUTION,Kirlilik,Pollution
+OVERLAY_HAPPINESS,Mutluluk,Happiness
+OVERLAY_LEGEND,Kırmızı: yok · Sarı: az · Yeşil: iyi · Mavi: hizmet binası,Red: none · Yellow: some · Green: good · Blue: service building
+OVERLAY_LEGEND_POLLUTION,Yeşil: temiz · Kırmızı: kirli,Green: clean · Red: polluted
+OVERLAY_POWER_TOTAL,Kullanım %.1f / %.1f MW,Use %.1f / %.1f MW
+OVERLAY_WATER_TOTAL,Su %s / %s m³ · Atık su %s / %s m³,Water %s / %s m³ · Sewage %s / %s m³
+ECON_TAB_SERVICES,Hizmetler,Services
+ECON_IN_POWER_FEES,Elektrik ücretleri,Electricity fees
+ECON_IN_WATER_FEES,Su ücretleri,Water fees
+ECON_SVC_BUDGETS,Hizmet bütçeleri,Service budgets
+ECON_SVC_FEES,Ücretler,Fees
+ECON_FEE_POWER,Elektrik,Electricity
+ECON_FEE_WATER,Su,Water
+ECON_SVC_HINT,Yüksek bütçe: daha geniş kapsama ve kapasite ama daha çok gider. Yüksek ücret: daha çok gelir ama daha az mutluluk ve tüketim.,Higher budget: wider coverage and capacity but more upkeep. Higher fees: more income but less happiness and use.
+ECON_UTIL_SUMMARY,Elektrik %.1f / %.1f MW · Su %s / %s m³ · Atık su %s / %s m³,Electricity %.1f / %.1f MW · Water %s / %s m³ · Sewage %s / %s m³
+WORD_YES,var,yes
+WORD_NO,yok,no
+BUILDING_UTILITIES,Elektrik: %s · Su: %s · Kanalizasyon: %s,Electricity: %s · Water: %s · Sewage: %s
+BUILDING_POLLUTED_WATER,Musluktan kirli su akıyor!,Polluted water from the taps!
+BUILDING_UTILITY_WARNING,Elektrik/su gelmezse %d ay içinde terk edilecek,Will be abandoned in %d months without electricity/water
+BUILDING_COVERAGE,Sağlık %d%% · Eğitim %d%% · Polis %d%% · İtfaiye %d%% · Çöp %d%% · Defin %d%%,Health %d%% · Education %d%% · Police %d%% · Fire %d%% · Garbage %d%% · Deathcare %d%%
+BUILDING_POLLUTION,Kirlilik: %d%%,Pollution: %d%%
+BUILDING_PEOPLE,Nüfus: %d · Mutluluk: %d%%,Residents: %d · Happiness: %d%%
+BUILDING_BURNED,Yangında yandı,Burned down
+SVC_INFO_UPKEEP,Bakım: %s/ay (bütçe %d%%),Upkeep: %s/mo (budget %d%%)
+SVC_INFO_POWER,Üretim: %.1f MW,Output: %.1f MW
+SVC_INFO_WATER,Pompalama: %s m³/ay,Pumping: %s m³/mo
+SVC_INFO_SEWAGE,Atık su: %s m³/ay,Sewage: %s m³/mo
+SVC_INFO_CAPACITY,Hizmet verilen: %s / %s kişi,Serving: %s / %s people
+SVC_INFO_RADIUS,Kapsama: yol üzerinden %.1f km,Coverage: %.1f km along roads
+SVC_INFO_STORAGE,Doluluk: %s / %s,Filled: %s / %s
+SVC_INFO_OVERLOADED,"Kapasite yetersiz, verim %d%%","Over capacity, working at %d%%"
+BUILDING_INFO_TITLE,Bina bilgisi,Building info

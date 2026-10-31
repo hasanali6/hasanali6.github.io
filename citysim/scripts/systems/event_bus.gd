@@ -52,6 +52,16 @@ signal city_stats_changed(stats: Dictionary)
 signal taxes_changed()
 signal loan_changed()
 
+# --- Services and utilities ---
+## Service budget or utility fee slider moved.
+signal service_budgets_changed()
+## Coverage, utilities and pollution were recomputed (building fields updated).
+signal services_changed()
+## Monthly service books: {upkeep: {category: amount}, fees: {power, water}, ...}.
+signal services_reported(report: Dictionary)
+## Info overlay chosen in the UI ("" = off).
+signal overlay_selected(key: String)
+
 # --- World queries resolved by the camera ---
 signal ground_long_pressed(world_pos: Vector3)
 

@@ -31,6 +31,7 @@ func _initialize() -> void:
 	_test_households()
 	_test_economy_rules()
 	_test_water()
+	_test_service_rules()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -51,7 +52,7 @@ func _input_config() -> Dictionary:
 
 
 func _test_data_files() -> void:
-	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy", "zones"]:
+	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy", "zones", "services", "vegetation", "catalog"]:
 		_check(not DataLoader.load_json("res://data/%s.json" % f).is_empty(), "data file %s loads" % f)
 	var db := DataLoader.load_files(PackedStringArray(["graphics"]))
 	for preset: String in DataLoader.lookup(db, "graphics/preset_order"):
@@ -447,3 +448,45 @@ func _test_water() -> void:
 		if w.distance(grid.centers[c]) < 4.0:
 			dry = false
 	_check(dry, "zoning cells stay out of the water")
+
+
+func _test_service_rules() -> void:
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(0, 0), Vector2(400, 0), null), "street")
+	g.commit_road(g.plan_road(Vector2(400, 0), Vector2(400, 400), null), "street")
+	g.commit_road(g.plan_road(Vector2(1000, 1000), Vector2(1200, 1000), null), "street")
+	var first := g.find_segment_near(Vector2(100, 0), 1.0)["segment"] as int
+	var dist := ServiceRules.node_distances(g, first, 0.0, 10000.0)
+	var corner := g.find_node_near(Vector2(400, 0), 0.5)
+	var far_end := g.find_node_near(Vector2(400, 400), 0.5)
+	_check(is_equal_approx(snappedf(float(dist[corner]), 0.1), 400.0) and is_equal_approx(snappedf(float(dist[far_end]), 0.1), 800.0),
+		"road distance follows the network (%.1f, %.1f)" % [float(dist.get(corner, -1)), float(dist.get(far_end, -1))])
+	var cov := ServiceRules.segment_coverage(g, first, 0.0, 700.0)
+	var second := g.find_segment_near(Vector2(400, 200), 1.0)["segment"] as int
+	var island := g.find_segment_near(Vector2(1100, 1000), 1.0)["segment"] as int
+	_check(cov.has(first) and cov.has(second) and float(cov[first]) > float(cov[second]), "coverage fades along the roads")
+	_check(not cov.has(island), "a separate road network gets no coverage")
+	var comps := ServiceRules.components(g)
+	_check(comps[corner] == comps[far_end] and comps[corner] != comps[g.find_node_near(Vector2(1000, 1000), 0.5)], "road networks are found")
+	var served := ServiceRules.distribute(10.0, [[1, 4.0], [2, 4.0], [3, 4.0]])
+	_check(served.has(1) and served.has(2) and not served.has(3), "supply serves demands in order")
+	_check(ServiceRules.efficiency(1.5, 0.7) > 1.0 and ServiceRules.efficiency(0.5, 0.7) < 1.0, "budget changes efficiency")
+	var grid := ServiceRules.PollutionGrid.new(64.0, 2000.0)
+	grid.stamp(Vector2(0, 0), 300.0, 0.8)
+	_check(grid.sample(Vector2(10, 10)) > 0.6 and grid.sample(Vector2(500, 0)) == 0.0, "pollution falls off with distance")
+	var svc := DataLoader.load_json("res://data/services.json")
+	var cats: Dictionary = svc["categories"]
+	var fx: Dictionary = svc["effects"]
+	var full := {"health": 1.0, "education0": 1.0, "police": 1.0, "fire": 1.0, "garbage": 1.0, "deathcare": 1.0}
+	var ok_util := {"power": true, "water": true, "sewage": true}
+	var served_h := ServiceRules.happiness_delta(full, ok_util, 0.0, cats, fx, 1.0)
+	var bare_h := ServiceRules.happiness_delta({}, ok_util, 0.0, cats, fx, 1.0)
+	_check(served_h > 0.0 and bare_h < 0.0, "services raise happiness, missing ones lower it (%.1f / %.1f)" % [served_h, bare_h])
+	_check(is_equal_approx(ServiceRules.happiness_delta({}, ok_util, 0.0, cats, fx, 0.0), 0.0), "a small town expects no services yet")
+	var dark := ServiceRules.happiness_delta(full, {"power": false, "water": true, "sewage": true}, 0.0, cats, fx, 1.0)
+	_check(dark < served_h - 10.0, "no electricity makes people unhappy")
+	_check(ServiceRules.happiness_delta(full, ok_util, 1.0, cats, fx, 1.0) < served_h, "pollution makes people unhappy")
+	_check(ServiceRules.death_multiplier(1.0, fx) < 1.0 and ServiceRules.death_multiplier(0.0, fx) > 1.0, "health care lowers deaths")
+	var chances := ServiceRules.education_chances({"education1": 1.0}, fx)
+	_check(chances.x > 0.5 and chances.y == 0.0, "high school without university educates to level 1 only")
+	_check(ServiceRules.category_coverage({"education0": 0.2, "education2": 0.7}, "education") == 0.7, "education coverage is the best school level")

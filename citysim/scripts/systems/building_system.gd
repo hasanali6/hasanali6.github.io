@@ -12,10 +12,14 @@ extends Node3D
 ## companies profitable for a while); homes left empty while demand is
 ## negative and companies that went bankrupt are abandoned (darkened) and
 ## collapse after a few months, freeing the lot for something new.
-## Players can also place buildings and parks by hand (BuildTool).
+## Players can also place buildings, parks and city services by hand
+## (BuildTool). Homes and companies left without electricity or water for
+## too long are abandoned as well; a fire turns a building into a ruin.
 ##
 ## Rendering: one MultiMesh per mesh kind (Kenney models, procedural house
-## bodies and roofs, facade boxes per style, factory parts, rooftop boxes).
+## bodies and roofs, facade boxes per style, factory parts, rooftop boxes,
+## service pieces from ServiceModels). While an info overlay is shown the
+## buildings are tinted with its colours.
 ## Any structural change rebuilds the instance lists; new buildings animate
 ## upwards by updating only their own instances each frame.
 
@@ -56,6 +60,9 @@ var _wall_palette: Array[Color] = []
 var _roof_palette: Array[Color] = []
 var _office_palette: Array[Color] = []
 var _industry_palette: Array[Color] = []
+var _overlay_tint: Dictionary = {}   # building id -> Color while an info overlay is shown
+var _utility_abandon_months: int
+var _service_names: Dictionary = {}  # service id -> name key
 
 
 func _ready() -> void:
@@ -66,6 +73,9 @@ func _ready() -> void:
 	_co_cfg = GameData.section("economy/companies")
 	_rules = GameData.section("economy/buildings")
 	_rise_seconds = float(_growth["rise_seconds"])
+	_utility_abandon_months = GameData.integer("services/effects/abandon_without_utility_months")
+	for t: Dictionary in GameData.value("services/types"):
+		_service_names[str(t["id"])] = str(t["name_key"])
 	_rng.randomize()
 	for c: String in _vis["wall_palette"]:
 		_wall_palette.append(Color.html(c))
@@ -169,7 +179,7 @@ func _create(zid: int, lot: PackedInt32Array, front_cell: int, w: int, d: int, s
 		"style": style, "floors": floors, "manual": manual,
 		"seed": _rng.randf() * 100.0, "palette": _rng.randi(),
 		"occupants": 0, "employees": 0, "abandoned": false, "empty_months": 0, "abandoned_months": 0,
-		"happiness": 0.0, "profit": 0.0, "profit_months": 0,
+		"happiness": 0.0, "profit": 0.0, "profit_months": 0, "service": "", "no_utility_months": 0,
 	}
 	_apply_capacity(b)
 	buildings[id] = b
@@ -195,6 +205,7 @@ func _floors_for(cfg: Dictionary, level: int) -> int:
 
 func _on_month(_m: int) -> void:
 	var changed := false
+	var abandoned_for_utilities := 0
 	var max_level := int(_growth["max_level"])
 	var grid: ZoneGrid = _zones.grid
 	for id: int in buildings.keys():
@@ -218,6 +229,18 @@ func _on_month(_m: int) -> void:
 				continue
 		else:
 			b["empty_months"] = 0
+		# Homes and companies without electricity or water are given up in time.
+		var used := int(b["occupants"]) + int(b["employees"]) > 0
+		if used and not (b.get("power", true) and b.get("water", true)):
+			b["no_utility_months"] = int(b.get("no_utility_months", 0)) + 1
+			if b["no_utility_months"] >= _utility_abandon_months:
+				b["abandoned"] = true
+				b["abandoned_months"] = 0
+				changed = true
+				abandoned_for_utilities += 1
+				continue
+		else:
+			b["no_utility_months"] = 0
 		if b["level"] < max_level and _rng.randf() < float(_growth["level_up_chance_per_month"]) and _deserves_level(b):
 			b["level"] += 1
 			b["floors"] = maxi(b["floors"], _floors_for(_zones.zone_config(b["zone"]), b["level"]))
@@ -226,6 +249,8 @@ func _on_month(_m: int) -> void:
 				b["style"] = str(_vis["kenney_upgrade_style"])
 			_apply_capacity(b)
 			changed = true
+	if abandoned_for_utilities > 0:
+		EventBus.notification_posted.emit("services", tr("NOTIFY_ABANDONED_UTILITIES") % abandoned_for_utilities)
 	if changed:
 		_render_all()
 		EventBus.buildings_changed.emit()
@@ -278,6 +303,14 @@ func _on_cells_rebuilt() -> void:
 		EventBus.buildings_changed.emit()
 
 
+## A fire leaves a ruin that collapses like an abandoned building.
+func burn(id: int) -> void:
+	if not buildings.has(id) or buildings[id]["abandoned"]:
+		return
+	buildings[id]["burned"] = true
+	_abandon(id)
+
+
 func demolish(id: int) -> void:
 	if not buildings.has(id):
 		return
@@ -316,6 +349,7 @@ func place(item: Dictionary, cell: int) -> int:
 	if key != "":
 		floors = maxi(floors, _floors_for(_zones.zone_config(zid), 1))
 	var id := _create(zid, lot, cell, int(item["lot"][0]), int(item["lot"][1]), str(item["style"]), floors, true)
+	buildings[id]["service"] = str(item.get("service", ""))
 	_render_all()
 	EventBus.zones_changed.emit()
 	EventBus.buildings_changed.emit()
@@ -328,12 +362,21 @@ func _on_long_press(world_pos: Vector3) -> void:
 		return
 	var b: Dictionary = buildings[id]
 	var slots: PackedInt32Array = b["job_slots"]
+	var name_key := "BUILD_PARK"
+	if b["zone_key"] != "":
+		name_key = _zones.zone_config(b["zone"])["name_key"]
+	elif str(b.get("service", "")) != "":
+		name_key = str(_service_names.get(b["service"], name_key))
 	EventBus.building_inspected.emit({
-		"zone_key": _zones.zone_config(b["zone"])["name_key"] if b["zone_key"] != "" else "BUILD_PARK",
+		"id": id, "zone_key": name_key, "service": b.get("service", ""),
 		"level": b["level"], "floors": b["floors"], "width": b["width"], "depth": b["depth"],
 		"households": b["occupants"], "households_cap": b["households_cap"],
 		"employees": b["employees"], "jobs": slots[0] + slots[1] + slots[2],
-		"abandoned": b["abandoned"], "profit": b["profit"],
+		"abandoned": b["abandoned"], "burned": b.get("burned", false), "profit": b["profit"],
+		"power": b.get("power", true), "water": b.get("water", true), "sewage": b.get("sewage", true),
+		"polluted_water": b.get("polluted_water", false), "pollution": b.get("pollution", 0.0),
+		"coverage": b.get("coverage", {}), "happiness": b.get("happiness", 0.0),
+		"residents": b.get("residents", 0), "no_utility_months": b.get("no_utility_months", 0),
 	})
 
 
@@ -351,6 +394,7 @@ func save_state() -> Dictionary:
 			"id": b["id"], "zone_key": b["zone_key"], "level": b["level"], "style": b["style"], "floors": b["floors"],
 			"manual": b["manual"], "seed": b["seed"], "palette": b["palette"], "lot": [b["lot"].x, b["lot"].y],
 			"abandoned": b["abandoned"], "empty_months": b["empty_months"], "abandoned_months": b["abandoned_months"],
+			"service": b.get("service", ""), "no_utility_months": b.get("no_utility_months", 0), "burned": b.get("burned", false),
 			"cells": keys, "front": [grid.segment[front_cell], grid.side[front_cell], grid.along[front_cell], grid.depth[front_cell]],
 		})
 	return {"buildings": list, "next_id": _next_id}
@@ -383,6 +427,9 @@ func load_state(state: Dictionary) -> void:
 		var b: Dictionary = buildings[id]
 		for field: String in ["level", "seed", "palette", "abandoned", "empty_months", "abandoned_months"]:
 			b[field] = rec[field]
+		for field: String in ["service", "no_utility_months", "burned"]:
+			if rec.has(field):
+				b[field] = rec[field]
 		_apply_capacity(b)
 		_rising.erase(id)
 	_next_id = maxi(int(state.get("next_id", 1)), _next_id + 1)
@@ -470,6 +517,12 @@ func _build_meshes() -> void:
 	chimney.rings = 1
 	chimney.material = plain
 	_add_multimesh("chimney", chimney, true, false)
+
+	for key in ServiceModels.build_meshes(_add_multimesh):
+		(_meshes[key] as MultiMeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Plumes and rotors move in their shaders, beyond their mesh bounds.
+	(_meshes["smoke"] as MultiMeshInstance3D).extra_cull_margin = 40.0
+	(_meshes["rotor"] as MultiMeshInstance3D).extra_cull_margin = 4.0
 
 
 func _noise_texture() -> NoiseTexture2D:
@@ -563,11 +616,17 @@ func _parts_for(b: Dictionary, rise: float) -> Array[Dictionary]:
 				_parts_tower(b, ctx, parts)
 			"factory":
 				_parts_factory(b, ctx, parts)
+			_:
+				if style.begins_with("svc_"):
+					ServiceModels.parts(b, ctx, parts)
 	parts.append(_part("lot", _basis(ctx, ctx["lot_w"], 1.0, ctx["lot_d"]), ctx["centre"], 0.04, Color.WHITE,
 		Color(_lot_kind(b), float(b["seed"]), 0.0, 0.0)))
 	if b["abandoned"]:
 		for part in parts:
-			part["color"] = _tint(b, part["color"])
+			if part["key"] == "smoke":
+				part["color"] = Color(0, 0, 0, 0)
+			else:
+				part["color"] = _tint(b, part["color"])
 	return parts
 
 
@@ -583,6 +642,7 @@ func _context(b: Dictionary, rise: float) -> Dictionary:
 		"lot_w": float(b["width"]), "lot_d": lot_d, "centre": b["centre"],
 		"front_edge": (b["centre"] as Vector2) + f * (lot_d * 0.5 - float(_growth["front_setback_m"])),
 		"margin": float(_growth["lot_margin_m"]), "e": maxf(ease(rise, 0.4), 0.02), "rng": rng,
+		"spread": float(_vis["contact_spread_m"]),
 		"wall": _wall_palette[rng.randi_range(0, _wall_palette.size() - 1)],
 	}
 
@@ -592,6 +652,8 @@ func _basis(ctx: Dictionary, w: float, h: float, d: float) -> Basis:
 
 
 func _lot_kind(b: Dictionary) -> int:
+	if str(b["style"]).begins_with("svc_"):
+		return ServiceModels.lot_kind(b["style"])
 	match str(b["style"]):
 		"house":
 			return LOT_GARDEN
@@ -706,6 +768,9 @@ func _parts_factory(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) ->
 	var stack: Vector2 = pos - ctx["f"] * (d * 0.3) + ctx["side"] * (w * 0.3)
 	var ch := h + 8.0
 	parts.append(_part("chimney", _basis(ctx, 1.6, ch * e, 1.6), stack, ch * e * 0.5, Color(0.72, 0.36, 0.3), Color()))
+	var he := maxf(26.0 * e * e * e, 0.01)
+	parts.append(_part("smoke", Basis(Vector3.RIGHT * 6.0, Vector3.UP * he, Vector3.BACK), stack, ch * e + he * 0.5,
+		Color(0.6, 0.6, 0.62, 0.55), Color(fposmod(float(b["seed"]) * 0.29, 1.0), 0.0, 0.0, 0.0)))
 	var annex: Vector2 = pos + ctx["f"] * (d * 0.5 + 2.6) - ctx["side"] * (w * 0.3)
 	parts.append(_part("house", _basis(ctx, w * 0.3, 4.0 * e, 5.0), annex, 2.0 * e, wall.lightened(0.1), Color(b["seed"], 0.5, 2.4, 0.0)))
 	_contact(parts, ctx, pos, w, d)
@@ -742,12 +807,29 @@ func _part(key: String, basis: Basis, pos: Vector2, y: float, color: Color, cust
 	return {"key": key, "xf": Transform3D(basis, Vector3(pos.x, y, pos.y)), "color": color, "custom": custom}
 
 
+## Info overlay colours per building id (empty = normal look).
+func set_overlay_tint(tints: Dictionary) -> void:
+	if tints == _overlay_tint:
+		return
+	_overlay_tint = tints
+	_render_all()
+
+
+const UNTINTED := ["lot", "contact", "smoke", "solar", "basin"]
+
+
 func _render_all() -> void:
 	var per_key: Dictionary = {}
 	_instances.clear()
 	for id: int in buildings:
 		var entries := []
-		for part in _parts_for(buildings[id], _rising.get(id, 1.0)):
+		var parts := _parts_for(buildings[id], _rising.get(id, 1.0))
+		if _overlay_tint.has(id):
+			var tint: Color = _overlay_tint[id]
+			for part in parts:
+				if not part["key"] in UNTINTED:
+					part["color"] = tint
+		for part in parts:
 			var key: String = part["key"]
 			if not per_key.has(key):
 				per_key[key] = []

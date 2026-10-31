@@ -64,3 +64,7 @@ night_factor={
 "type": "float",
 "value": 0.0
 }
+overlay_dim={
+"type": "float",
+"value": 0.0
+}

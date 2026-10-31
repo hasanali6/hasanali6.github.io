@@ -8,6 +8,7 @@ extends Node
 ## Each month a company books revenue, wages and goods costs, pays tax on
 ## profit, and adjusts how many of its job slots it wants filled. Companies
 ## that stay deep in debt go bankrupt and their building is abandoned.
+## Without electricity or water a company works at a fraction of its output.
 
 @export var building_system_path: NodePath
 
@@ -21,12 +22,14 @@ var _rng := RandomNumberGenerator.new()
 var _vacant: Dictionary = {}     # building id -> true while it has open slots
 var _shops: Dictionary = {}      # bucket -> PackedInt32Array of shop building ids
 var _shop_bucket: float = 256.0
+var _no_utility_output: float
 
 
 func _ready() -> void:
 	_buildings = get_node(building_system_path)
 	_cfg = GameData.section("economy/companies")
 	_money = GameData.section("economy/money")
+	_no_utility_output = GameData.num("services/effects/no_utility_company_output")
 	_rng.randomize()
 	EventBus.buildings_changed.connect(_sync)
 	EventBus.month_changed.connect(_on_month)
@@ -168,19 +171,27 @@ func nearest_shop(pos: Vector2) -> int:
 
 # --- Monthly books -----------------------------------------------------------
 
+## 1 with electricity and water, a fraction without.
+func _output_factor(bid: int) -> float:
+	var b: Dictionary = _buildings.buildings.get(bid, {})
+	return 1.0 if b.get("power", true) and b.get("water", true) else _no_utility_output
+
+
 func _on_month(_m: int) -> void:
 	var wages: Array = _money["wage_by_education"]
 	var units_per: Array = _cfg["industry_units_per_worker"]
 	var office_value: Array = _cfg["office_value_per_worker"]
 	var sales_total := 0.0
 	var production_total := 0.0
-	for c: Dictionary in companies.values():
+	for bid: int in companies:
+		var c: Dictionary = companies[bid]
 		if c["kind"] == "commercial":
 			sales_total += c["sales"]
 		elif c["kind"] == "industrial":
 			var units := 0.0
 			for level in 3:
 				units += (c["employees"] as PackedInt32Array)[level] * float(units_per[level])
+			units *= _output_factor(bid)
 			c["units"] = units
 			production_total += units
 	var local := minf(sales_total, production_total)
@@ -201,10 +212,11 @@ func _on_month(_m: int) -> void:
 			wage_bill += employees[level] * float(wages[level])
 		var revenue := 0.0
 		var costs := wage_bill
+		var output := _output_factor(bid)
 		match c["kind"]:
 			"commercial":
 				# A shop can only serve so much per worker; the rest shop elsewhere.
-				var capacity := float(employees[0] + employees[1] + employees[2]) * float(_cfg["shop_units_per_worker"])
+				var capacity := float(employees[0] + employees[1] + employees[2]) * float(_cfg["shop_units_per_worker"]) * output
 				var units := minf(float(c["sales"]), capacity)
 				report["overflow"] += float(c["sales"]) - units
 				revenue = units * float(_money["retail_price"])
@@ -215,7 +227,7 @@ func _on_month(_m: int) -> void:
 				costs += units * float(_cfg["industry_raw_cost_per_unit"])
 			"office":
 				for level in 3:
-					revenue += employees[level] * float(office_value[level])
+					revenue += employees[level] * float(office_value[level]) * output
 		var profit := revenue - costs
 		var tax := maxf(profit, 0.0) * EconomySystem.tax_rate(c["kind"]) / 100.0 * EconomySystem.city_share()
 		report["taxes"][c["kind"]] += tax

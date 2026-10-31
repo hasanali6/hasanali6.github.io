@@ -7,6 +7,9 @@ extends Node
 ##  * One adjustable loan: borrowing more pays cash out, borrowing less repays
 ##    from the treasury. Its limit grows with population; the interest rate
 ##    grows with how much of the limit is used.
+##  * Services: a budget slider per service category (50..150 %) scales its
+##    upkeep and its efficiency; electricity and water fees (50..150 %) bring
+##    income but lower consumption and happiness when high.
 ## Settlement runs deferred on month change, after the citizen and company
 ## systems have filed their monthly reports.
 
@@ -18,6 +21,8 @@ var loan_rate: float = 0.0
 var loan_payment: float = 0.0
 var loan_months_left: int = 0
 var last_ledger: Dictionary = {}
+var service_budgets: Dictionary = {}           # service category -> 0.5..1.5
+var utility_fees: Dictionary = {}              # "power" / "water" -> 0.5..1.5
 
 var _tax_cfg: Dictionary
 var _budget_cfg: Dictionary
@@ -28,16 +33,22 @@ var _construction: float = 0.0
 var _refunds: float = 0.0
 var _citizens: Dictionary = {}
 var _companies: Dictionary = {}
+var _services: Dictionary = {}
+var _svc_budget_cfg: Dictionary
+var _fee_cfg: Dictionary
 
 
 func _ready() -> void:
 	_tax_cfg = GameData.section("economy/taxes")
 	_budget_cfg = GameData.section("economy/budget")
 	_loan_cfg = GameData.section("economy/loan")
+	_svc_budget_cfg = GameData.section("services/budget")
+	_fee_cfg = GameData.section("services/fees")
 	reset_state()
 	EventBus.month_changed.connect(func(_m: int) -> void: _settle.call_deferred())
 	EventBus.citizens_reported.connect(func(r: Dictionary) -> void: _citizens = r)
 	EventBus.companies_reported.connect(func(r: Dictionary) -> void: _companies = r)
+	EventBus.services_reported.connect(func(r: Dictionary) -> void: _services = r)
 	EventBus.road_upkeep_changed.connect(func(v: float) -> void: _road_upkeep = v)
 	EventBus.city_stats_changed.connect(func(s: Dictionary) -> void: _population = int(s.get("population", 0)))
 
@@ -95,6 +106,26 @@ func set_residential_edu_tax(education: int, percent: float) -> void:
 	EventBus.taxes_changed.emit()
 
 
+# --- Service budgets and utility fees ----------------------------------------------
+
+func service_budget(category: String) -> float:
+	return float(service_budgets.get(category, _svc_budget_cfg["default"]))
+
+
+func set_service_budget(category: String, value: float) -> void:
+	service_budgets[category] = clampf(snappedf(value, 0.05), float(_svc_budget_cfg["min"]), float(_svc_budget_cfg["max"]))
+	EventBus.service_budgets_changed.emit()
+
+
+func utility_fee(kind: String) -> float:
+	return float(utility_fees.get(kind, _fee_cfg["default"]))
+
+
+func set_utility_fee(kind: String, value: float) -> void:
+	utility_fees[kind] = clampf(snappedf(value, 0.05), float(_fee_cfg["min"]), float(_fee_cfg["max"]))
+	EventBus.service_budgets_changed.emit()
+
+
 # --- Loan ------------------------------------------------------------------------------
 
 func loan_limit() -> int:
@@ -116,6 +147,7 @@ func set_loan(amount: float) -> bool:
 	loan_payment = EconomyRules.loan_payment(loan, loan_rate, loan_months_left)
 	EventBus.money_changed.emit(balance)
 	EventBus.loan_changed.emit()
+	EventBus.service_budgets_changed.emit()
 	return true
 
 
@@ -129,6 +161,8 @@ func _settle() -> void:
 		"office": float(company_taxes.get("office", 0.0)),
 		"industrial": float(company_taxes.get("industrial", 0.0)),
 		"subsidy": EconomyRules.subsidy(_population, _budget_cfg),
+		"power_fees": float((_services.get("fees", {}) as Dictionary).get("power", 0.0)),
+		"water_fees": float((_services.get("fees", {}) as Dictionary).get("water", 0.0)),
 	}
 	var instalment := 0.0
 	if loan > 0.0 and loan_months_left > 0:
@@ -140,7 +174,11 @@ func _settle() -> void:
 			loan = 0.0
 			loan_payment = 0.0
 		EventBus.loan_changed.emit()
-	var expenses := {"roads": _road_upkeep, "loan": instalment}
+	var expenses := {"roads": _road_upkeep}
+	var upkeep: Dictionary = _services.get("upkeep", {})
+	for cat: String in GameData.section("services/categories"):
+		expenses[cat] = float(upkeep.get(cat, 0.0))
+	expenses["loan"] = instalment
 	var total_in := 0.0
 	for v: float in income.values():
 		total_in += v
@@ -155,6 +193,7 @@ func _settle() -> void:
 	}
 	_construction = 0.0
 	_refunds = 0.0
+	_services = {}
 	EventBus.money_changed.emit(balance)
 	EventBus.budget_settled.emit(last_ledger)
 
@@ -177,13 +216,16 @@ func reset_state() -> void:
 	_refunds = 0.0
 	_citizens = {}
 	_companies = {}
+	_services = {}
+	service_budgets = {}
+	utility_fees = {}
 
 
 func save_state() -> Dictionary:
 	return {
 		"balance": balance, "taxes": taxes, "residential_by_edu": residential_by_edu, "loan": loan,
 		"loan_rate": loan_rate, "loan_payment": loan_payment, "loan_months_left": loan_months_left,
-		"last_ledger": last_ledger,
+		"last_ledger": last_ledger, "service_budgets": service_budgets, "utility_fees": utility_fees,
 	}
 
 
@@ -198,6 +240,9 @@ func load_state(state: Dictionary) -> void:
 	loan_payment = float(state.get("loan_payment", 0.0))
 	loan_months_left = int(state.get("loan_months_left", 0))
 	last_ledger = state.get("last_ledger", {})
+	service_budgets = (state.get("service_budgets", {}) as Dictionary).duplicate()
+	utility_fees = (state.get("utility_fees", {}) as Dictionary).duplicate()
 	EventBus.money_changed.emit(balance)
 	EventBus.taxes_changed.emit()
 	EventBus.loan_changed.emit()
+	EventBus.service_budgets_changed.emit()

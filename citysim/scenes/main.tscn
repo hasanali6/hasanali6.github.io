@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3 uid="uid://b8c1tymain001"]
+[gd_scene load_steps=20 format=3 uid="uid://b8c1tymain001"]
 
 [ext_resource type="Script" path="res://scripts/world/day_night_cycle.gd" id="1_daynight"]
 [ext_resource type="Script" path="res://scripts/systems/terrain_system.gd" id="2_terrain"]
@@ -16,6 +16,8 @@
 [ext_resource type="Script" path="res://scripts/world/build_tool.gd" id="14_buildtool"]
 [ext_resource type="Script" path="res://scripts/systems/save_system.gd" id="15_save"]
 [ext_resource type="Script" path="res://scripts/world/vegetation.gd" id="16_vegetation"]
+[ext_resource type="Script" path="res://scripts/systems/service_system.gd" id="17_services"]
+[ext_resource type="Script" path="res://scripts/world/info_overlay.gd" id="18_overlay"]
 
 [node name="Main" type="Node3D"]
 
@@ -63,6 +65,18 @@ script = ExtResource("13_demand")
 citizen_system_path = NodePath("../CitizenSystem")
 company_system_path = NodePath("../CompanySystem")
 
+[node name="ServiceSystem" type="Node3D" parent="."]
+script = ExtResource("17_services")
+road_network_path = NodePath("../RoadNetwork")
+zone_system_path = NodePath("../ZoneSystem")
+building_system_path = NodePath("../BuildingSystem")
+
+[node name="InfoOverlay" type="Node3D" parent="."]
+script = ExtResource("18_overlay")
+zone_system_path = NodePath("../ZoneSystem")
+building_system_path = NodePath("../BuildingSystem")
+service_system_path = NodePath("../ServiceSystem")
+
 [node name="BuildTool" type="Node3D" parent="."]
 script = ExtResource("14_buildtool")
 building_system_path = NodePath("../BuildingSystem")
@@ -76,6 +90,7 @@ building_system_path = NodePath("../BuildingSystem")
 company_system_path = NodePath("../CompanySystem")
 citizen_system_path = NodePath("../CitizenSystem")
 demand_system_path = NodePath("../DemandSystem")
+service_system_path = NodePath("../ServiceSystem")
 
 [node name="Vegetation" type="Node3D" parent="."]
 script = ExtResource("16_vegetation")

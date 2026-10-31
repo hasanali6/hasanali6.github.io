@@ -251,6 +251,15 @@ func _yard_trees() -> Array:
 				count = int(_cfg["yard_trees_house"])
 			"apartment", "kenney_b", "kenney_c":
 				count = int(_cfg["yard_trees_apartment"])
+		var spots: Array = (_cfg.get("service_trees", {}) as Dictionary).get(str(b["style"]), [])
+		if not spots.is_empty() and not b.get("abandoned", false):
+			# Service grounds: trees at fixed spots, fractions of the half lot size.
+			var fr: Vector2 = b["front"]
+			var across := Vector2(fr.y, -fr.x)
+			for k in spots.size():
+				var sp: Array = spots[k]
+				var q: Vector2 = b["centre"] + across * float(sp[0]) * float(b["width"]) * 0.5 + fr * float(sp[1]) * float(b["depth"]) * 0.5
+				out.append([1, q, s * (0.9 + 0.08 * (k % 3)), Color.html(palette[(int(b["id"]) + k) % palette.size()])])
 		if count == 0 or b.get("abandoned", false):
 			continue
 		var f: Vector2 = b["front"]

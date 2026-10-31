@@ -11,6 +11,11 @@ extends Node
 ## free homes and picks the best score from rent, shop access, a park nearby
 ## and a little randomness. Job choice: CompanySystem.try_hire samples nearby
 ## companies, preferring a job matching the worker's education.
+##
+## City services (ServiceSystem writes them onto the building records) add
+## to happiness, lower the death rate (health care) and decide how far
+## children growing up in a home get in school. Homes without electricity
+## or water are avoided by newcomers.
 
 @export var building_system_path: NodePath
 @export var company_system_path: NodePath
@@ -35,6 +40,7 @@ var _cursor: int = 0
 var _budget: float = 0.0
 var _immigration: float = 0.0
 var _demand_res: float = 0.0
+var _no_utility_score: float
 
 # Live counters (kept exact on every change).
 var population: int = 0
@@ -57,6 +63,7 @@ func _ready() -> void:
 	_happy = GameData.section("economy/happiness")
 	_default_tax = GameData.num("economy/taxes/default")
 	_ticks_per_month = int(GameData.num("time/real_seconds_per_day_at_1x") * GameData.num("time/tick_rate_hz"))
+	_no_utility_score = GameData.num("services/effects/no_utility_home_score")
 	_reset_month()
 	EventBus.sim_tick.connect(_on_tick)
 	EventBus.month_changed.connect(_on_month)
@@ -68,7 +75,7 @@ func _ready() -> void:
 
 
 func _reset_month() -> void:
-	_acc = {"tax": 0.0, "income": 0.0, "rent": 0.0, "goods": 0.0, "unmet": 0.0, "happy_sum": 0.0, "happy_n": 0}
+	_acc = {"tax": 0.0, "income": 0.0, "rent": 0.0, "goods": 0.0, "unmet": 0.0, "happy_sum": 0.0, "happy_n": 0, "deaths": 0}
 
 
 # --- Homes -----------------------------------------------------------------------
@@ -112,11 +119,22 @@ func _update_vacancy(bid: int) -> void:
 		_vacant.erase(bid)
 
 
+## Households, people and children per home onto the building records.
 func _write_occupancy() -> void:
 	var records: Dictionary = _buildings.buildings
 	for bid: int in _homes:
-		if records.has(bid):
-			records[bid]["occupants"] = (_homes[bid]["residents"] as PackedInt32Array).size()
+		if not records.has(bid):
+			continue
+		var residents: PackedInt32Array = _homes[bid]["residents"]
+		var people := 0
+		var children := 0
+		for i in residents:
+			people += data.members(i)
+			children += data.children[i]
+		var b: Dictionary = records[bid]
+		b["occupants"] = residents.size()
+		b["residents"] = people
+		b["children"] = children
 
 
 func _refresh_shops() -> void:
@@ -146,6 +164,9 @@ func _pick_home(max_rent: float, exclude: int) -> int:
 		if float(home["rent"]) > max_rent:
 			continue
 		var score := -float(home["rent"]) / 1000.0 + _rng.randf() * 0.3
+		var b: Dictionary = _buildings.buildings.get(bid, {})
+		if not (b.get("power", true) and b.get("water", true)):
+			score += _no_utility_score
 		if int(home["shop"]) >= 0:
 			score += 0.5
 		if _near_park(home["pos"]):
@@ -361,6 +382,8 @@ func _update(i: int) -> void:
 	var avg_tax := EconomySystem.residential_rate(data.edu[i * HouseholdData.MAX_ADULTS])
 	var h := EconomyRules.happiness(ratio, data.adults[i] > 0, data.broke[i] > 0, shop >= 0, avg_tax,
 		_near_park(home["pos"]), _happy, _default_tax)
+	var record: Dictionary = _buildings.buildings.get(bid, {})
+	h = clampf(h + float(record.get("service_happiness", 0.0)), 0.0, 100.0)
 	data.happiness[i] = h
 	_acc["happy_sum"] += h
 	_acc["happy_n"] += 1
@@ -388,18 +411,20 @@ func _update(i: int) -> void:
 
 func _lifecycle(i: int) -> void:
 	var before := data.members(i)
+	var record: Dictionary = _buildings.buildings.get(data.home[i], {})
 	_count(i, -1)
 	if data.adults[i] > 0 and data.children[i] < int(_hh["max_children"]) and _rng.randf() < float(_life["birth_chance"]):
 		data.children[i] += 1
 	if data.children[i] > 0 and _rng.randf() < float(_life["child_grows_chance"]):
 		if data.adults[i] < HouseholdData.MAX_ADULTS:
 			data.children[i] -= 1
-			data.add_adult(i, _random_education())
+			data.add_adult(i, _grown_education(record))
 	if data.adults[i] > 0 and _rng.randf() < float(_life["retire_chance"]):
 		_companies.release(data.remove_adult(i, data.adults[i] - 1))
 		data.seniors[i] += 1
-	if data.seniors[i] > 0 and _rng.randf() < float(_life["senior_death_chance"]):
+	if data.seniors[i] > 0 and _rng.randf() < float(_life["senior_death_chance"]) * float(record.get("death_mult", 1.0)):
 		data.seniors[i] -= 1
+		_acc["deaths"] += 1
 	_count(i, 1)
 	# A grown-up child may start a household of its own.
 	if data.adults[i] >= 2 and _rng.randf() < float(_life["move_out_chance"]):
@@ -419,12 +444,22 @@ func _lifecycle(i: int) -> void:
 		_write_occupancy_one(data.home[i])
 
 
+## Education a child reaches growing up in this home: high school and then
+## university need those schools covering it.
+func _grown_education(record: Dictionary) -> int:
+	var chance: Vector2 = record.get("edu_chance", Vector2.ZERO)
+	if _rng.randf() >= chance.x:
+		return 0
+	return 2 if _rng.randf() < chance.y else 1
+
+
 func _on_month(_m: int) -> void:
 	var n: int = _acc["happy_n"]
 	last_report = {
 		"population": population, "residential_tax": _acc["tax"], "income": _acc["income"], "rent": _acc["rent"],
 		"happiness": 50.0 if n == 0 else _acc["happy_sum"] / n,
 		"goods_unmet_ratio": 0.0 if _acc["goods"] <= 0.0 else _acc["unmet"] / _acc["goods"],
+		"deaths": _acc["deaths"],
 	}
 	_write_occupancy()
 	_write_building_happiness()

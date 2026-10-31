@@ -3,6 +3,7 @@ shader_type spatial;
 // instance (MultiMesh COLOR), a soft darkening towards the bottom and a gentle
 // wind sway that grows with height.
 
+global uniform float overlay_dim;
 uniform float sway = 0.12;
 uniform float crown_height = 8.0;
 
@@ -19,7 +20,8 @@ void vertex() {
 }
 
 void fragment() {
-	ALBEDO = v_color * mix(0.72, 1.05, clamp(v_height / crown_height, 0.0, 1.0));
+	vec3 albedo = v_color * mix(0.72, 1.05, clamp(v_height / crown_height, 0.0, 1.0));
+	ALBEDO = mix(albedo, vec3(dot(albedo, vec3(0.3, 0.55, 0.15))), overlay_dim * 0.8);
 	ROUGHNESS = 0.85;
 	SPECULAR = 0.25;
 	BACKLIGHT = v_color * 0.25;

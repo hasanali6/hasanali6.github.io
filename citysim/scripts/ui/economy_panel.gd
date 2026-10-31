@@ -1,11 +1,14 @@
 class_name EconomyPanel
 extends RefCounted
-## The economy card: three tabs.
-##   Bütçe   : last month's income and expenses line by line, and the net.
-##   Vergiler: tax sliders per zone group, residential also per education level.
-##   Kredi   : the single loan: amount, limit, interest, instalment, borrow/repay.
+## The economy card: four tabs.
+##   Bütçe     : last month's income and expenses line by line, and the net.
+##   Vergiler  : tax sliders per zone group, residential also per education level.
+##   Hizmetler : budget per service category (50..150 %), electricity and
+##               water fees, and how much of the utility capacity is in use.
+##   Kredi     : the single loan: amount, limit, interest, instalment, borrow/repay.
 
-const ROW_HEIGHT := 46.0
+const ROW_HEIGHT := 40.0
+const INCOME_KEYS := ["residential", "commercial", "office", "industrial", "subsidy", "power_fees", "water_fees"]
 
 var card: PanelContainer
 
@@ -17,20 +20,25 @@ var _budget_rows: Dictionary = {}
 var _net_label: Label
 var _tax_sliders: Dictionary = {}
 var _tax_values: Dictionary = {}
+var _svc_sliders: Dictionary = {}
+var _svc_values: Dictionary = {}
+var _utility_label: Label
 var _loan_label: Label
+var _categories: Dictionary
 
 
 func _init(font_size: int, min_touch: float) -> void:
 	_font = font_size
 	_touch = min_touch
-	var parts := UiStyle.card("ECON_TITLE", 640, font_size, min_touch)
+	_categories = GameData.section("services/categories")
+	var parts := UiStyle.card("ECON_TITLE", 760, font_size, min_touch)
 	card = parts[0]
 	var content: VBoxContainer = parts[1]
 
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 10)
 	var group := ButtonGroup.new()
-	for key: String in ["budget", "taxes", "loan"]:
+	for key: String in ["budget", "taxes", "services", "loan"]:
 		var b := Button.new()
 		b.text = "ECON_TAB_" + key.to_upper()
 		b.toggle_mode = true
@@ -45,6 +53,7 @@ func _init(font_size: int, min_touch: float) -> void:
 
 	_pages["budget"] = _build_budget()
 	_pages["taxes"] = _build_taxes()
+	_pages["services"] = _build_services()
 	_pages["loan"] = _build_loan()
 	for page: Control in _pages.values():
 		content.add_child(page)
@@ -52,6 +61,10 @@ func _init(font_size: int, min_touch: float) -> void:
 
 	EventBus.budget_settled.connect(func(_l: Dictionary) -> void: _refresh_budget())
 	EventBus.taxes_changed.connect(_refresh_taxes)
+	EventBus.service_budgets_changed.connect(_refresh_services)
+	EventBus.services_changed.connect(func() -> void:
+		if card.visible:
+			_refresh_utilities())
 	EventBus.loan_changed.connect(_refresh_loan)
 	EventBus.money_changed.connect(func(_b: int) -> void: _refresh_loan())
 
@@ -59,6 +72,7 @@ func _init(font_size: int, min_touch: float) -> void:
 func open() -> void:
 	_refresh_budget()
 	_refresh_taxes()
+	_refresh_services()
 	_refresh_loan()
 	card.visible = true
 
@@ -67,15 +81,17 @@ func _show(key: String) -> void:
 	for k: String in _pages:
 		(_pages[k] as Control).visible = k == key
 		(_tab_buttons[k] as Button).set_pressed_no_signal(k == key)
+	if key == "services":
+		_refresh_utilities()
 
 
 func _row(text_key: String) -> Array:
 	var row := HBoxContainer.new()
-	row.custom_minimum_size.y = ROW_HEIGHT * 0.7
-	var name := UiStyle.label(text_key, _font - 4)
+	row.custom_minimum_size.y = ROW_HEIGHT * 0.75
+	var name := UiStyle.label(text_key, _font - 5)
 	name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(name)
-	var value := UiStyle.label("", _font - 4)
+	var value := UiStyle.label("", _font - 5)
 	value.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(value)
@@ -85,35 +101,57 @@ func _row(text_key: String) -> Array:
 # --- Budget --------------------------------------------------------------------
 
 func _build_budget() -> VBoxContainer:
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 2)
-	col.add_child(UiStyle.label("ECON_INCOME", _font - 2))
-	for key: String in ["residential", "commercial", "office", "industrial", "subsidy"]:
+	var page := VBoxContainer.new()
+	page.add_theme_constant_override("separation", 6)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 28)
+	var income := VBoxContainer.new()
+	income.add_theme_constant_override("separation", 0)
+	income.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	income.add_child(UiStyle.label("ECON_INCOME", _font - 3))
+	for key: String in INCOME_KEYS:
 		var r := _row("ECON_IN_" + key.to_upper())
 		_budget_rows["in_" + key] = r[1]
-		col.add_child(r[0])
-	col.add_child(UiStyle.label("ECON_EXPENSES", _font - 2))
-	for key: String in ["roads", "loan"]:
-		var r := _row("ECON_OUT_" + key.to_upper())
+		income.add_child(r[0])
+	columns.add_child(income)
+	var expenses := VBoxContainer.new()
+	expenses.add_theme_constant_override("separation", 0)
+	expenses.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	expenses.add_child(UiStyle.label("ECON_EXPENSES", _font - 3))
+	for key: String in _expense_keys():
+		var r := _row(_expense_label(key))
 		_budget_rows["out_" + key] = r[1]
-		col.add_child(r[0])
+		expenses.add_child(r[0])
 	var c := _row("ECON_CONSTRUCTION")
 	_budget_rows["construction"] = c[1]
-	col.add_child(c[0])
+	expenses.add_child(c[0])
+	columns.add_child(expenses)
+	page.add_child(columns)
 	var n := _row("ECON_NET")
 	_net_label = n[1]
 	_net_label.add_theme_font_size_override("font_size", _font)
-	col.add_child(n[0])
-	return col
+	page.add_child(n[0])
+	return page
+
+
+func _expense_keys() -> Array:
+	var keys := ["roads"]
+	keys.append_array(_categories.keys())
+	keys.append("loan")
+	return keys
+
+
+func _expense_label(key: String) -> String:
+	return str(_categories[key]["name_key"]) if _categories.has(key) else "ECON_OUT_" + key.to_upper()
 
 
 func _refresh_budget() -> void:
 	var ledger := EconomySystem.last_ledger
 	var income: Dictionary = ledger.get("income", {})
 	var expenses: Dictionary = ledger.get("expenses", {})
-	for key: String in ["residential", "commercial", "office", "industrial", "subsidy"]:
+	for key: String in INCOME_KEYS:
 		(_budget_rows["in_" + key] as Label).text = "+" + UiStyle.format_int(roundi(float(income.get(key, 0.0))))
-	for key: String in ["roads", "loan"]:
+	for key: String in _expense_keys():
 		(_budget_rows["out_" + key] as Label).text = _minus(float(expenses.get(key, 0.0)))
 	(_budget_rows["construction"] as Label).text = _minus(float(ledger.get("construction", 0.0)))
 	var net := roundi(float(ledger.get("net", 0.0)))
@@ -128,6 +166,29 @@ func _minus(value: float) -> String:
 
 # --- Taxes ---------------------------------------------------------------------
 
+func _slider_row(name_key: String, lo: float, hi: float, step: float, name_width: float, on_change: Callable) -> Array:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var name := UiStyle.label(name_key, _font - 4)
+	name.custom_minimum_size.x = name_width
+	row.add_child(name)
+	var slider := HSlider.new()
+	slider.min_value = lo
+	slider.max_value = hi
+	slider.step = step
+	slider.focus_mode = Control.FOCUS_NONE
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size.y = _touch * 0.55
+	slider.value_changed.connect(on_change)
+	row.add_child(slider)
+	var value := UiStyle.label("", _font - 4)
+	value.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	value.custom_minimum_size.x = 64
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(value)
+	return [row, slider, value]
+
+
 func _build_taxes() -> VBoxContainer:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 4)
@@ -139,28 +200,10 @@ func _build_taxes() -> VBoxContainer:
 	entries.append_array([["commercial", "ECON_TAX_COMMERCIAL"], ["office", "ECON_TAX_OFFICE"], ["industrial", "ECON_TAX_INDUSTRIAL"]])
 	for entry: Array in entries:
 		var key: String = entry[0]
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		var name := UiStyle.label(entry[1], _font - 4 if key.begins_with("edu") else _font - 2)
-		name.custom_minimum_size.x = 230
-		row.add_child(name)
-		var slider := HSlider.new()
-		slider.min_value = tax_min
-		slider.max_value = tax_max
-		slider.step = 1.0
-		slider.focus_mode = Control.FOCUS_NONE
-		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		slider.custom_minimum_size.y = _touch * 0.6
-		slider.value_changed.connect(_on_tax.bind(key))
-		row.add_child(slider)
-		var value := UiStyle.label("", _font - 2)
-		value.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-		value.custom_minimum_size.x = 70
-		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		row.add_child(value)
-		_tax_sliders[key] = slider
-		_tax_values[key] = value
-		col.add_child(row)
+		var r := _slider_row(entry[1], tax_min, tax_max, 1.0, 230, _on_tax.bind(key))
+		_tax_sliders[key] = r[1]
+		_tax_values[key] = r[2]
+		col.add_child(r[0])
 	col.add_child(UiStyle.label("ECON_TAX_HINT", _font - 6))
 	return col
 
@@ -181,6 +224,80 @@ func _refresh_taxes() -> void:
 			v = EconomySystem.tax_rate(key)
 		(_tax_sliders[key] as HSlider).set_value_no_signal(v)
 		(_tax_values[key] as Label).text = "%d%%" % roundi(v)
+
+
+# --- Services -------------------------------------------------------------------
+
+func _build_services() -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 2)
+	col.add_child(UiStyle.label("ECON_SVC_BUDGETS", _font - 3))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 24)
+	grid.add_theme_constant_override("v_separation", 0)
+	var lo := GameData.num("services/budget/min") * 100.0
+	var hi := GameData.num("services/budget/max") * 100.0
+	for cat: String in _categories:
+		var r := _slider_row(_categories[cat]["name_key"], lo, hi, 5.0, 120, _on_service_budget.bind(cat))
+		(r[0] as Control).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_svc_sliders[cat] = r[1]
+		_svc_values[cat] = r[2]
+		grid.add_child(r[0])
+	col.add_child(grid)
+	col.add_child(UiStyle.label("ECON_SVC_FEES", _font - 3))
+	var fees := GridContainer.new()
+	fees.columns = 2
+	fees.add_theme_constant_override("h_separation", 24)
+	var flo := GameData.num("services/fees/min") * 100.0
+	var fhi := GameData.num("services/fees/max") * 100.0
+	for kind: String in ["power", "water"]:
+		var r := _slider_row("ECON_FEE_" + kind.to_upper(), flo, fhi, 5.0, 120, _on_fee.bind(kind))
+		(r[0] as Control).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_svc_sliders["fee_" + kind] = r[1]
+		_svc_values["fee_" + kind] = r[2]
+		fees.add_child(r[0])
+	col.add_child(fees)
+	_utility_label = UiStyle.label("", _font - 5)
+	_utility_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	col.add_child(_utility_label)
+	var hint := UiStyle.label("ECON_SVC_HINT", _font - 7)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size.x = 700
+	col.add_child(hint)
+	return col
+
+
+func _on_service_budget(value: float, category: String) -> void:
+	EconomySystem.set_service_budget(category, value / 100.0)
+
+
+func _on_fee(value: float, kind: String) -> void:
+	EconomySystem.set_utility_fee(kind, value / 100.0)
+
+
+func _refresh_services() -> void:
+	for key: String in _svc_sliders:
+		var v: float
+		if key.begins_with("fee_"):
+			v = EconomySystem.utility_fee(key.substr(4)) * 100.0
+		else:
+			v = EconomySystem.service_budget(key) * 100.0
+		(_svc_sliders[key] as HSlider).set_value_no_signal(v)
+		(_svc_values[key] as Label).text = "%d%%" % roundi(v)
+
+
+func _refresh_utilities() -> void:
+	var services := card.get_tree().current_scene.get_node_or_null("ServiceSystem") if card.is_inside_tree() else null
+	if services == null:
+		return
+	var totals: Dictionary = services.utility_totals()
+	var p: Array = totals["power"]
+	var w: Array = totals["water"]
+	var s: Array = totals["sewage"]
+	_utility_label.text = tr("ECON_UTIL_SUMMARY") % [snappedf(float(p[0]), 0.1), snappedf(float(p[1]), 0.1),
+		UiStyle.format_int(roundi(float(w[0]))), UiStyle.format_int(roundi(float(w[1]))),
+		UiStyle.format_int(roundi(float(s[0]))), UiStyle.format_int(roundi(float(s[1])))]
 
 
 # --- Loan ------------------------------------------------------------------------

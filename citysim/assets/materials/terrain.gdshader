@@ -5,6 +5,9 @@ shader_type spatial;
 // a dirt/dry-grass mask adds imperfection, the locked area outside the map is
 // desaturated, and an optional 8 m zoning grid fades out with distance.
 
+// 0..1 while an info overlay is shown: the ground turns grey so the
+// overlay colours stand out.
+global uniform float overlay_dim;
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform sampler2D noise_normal : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform vec3 grass_a : source_color = vec3(0.36, 0.42, 0.27);
@@ -91,7 +94,7 @@ void fragment() {
 		col = mix(col, grid_color, grid);
 	}
 
-	ALBEDO = col;
+	ALBEDO = mix(col, vec3(dot(col, vec3(0.3, 0.55, 0.15))) * 0.85, overlay_dim * 0.8);
 	ROUGHNESS = clamp(base_roughness - fine * 0.06 + dirt_mask * 0.03, 0.0, 1.0);
 	SPECULAR = 0.35;
 }
