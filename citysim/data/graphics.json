@@ -2,11 +2,7 @@
   "default_preset": "medium",
   "target_fps": 60,
   "refresh_divisor_tolerance": 0.05,
-  "preset_order": [
-    "low",
-    "medium",
-    "high"
-  ],
+  "preset_order": ["low", "medium", "high"],
   "presets": {
     "low": {
       "render_scale": 0.6,
@@ -22,7 +18,9 @@
       "tree_draw_distance_m": 500.0,
       "glow": false,
       "terrain_detail": false,
-      "tree_shadows": false
+      "tree_shadows": false,
+      "vehicle_cap": 300,
+      "vehicle_draw_distance_m": 700.0
     },
     "medium": {
       "render_scale": 0.75,
@@ -38,7 +36,9 @@
       "tree_draw_distance_m": 900.0,
       "glow": false,
       "terrain_detail": true,
-      "tree_shadows": true
+      "tree_shadows": true,
+      "vehicle_cap": 800,
+      "vehicle_draw_distance_m": 1100.0
     },
     "high": {
       "render_scale": 0.9,
@@ -54,7 +54,9 @@
       "tree_draw_distance_m": 1600.0,
       "glow": true,
       "terrain_detail": true,
-      "tree_shadows": true
+      "tree_shadows": true,
+      "vehicle_cap": 1500,
+      "vehicle_draw_distance_m": 1600.0
     }
   },
   "dynamic_resolution": {

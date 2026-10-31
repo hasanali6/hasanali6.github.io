@@ -62,6 +62,14 @@ signal services_reported(report: Dictionary)
 ## Info overlay chosen in the UI ("" = off).
 signal overlay_selected(key: String)
 
+# --- Traffic ---
+## Driving lanes were rebuilt after a road edit (vehicles remap their pieces).
+signal lanes_rebuilt()
+## A traffic assignment finished: congestion, routes and commute times changed.
+signal traffic_updated()
+## A road was long-pressed: {type_key, lanes, daily, ratio, speed_kmh}.
+signal road_inspected(info: Dictionary)
+
 # --- World queries resolved by the camera ---
 signal ground_long_pressed(world_pos: Vector3)
 

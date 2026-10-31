@@ -377,6 +377,7 @@ func _on_long_press(world_pos: Vector3) -> void:
 		"polluted_water": b.get("polluted_water", false), "pollution": b.get("pollution", 0.0),
 		"coverage": b.get("coverage", {}), "happiness": b.get("happiness", 0.0),
 		"residents": b.get("residents", 0), "no_utility_months": b.get("no_utility_months", 0),
+		"commute": b.get("commute", -1.0),
 	})
 
 

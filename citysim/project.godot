@@ -68,3 +68,7 @@ overlay_dim={
 "type": "float",
 "value": 0.0
 }
+traffic_time={
+"type": "float",
+"value": 0.0
+}

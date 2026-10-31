@@ -31,6 +31,7 @@ const OVERLAYS: Array = [
 	["police", "SVC_CAT_POLICE", UiStyle.BLUE], ["fire", "SVC_CAT_FIRE", UiStyle.ORANGE],
 	["garbage", "SVC_CAT_GARBAGE", UiStyle.GREEN], ["deathcare", "SVC_CAT_DEATHCARE", UiStyle.SLATE],
 	["pollution", "OVERLAY_POLLUTION", UiStyle.SLATE], ["happiness", "OVERLAY_HAPPINESS", UiStyle.GREEN],
+	["traffic", "OVERLAY_TRAFFIC", UiStyle.ORANGE],
 ]
 ## Speed buttons: [icon, badge text].
 const SPEEDS: Array = [["pause", ""], ["play", ""], ["fast-forward", "2"], ["fast-forward", "3"]]
@@ -114,7 +115,7 @@ func _ready() -> void:
 	_catalog = CatalogPanel.new(FONT_SIZE, MIN_TOUCH, _close_catalog)
 	_overlay_panel = _build_overlay_panel()
 	# Beside the left buttons, so the city stays visible under the colours.
-	_place(_overlay_panel, Vector2(0, 0.5), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BOTH, Vector2(MIN_TOUCH + 26, 40))
+	_place(_overlay_panel, Vector2(0, 0.5), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BOTH, Vector2(MIN_TOUCH + 26, 70))
 	_place(_catalog.panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
 	_rci = _build_rci()
 	_place(_rci.get_parent(), Vector2(0, 0), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_END, Vector2(0, 96))
@@ -150,6 +151,10 @@ func _ready() -> void:
 			_select_overlay(str(item["category"]))
 		elif tool == "place" and not _overlay_panel.visible:
 			_select_overlay(""))
+	EventBus.road_inspected.connect(_on_road_inspected)
+	EventBus.traffic_updated.connect(func() -> void:
+		if _overlay_panel.visible:
+			_refresh_overlay_legend())
 	EventBus.services_changed.connect(func() -> void:
 		if _overlay_panel.visible:
 			_refresh_overlay_legend())
@@ -656,8 +661,21 @@ func _on_building_inspected(info: Dictionary) -> void:
 			pct.call("fire"), pct.call("garbage"), pct.call("deathcare")])
 		if float(info.get("pollution", 0.0)) > 0.02:
 			lines.append(tr("BUILDING_POLLUTION") % roundi(float(info["pollution"]) * 100.0))
+		if float(info.get("commute", -1.0)) >= 0.0 and int(info.get("households", 0)) > 0:
+			lines.append(tr("BUILDING_COMMUTE") % roundi(float(info["commute"])))
 	lines.append(tr("BUILDING_SIZE") % [roundi(info["width"]), roundi(info["depth"])])
 	_show_info(lines)
+
+
+func _on_road_inspected(info: Dictionary) -> void:
+	_building_shown_frame = Engine.get_process_frames()
+	var lines := PackedStringArray([tr(info["type_key"])])
+	lines.append(tr("ROAD_INFO_LANES") % [int(info["lanes"]), roundi(float(info["limit_kmh"]))])
+	lines.append(tr("ROAD_INFO_DAILY") % UiStyle.format_int(roundi(float(info["daily"]))))
+	lines.append(tr("ROAD_INFO_LOAD") % [roundi(float(info["ratio"]) * 100.0), roundi(float(info["speed_kmh"]))])
+	lines.append(tr("ROAD_INFO_LENGTH") % roundi(float(info["length"])))
+	_show_info(lines)
+	_info_title.text = "ROAD_INFO_TITLE"
 
 
 func _show_info(lines: PackedStringArray) -> void:
@@ -761,7 +779,7 @@ func _build_overlay_panel() -> PanelContainer:
 	top.add_child(close)
 	col.add_child(top)
 	var grid := GridContainer.new()
-	grid.columns = 2
+	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 6)
 	var group := ButtonGroup.new()
@@ -779,7 +797,7 @@ func _build_overlay_panel() -> PanelContainer:
 	_overlay_legend = _label("", FONT_SIZE - 8)
 	_overlay_legend.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	_overlay_legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_overlay_legend.custom_minimum_size.x = 270
+	_overlay_legend.custom_minimum_size.x = 400
 	col.add_child(_overlay_legend)
 	return panel
 
@@ -821,6 +839,10 @@ func _refresh_overlay_legend() -> void:
 					UiStyle.format_int(roundi(float(sw[0]))), UiStyle.format_int(roundi(float(sw[1])))]
 		"pollution":
 			text = tr("OVERLAY_LEGEND_POLLUTION")
+		"traffic":
+			var traffic := get_tree().current_scene.get_node("TrafficSystem")
+			var vehicles := get_tree().current_scene.get_node("VehicleSystem")
+			text = tr("OVERLAY_LEGEND_TRAFFIC") % [roundi(float(traffic.last_stats.get("avg_commute", 0.0))), int(vehicles.active)]
 		_:
 			text = tr("OVERLAY_LEGEND")
 	_overlay_legend.text = text

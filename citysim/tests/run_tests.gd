@@ -32,6 +32,9 @@ func _initialize() -> void:
 	_test_economy_rules()
 	_test_water()
 	_test_service_rules()
+	_test_traffic_rules()
+	_test_traffic_assignment()
+	_test_lane_geometry()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -52,7 +55,7 @@ func _input_config() -> Dictionary:
 
 
 func _test_data_files() -> void:
-	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy", "zones", "services", "vegetation", "catalog"]:
+	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy", "zones", "services", "vegetation", "catalog", "traffic"]:
 		_check(not DataLoader.load_json("res://data/%s.json" % f).is_empty(), "data file %s loads" % f)
 	var db := DataLoader.load_files(PackedStringArray(["graphics"]))
 	for preset: String in DataLoader.lookup(db, "graphics/preset_order"):
@@ -490,3 +493,136 @@ func _test_service_rules() -> void:
 	var chances := ServiceRules.education_chances({"education1": 1.0}, fx)
 	_check(chances.x > 0.5 and chances.y == 0.0, "high school without university educates to level 1 only")
 	_check(ServiceRules.category_coverage({"education0": 0.2, "education2": 0.7}, "education") == 0.7, "education coverage is the best school level")
+
+
+func _traffic_cfg() -> Dictionary:
+	return DataLoader.load_json("res://data/traffic.json")
+
+
+func _test_traffic_rules() -> void:
+	_check(is_equal_approx(TrafficRules.speed_factor(0.0, 600.0, 0.15, 4.0, 0.15), 1.0), "an empty road runs at full speed")
+	_check(TrafficRules.speed_factor(1200.0, 600.0, 0.15, 4.0, 0.15) < 0.4, "a road at twice its capacity crawls")
+	var free := TrafficRules.position_at(10.0, 0.0, 0.0, 10.0, 1e6, 0.0, 1.4, 2.5)
+	_check(is_equal_approx(snappedf(free, 0.01), 100.0), "free vehicle moves at its speed (%.2f)" % free)
+	var stopped := TrafficRules.position_at(100.0, 0.0, 0.0, 10.0, 50.0, 0.0, 1.4, 2.5)
+	var before := TrafficRules.position_at(4.0, 0.0, 0.0, 10.0, 50.0, 0.0, 1.4, 2.5)
+	_check(absf(stopped - 50.0) < 0.05 and before < 40.0, "vehicle eases to its stop line (%.2f, %.2f)" % [stopped, before])
+	var peak := -INF
+	for i in 200:
+		peak = maxf(peak, TrafficRules.position_at(i * 0.1, 0.0, 0.0, 14.0, 30.0, 0.0, 1.4, 2.5))
+	_check(peak <= 30.0 + 1e-3, "no overshoot past the stop line (%.3f)" % peak)
+	var starting := TrafficRules.position_at(0.5, 0.0, 0.0, 10.0, 1e6, 1.0, 1.4, 2.5)
+	_check(starting < 2.0 and starting > 0.0, "a vehicle starting from rest accelerates (%.2f)" % starting)
+	var arrive := TrafficRules.time_to_reach(80.0, 0.0, 0.0, 10.0, 1.0, 1.4)
+	var at := TrafficRules.position_at(arrive, 0.0, 0.0, 10.0, 1e6, 1.0, 1.4, 2.5)
+	_check(absf(at - 80.0) < 0.3, "arrival time matches the motion model (%.2f m)" % at)
+	var cross := TrafficRules.signal_groups([Vector2.RIGHT, Vector2.UP, Vector2.LEFT, Vector2.DOWN])
+	_check(cross == PackedInt32Array([0, 1, 0, 1]), "a crossing gets two opposite signal groups")
+	var tee := TrafficRules.signal_groups([Vector2.RIGHT, Vector2.LEFT, Vector2.DOWN])
+	_check(tee == PackedInt32Array([0, 0, 1]), "a T junction lets the through road share a phase")
+	_check(TrafficRules.turn_of(Vector2.RIGHT, Vector2.DOWN) == 1 and TrafficRules.turn_of(Vector2.RIGHT, Vector2.UP) == -1
+		and TrafficRules.turn_of(Vector2.RIGHT, Vector2.RIGHT) == 0, "turns are classified (map z points down)")
+	_check(TrafficRules.lane_for_turn(1, 0, 3) == 2 and TrafficRules.lane_for_turn(-1, 2, 3) == 0
+		and TrafficRules.lane_for_turn(0, 5, 2) == 1, "lanes are picked for the next turn")
+	var cfg: Dictionary = _traffic_cfg()["commute"]
+	_check(TrafficRules.commute_happiness(10.0, cfg) == 0.0 and TrafficRules.commute_happiness(45.0, cfg) < -10.0,
+		"long commutes make people unhappy")
+	_check(is_equal_approx(TrafficRules.hourly([0.0, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 0.5), 0.5),
+		"hourly profiles interpolate")
+	var g := _graph()
+	for r: Array in [[Vector2(0, 0), Vector2(400, 0)], [Vector2(400, 0), Vector2(400, 400)], [Vector2(0, 0), Vector2(0, 400)], [Vector2(0, 400), Vector2(400, 400)]]:
+		g.commit_road(g.plan_road(r[0], r[1], null), "street")
+	g.commit_road(g.plan_road(Vector2(1000, 0), Vector2(1400, 0), null), "street_oneway")
+	var tg := TrafficGraph.build(g, _roads()["types"], _traffic_cfg())
+	_check(tg.node_count() == 6 and tg.edge_count() == 10, "traffic graph mirrors the roads (%d nodes, %d edges)" % [tg.node_count(), tg.edge_count()])
+	var costs := TrafficRules.edge_costs(tg, TrafficRules.factors_for(tg, PackedFloat32Array(), _traffic_cfg()), _traffic_cfg())
+	var origin: int = tg.node_index[g.find_node_near(Vector2(0, 0), 0.5)]
+	var corner: int = tg.node_index[g.find_node_near(Vector2(400, 400), 0.5)]
+	var res := TrafficRules.dijkstra(tg, PackedInt32Array([origin]), PackedFloat32Array([0.0]), costs, true)
+	var t_corner: float = res["dist"][corner]
+	_check(absf(t_corner - 800.0 / (40.0 / 3.6)) < 0.5, "shortest time follows the streets (%.1f s)" % t_corner)
+	_check(TrafficRules.path_to(tg, res["via"], corner).size() == 2, "the route to the far corner has two roads")
+	var ow_a: int = tg.node_index[g.find_node_near(Vector2(1000, 0), 0.5)]
+	var ow_b: int = tg.node_index[g.find_node_near(Vector2(1400, 0), 0.5)]
+	var ow := TrafficRules.dijkstra(tg, PackedInt32Array([ow_b]), PackedFloat32Array([0.0]), costs, true)
+	var ow_back := TrafficRules.dijkstra(tg, PackedInt32Array([ow_a]), PackedFloat32Array([0.0]), costs, true)
+	_check(ow["dist"][ow_a] >= TrafficRules.FAR and ow_back["dist"][ow_b] < TrafficRules.FAR, "one-way roads only run one way")
+
+
+func _test_traffic_assignment() -> void:
+	var cfg := _traffic_cfg()
+	var g := _graph()
+	for x in [0, 400, 800]:
+		g.commit_road(g.plan_road(Vector2(x, 2000), Vector2(x + 400, 2000), null), "street")
+	var tg := TrafficGraph.build(g, _roads()["types"], cfg)
+	var s_first: int = tg.seg_index[g.find_segment_near(Vector2(200, 2000), 1.0)["segment"]]
+	var s_mid: int = tg.seg_index[g.find_segment_near(Vector2(600, 2000), 1.0)["segment"]]
+	var s_last: int = tg.seg_index[g.find_segment_near(Vector2(1000, 2000), 1.0)["segment"]]
+	var job := TrafficAssignment.new()
+	job.graph = tg
+	job.cfg = cfg
+	job.trip_origin = PackedInt32Array([s_first, s_last])
+	job.trip_dest = PackedInt32Array([s_last, s_first])
+	job.trip_count = PackedFloat32Array([100.0, 40.0])
+	job.trip_forward = PackedByteArray([0, 1])
+	job.run()
+	var east := s_mid * 2 if tg.node_pos[tg.seg_a[s_mid]].x < tg.node_pos[tg.seg_b[s_mid]].x else s_mid * 2 + 1
+	var west := east ^ 1
+	_check(job.done and is_equal_approx(job.volumes[east], 100.0) and is_equal_approx(job.volumes[west], 40.0),
+		"trips load the roads they use (%.0f / %.0f)" % [job.volumes[east], job.volumes[west]])
+	_check(absf(job.trip_time[0] - 800.0 / (40.0 / 3.6)) < 1.0, "trip time from the tree (%.1f s)" % job.trip_time[0])
+	var via: PackedInt32Array = job.rev_trees[s_last]
+	_check(TrafficRules.path_from(tg, via, job.trip_node[0]).size() == 1, "vehicle routes come from the kept trees")
+	var jam := TrafficAssignment.new()
+	jam.graph = tg
+	jam.cfg = cfg
+	jam.trip_origin = PackedInt32Array([s_first])
+	jam.trip_dest = PackedInt32Array([s_last])
+	jam.trip_count = PackedFloat32Array([20000.0])
+	jam.trip_forward = PackedByteArray([0])
+	jam.run()
+	var again := TrafficAssignment.new()
+	again.graph = tg
+	again.cfg = cfg
+	again.trip_origin = jam.trip_origin
+	again.trip_dest = jam.trip_dest
+	again.trip_count = jam.trip_count
+	again.trip_forward = jam.trip_forward
+	again.previous = jam.volumes
+	again.run()
+	_check(jam.factors[east] < 0.5 and again.trip_time[0] > jam.trip_time[0] * 1.5,
+		"congestion slows trips down (%.2f, %.0f s -> %.0f s)" % [jam.factors[east], jam.trip_time[0], again.trip_time[0]])
+
+
+func _test_lane_geometry() -> void:
+	var roads := _roads()
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(0, 3000), Vector2(200, 3000), null), "street")
+	g.commit_road(g.plan_road(Vector2(100, 3000), Vector2(100, 3200), null), "avenue")
+	var lg := LaneGeometry.new()
+	lg.rebuild(g, roads["types"], roads["mesh"])
+	var west_seg: int = g.find_segment_near(Vector2(50, 3000), 1.0)["segment"]
+	var seg: RoadGraph.RoadSegment = g.segments[west_seg]
+	var eastward := 0 if g.nodes[seg.a].pos.x < g.nodes[seg.b].pos.x else 1
+	var pid: int = lg.lane_pieces[LaneGeometry.lane_key(west_seg, eastward, 0)]
+	var pts := lg.points(pid)
+	_check(pts[0].x < pts[pts.size() - 1].x and absf(pts[0].y - 3001.5) < 0.05,
+		"eastbound lane runs east on the right-hand side (z %.2f)" % pts[0].y)
+	_check(lg.piece_length[pid] < 100.0 - 1.0, "lanes stop at the junction mouth (%.1f m)" % lg.piece_length[pid])
+	var connectors := 0
+	var joined := true
+	for key: Vector3i in lg.conn_pieces:
+		connectors += 1
+		var c := lg.points(lg.conn_pieces[key])
+		var from_pts := lg.points(lg.lane_pieces[key.y])
+		var to_pts := lg.points(lg.lane_pieces[key.z])
+		if c[0].distance_to(from_pts[from_pts.size() - 1]) > 0.01 or c[c.size() - 1].distance_to(to_pts[0]) > 0.01:
+			joined = false
+	# T junction: street legs 1 lane, avenue leg 2 lanes per direction.
+	# street->street 1x1 twice, street->avenue 1x2 twice, avenue->street 2x1 twice.
+	_check(connectors == 10 and joined, "junction connectors link lane ends to lane starts (%d)" % connectors)
+	var img := lg.image()
+	_check(img.get_width() == LaneGeometry.TEX_WIDTH and img.get_format() == Image.FORMAT_RGF, "lane texture is packed for the shader")
+	var before := lg.piece_total()
+	lg.rebuild(g, roads["types"], roads["mesh"])
+	_check(lg.piece_total() == before, "rebuilding reuses unchanged pieces")

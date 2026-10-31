@@ -209,3 +209,12 @@ SVC_INFO_RADIUS,Kapsama: yol üzerinden %.1f km,Coverage: %.1f km along roads
 SVC_INFO_STORAGE,Doluluk: %s / %s,Filled: %s / %s
 SVC_INFO_OVERLOADED,"Kapasite yetersiz, verim %d%%","Over capacity, working at %d%%"
 BUILDING_INFO_TITLE,Bina bilgisi,Building info
+OVERLAY_TRAFFIC,Trafik,Traffic
+OVERLAY_LEGEND_TRAFFIC,Yeşil: akıcı · Sarı: yoğun · Kırmızı: sıkışık · Ortalama işe gidiş %d dk · %d araç,Green: flowing · Yellow: busy · Red: jammed · Average commute %d min · %d vehicles
+ROAD_INFO_TITLE,Yol bilgisi,Road info
+ROAD_INFO_LANES,%d şerit · Hız sınırı %d km/sa,%d lanes · Speed limit %d km/h
+ROAD_INFO_DAILY,Günlük trafik: %s araç,Daily traffic: %s vehicles
+ROAD_INFO_LOAD,Yoğunluk: %d%% · Ortalama hız: %d km/sa,Load: %d%% · Average speed: %d km/h
+ROAD_INFO_LENGTH,Uzunluk: %d m,Length: %d m
+BUILDING_COMMUTE,İşe gidiş: %d dk,Commute: %d min
+NOTIFY_TRAFFIC_JAM,Trafik sıkışık! %d yolda yoğunluk çok yüksek,Traffic jam! %d roads are over capacity

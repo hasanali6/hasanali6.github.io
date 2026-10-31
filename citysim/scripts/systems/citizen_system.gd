@@ -15,10 +15,12 @@ extends Node
 ## City services (ServiceSystem writes them onto the building records) add
 ## to happiness, lower the death rate (health care) and decide how far
 ## children growing up in a home get in school. Homes without electricity
-## or water are avoided by newcomers.
+## or water are avoided by newcomers. Long commutes (road travel times from
+## the TrafficSystem) and traffic noise outside the home lower happiness.
 
 @export var building_system_path: NodePath
 @export var company_system_path: NodePath
+@export var traffic_system_path: NodePath
 
 var data := HouseholdData.new()
 var last_report: Dictionary = {}
@@ -41,6 +43,9 @@ var _budget: float = 0.0
 var _immigration: float = 0.0
 var _demand_res: float = 0.0
 var _no_utility_score: float
+var _traffic: Node
+var _commute_cfg: Dictionary
+var _noise_happiness: float
 
 # Live counters (kept exact on every change).
 var population: int = 0
@@ -64,6 +69,10 @@ func _ready() -> void:
 	_default_tax = GameData.num("economy/taxes/default")
 	_ticks_per_month = int(GameData.num("time/real_seconds_per_day_at_1x") * GameData.num("time/tick_rate_hz"))
 	_no_utility_score = GameData.num("services/effects/no_utility_home_score")
+	_commute_cfg = GameData.section("traffic/commute")
+	_noise_happiness = GameData.num("traffic/noise/happiness")
+	if not traffic_system_path.is_empty():
+		_traffic = get_node(traffic_system_path)
 	_reset_month()
 	EventBus.sim_tick.connect(_on_tick)
 	EventBus.month_changed.connect(_on_month)
@@ -385,7 +394,13 @@ func _update(i: int) -> void:
 	var h := EconomyRules.happiness(ratio, data.adults[i] > 0, data.broke[i] > 0, shop >= 0, avg_tax,
 		_near_park(home["pos"]), _happy, _default_tax)
 	var record: Dictionary = _buildings.buildings.get(bid, {})
-	h = clampf(h + float(record.get("service_happiness", 0.0)), 0.0, 100.0)
+	h += float(record.get("service_happiness", 0.0))
+	if _traffic != null:
+		var commute := _commute_of(i, record)
+		if commute >= 0.0:
+			h += TrafficRules.commute_happiness(commute, _commute_cfg)
+		h += _noise_happiness * float(_traffic.noise(int(record.get("segment", -1))))
+	h = clampf(h, 0.0, 100.0)
 	data.happiness[i] = h
 	_acc["happy_sum"] += h
 	_acc["happy_n"] += 1
@@ -469,6 +484,30 @@ func _on_month(_m: int) -> void:
 	EventBus.citizens_reported.emit(last_report)
 
 
+## Average road commute (minutes) of a household's workers, or -1 if nobody
+## works. Pairs the traffic assignment has not seen yet are estimated from
+## the straight distance.
+func _commute_of(i: int, record: Dictionary) -> float:
+	var records: Dictionary = _buildings.buildings
+	var home_seg := int(record.get("segment", -1))
+	var total := 0.0
+	var n := 0
+	for k in data.adults[i]:
+		var code := data.job[i * HouseholdData.MAX_ADULTS + k]
+		if code == HouseholdData.NO_JOB:
+			continue
+		var work: Dictionary = records.get(HouseholdData.job_company(code), {})
+		if work.is_empty():
+			continue
+		var minutes: float = _traffic.commute_minutes(home_seg, int(work.get("segment", -1)))
+		if minutes < 0.0:
+			var dist := (record.get("centre", Vector2.ZERO) as Vector2).distance_to(work["centre"])
+			minutes = dist * 1.3 / float(_commute_cfg["fallback_speed_ms"]) / 60.0
+		total += minutes
+		n += 1
+	return -1.0 if n == 0 else total / n
+
+
 func _write_building_happiness() -> void:
 	var records: Dictionary = _buildings.buildings
 	for bid: int in _homes:
@@ -476,9 +515,17 @@ func _write_building_happiness() -> void:
 			continue
 		var residents: PackedInt32Array = _homes[bid]["residents"]
 		var total := 0.0
+		var commute_sum := 0.0
+		var commute_n := 0
 		for i in residents:
 			total += data.happiness[i]
+			if _traffic != null:
+				var c := _commute_of(i, records[bid])
+				if c >= 0.0:
+					commute_sum += c
+					commute_n += 1
 		records[bid]["happiness"] = 0.0 if residents.is_empty() else total / residents.size()
+		records[bid]["commute"] = -1.0 if commute_n == 0 else commute_sum / commute_n
 
 
 func stats() -> Dictionary:

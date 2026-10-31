@@ -67,44 +67,29 @@
       "category": "power",
       "name_key": "SVC_COAL",
       "style": "svc_coal",
-      "lot": [
-        4,
-        4
-      ],
+      "lot": [4, 4],
       "cost": 30000,
       "upkeep": 1400,
       "power": 60.0,
-      "pollution": [
-        450.0,
-        1.0
-      ]
+      "pollution": [450.0, 1.0]
     },
     {
       "id": "gas_plant",
       "category": "power",
       "name_key": "SVC_GAS",
       "style": "svc_gas",
-      "lot": [
-        3,
-        3
-      ],
+      "lot": [3, 3],
       "cost": 38000,
       "upkeep": 1600,
       "power": 40.0,
-      "pollution": [
-        260.0,
-        0.5
-      ]
+      "pollution": [260.0, 0.5]
     },
     {
       "id": "wind_turbine",
       "category": "power",
       "name_key": "SVC_WIND",
       "style": "svc_wind",
-      "lot": [
-        1,
-        1
-      ],
+      "lot": [1, 1],
       "cost": 7000,
       "upkeep": 160,
       "power": 3.0
@@ -114,10 +99,7 @@
       "category": "power",
       "name_key": "SVC_SOLAR",
       "style": "svc_solar",
-      "lot": [
-        3,
-        3
-      ],
+      "lot": [3, 3],
       "cost": 20000,
       "upkeep": 320,
       "power": 8.0
@@ -127,10 +109,7 @@
       "category": "water",
       "name_key": "SVC_PUMP",
       "style": "svc_pump",
-      "lot": [
-        2,
-        2
-      ],
+      "lot": [2, 2],
       "cost": 9000,
       "upkeep": 420,
       "water": 30000.0,
@@ -141,18 +120,12 @@
       "category": "water",
       "name_key": "SVC_OUTLET",
       "style": "svc_outlet",
-      "lot": [
-        1,
-        2
-      ],
+      "lot": [1, 2],
       "cost": 5000,
       "upkeep": 220,
       "sewage": 36000.0,
       "needs_water": true,
-      "pollution": [
-        380.0,
-        0.9
-      ],
+      "pollution": [380.0, 0.9],
       "water_pollution": true
     },
     {
@@ -160,10 +133,7 @@
       "category": "water",
       "name_key": "SVC_TREATMENT",
       "style": "svc_treatment",
-      "lot": [
-        3,
-        3
-      ],
+      "lot": [3, 3],
       "cost": 26000,
       "upkeep": 950,
       "sewage": 60000.0,
@@ -174,10 +144,7 @@
       "category": "health",
       "name_key": "SVC_CLINIC",
       "style": "svc_clinic",
-      "lot": [
-        2,
-        2
-      ],
+      "lot": [2, 2],
       "cost": 9000,
       "upkeep": 650,
       "radius": 900.0,
@@ -188,10 +155,7 @@
       "category": "health",
       "name_key": "SVC_HOSPITAL",
       "style": "svc_hospital",
-      "lot": [
-        3,
-        4
-      ],
+      "lot": [3, 4],
       "cost": 32000,
       "upkeep": 2200,
       "radius": 2400.0,
@@ -202,10 +166,7 @@
       "category": "education",
       "name_key": "SVC_ELEMENTARY",
       "style": "svc_school",
-      "lot": [
-        2,
-        3
-      ],
+      "lot": [2, 3],
       "cost": 12000,
       "upkeep": 800,
       "radius": 1000.0,
@@ -217,10 +178,7 @@
       "category": "education",
       "name_key": "SVC_HIGHSCHOOL",
       "style": "svc_highschool",
-      "lot": [
-        3,
-        3
-      ],
+      "lot": [3, 3],
       "cost": 22000,
       "upkeep": 1400,
       "radius": 1800.0,
@@ -232,10 +190,7 @@
       "category": "education",
       "name_key": "SVC_UNIVERSITY",
       "style": "svc_university",
-      "lot": [
-        4,
-        4
-      ],
+      "lot": [4, 4],
       "cost": 52000,
       "upkeep": 3200,
       "radius": 4500.0,
@@ -247,10 +202,7 @@
       "category": "police",
       "name_key": "SVC_POLICE",
       "style": "svc_police",
-      "lot": [
-        2,
-        2
-      ],
+      "lot": [2, 2],
       "cost": 11000,
       "upkeep": 750,
       "radius": 1200.0,
@@ -261,10 +213,7 @@
       "category": "fire",
       "name_key": "SVC_FIRE",
       "style": "svc_fire",
-      "lot": [
-        2,
-        2
-      ],
+      "lot": [2, 2],
       "cost": 11000,
       "upkeep": 750,
       "radius": 1200.0,
@@ -275,10 +224,7 @@
       "category": "garbage",
       "name_key": "SVC_LANDFILL",
       "style": "svc_landfill",
-      "lot": [
-        4,
-        4
-      ],
+      "lot": [4, 4],
       "cost": 9000,
       "upkeep": 550,
       "radius": 2600.0,
@@ -290,28 +236,19 @@
       "category": "garbage",
       "name_key": "SVC_INCINERATOR",
       "style": "svc_incinerator",
-      "lot": [
-        3,
-        3
-      ],
+      "lot": [3, 3],
       "cost": 30000,
       "upkeep": 1500,
       "radius": 3200.0,
       "capacity": 14000,
-      "pollution": [
-        300.0,
-        0.6
-      ]
+      "pollution": [300.0, 0.6]
     },
     {
       "id": "cemetery",
       "category": "deathcare",
       "name_key": "SVC_CEMETERY",
       "style": "svc_cemetery",
-      "lot": [
-        3,
-        3
-      ],
+      "lot": [3, 3],
       "cost": 7000,
       "upkeep": 320,
       "radius": 2200.0,
@@ -323,18 +260,12 @@
       "category": "deathcare",
       "name_key": "SVC_CREMATORIUM",
       "style": "svc_crematorium",
-      "lot": [
-        2,
-        2
-      ],
+      "lot": [2, 2],
       "cost": 16000,
       "upkeep": 800,
       "radius": 2600.0,
       "capacity": 15000,
-      "pollution": [
-        160.0,
-        0.25
-      ]
+      "pollution": [160.0, 0.25]
     }
   ],
   "consumption": {
@@ -363,10 +294,7 @@
     "death_multiplier_covered": 0.7,
     "high_school_chance": 0.85,
     "university_chance": 0.6,
-    "industry_pollution": [
-      140.0,
-      0.35
-    ],
+    "industry_pollution": [140.0, 0.35],
     "pollution_cell_m": 64.0,
     "water_reach_m": 40.0,
     "fire_min_population": 800,

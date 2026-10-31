@@ -5,7 +5,8 @@ extends Node3D
 ## (providers of the shown service in blue), so the whole city reads at a
 ## glance. The ground and trees fade to grey (global shader parameter
 ## overlay_dim) so the colours stand out. Refreshes are throttled while the
-## city keeps changing.
+## city keeps changing. The traffic layer colours the roads themselves by
+## how full they are and homes by their commute time.
 
 const OVERLAY_SHADER := preload("res://assets/materials/info_overlay.gdshader")
 const BAD := Color(0.9, 0.24, 0.2)
@@ -21,6 +22,7 @@ const COVERAGE_LAYERS := ["health", "education", "police", "fire", "garbage", "d
 @export var zone_system_path: NodePath
 @export var building_system_path: NodePath
 @export var service_system_path: NodePath
+@export var traffic_system_path: NodePath
 
 var current: String = ""
 
@@ -34,6 +36,11 @@ var _height: float
 var _dim: float = 0.0
 var _cells_dirty: bool = true   # cell transforms must be rebuilt
 var _buffer := PackedFloat32Array()
+var _traffic: Node
+var _roads: MultiMeshInstance3D
+var _road_seg := PackedInt32Array()
+var _road_buffer := PackedFloat32Array()
+var _roads_dirty: bool = true
 
 
 func _ready() -> void:
@@ -55,6 +62,21 @@ func _ready() -> void:
 	_cells.multimesh = mm
 	_cells.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_cells)
+	var rmm := MultiMesh.new()
+	rmm.transform_format = MultiMesh.TRANSFORM_3D
+	rmm.use_colors = true
+	rmm.mesh = quad
+	_roads = MultiMeshInstance3D.new()
+	_roads.name = "InfoRoads"
+	_roads.multimesh = rmm
+	_roads.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_roads)
+	if not traffic_system_path.is_empty():
+		_traffic = get_node(traffic_system_path)
+	EventBus.lanes_rebuilt.connect(func() -> void:
+		_roads_dirty = true
+		_queue())
+	EventBus.traffic_updated.connect(_queue)
 	EventBus.overlay_selected.connect(func(key: String) -> void:
 		current = key
 		_refresh())
@@ -89,10 +111,22 @@ func _refresh() -> void:
 	_dirty = false
 	_since_refresh = 0.0
 	var mm := _cells.multimesh
+	if current != "traffic":
+		_roads.multimesh.instance_count = 0
+		_roads_dirty = true
 	if current == "":
 		mm.instance_count = 0
 		_cells_dirty = true
 		_buildings.set_overlay_tint({})
+		return
+	if current == "traffic":
+		mm.instance_count = 0
+		_cells_dirty = true
+		_refresh_roads()
+		var commute_tints := {}
+		for id: int in _buildings.buildings:
+			commute_tints[id] = _building_color(_buildings.buildings[id])
+		_buildings.set_overlay_tint(commute_tints)
 		return
 	var grid: ZoneGrid = _zones.grid
 	var records: Dictionary = _buildings.buildings
@@ -123,6 +157,63 @@ func _refresh() -> void:
 	for id: int in records:
 		tints[id] = _building_color(records[id])
 	_buildings.set_overlay_tint(tints)
+
+
+## Road surfaces coloured by how full they are (peak volume / capacity).
+func _refresh_roads() -> void:
+	if _traffic == null:
+		return
+	var mm := _roads.multimesh
+	if _roads_dirty or mm.instance_count != _road_seg.size():
+		_build_road_quads()
+	var colors := {}
+	for i in _road_seg.size():
+		var sid := _road_seg[i]
+		if not colors.has(sid):
+			var ratio: float = _traffic.segment_ratio(sid)
+			colors[sid] = ramp(1.0 - clampf(ratio / 1.1, 0.0, 1.0))
+		var col: Color = colors[sid]
+		var o := i * 16 + 12
+		_road_buffer[o] = col.r
+		_road_buffer[o + 1] = col.g
+		_road_buffer[o + 2] = col.b
+		_road_buffer[o + 3] = 0.85
+	if not _road_seg.is_empty():
+		mm.buffer = _road_buffer
+
+
+func _build_road_quads() -> void:
+	_roads_dirty = false
+	var rg: RoadGraph = _traffic.get_node(_traffic.road_network_path).graph
+	var types := GameData.section("roads/types")
+	var mesh_cfg := GameData.section("roads/mesh")
+	var trims := {}
+	var xforms := []
+	_road_seg = PackedInt32Array()
+	for seg: RoadGraph.RoadSegment in rg.segments.values():
+		for nid in [seg.a, seg.b]:
+			if not trims.has(nid):
+				trims[nid] = RoadMeshBuilder.junction_radius(rg, nid, types, mesh_cfg)
+		var c := rg.curve_of(seg)
+		var table := RoadMeshBuilder.arc_table(c[0], c[1], c[2], 2.0)
+		var total: float = table[table.size() - 1].y
+		var s0 := minf(float(trims[seg.a]), total * 0.45)
+		var s1 := maxf(total - float(trims[seg.b]), s0 + 0.5)
+		var width := RoadTypes.carriageway_width(types[seg.type]) * 0.92
+		var n := maxi(ceili((s1 - s0) / 8.0), 1)
+		var step := (s1 - s0) / n
+		for k in n:
+			var t := RoadMeshBuilder.t_at(table, s0 + step * (k + 0.5))
+			var p := RoadGraph.bezier(c[0], c[1], c[2], t)
+			var d := RoadGraph.bezier_tangent(c[0], c[1], c[2], t).normalized()
+			var fz := Vector3(d.x, 0.0, d.y)
+			xforms.append(Transform3D(Basis(Vector3.UP.cross(fz) * width, Vector3.UP, fz * (step + 0.4)), Vector3(p.x, 0.22, p.y)))
+			_road_seg.append(seg.id)
+	var mm := _roads.multimesh
+	mm.instance_count = xforms.size()
+	for i in xforms.size():
+		mm.set_instance_transform(i, xforms[i])
+	_road_buffer = mm.buffer if not xforms.is_empty() else PackedFloat32Array()
 
 
 func _cell_color(i: int, grid: ZoneGrid, records: Dictionary, seg_colors: Dictionary) -> Color:
@@ -169,4 +260,8 @@ func _building_color(b: Dictionary) -> Color:
 		"happiness":
 			if int(b.get("occupants", 0)) > 0:
 				return ramp(float(b.get("happiness", 0.0)) / 100.0)
+		"traffic":
+			var commute := float(b.get("commute", -1.0))
+			if int(b.get("occupants", 0)) > 0 and commute >= 0.0:
+				return ramp(1.0 - clampf((commute - 8.0) / 32.0, 0.0, 1.0))
 	return NONE

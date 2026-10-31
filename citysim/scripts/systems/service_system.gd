@@ -366,6 +366,7 @@ func _step_pass(chunk: int) -> void:
 		if b.is_empty():
 			continue
 		var sid := _segment_of(b, grid)
+		b["segment"] = sid
 		var fx: Dictionary = _seg_fx.get(sid, _no_fx)
 		b["coverage"] = fx["cov"]
 		b["death_mult"] = fx["death"]
@@ -453,6 +454,12 @@ func segment_coverage(sid: int, category: String) -> float:
 			best = maxf(best, float((coverage.get("education%d" % level, {}) as Dictionary).get(sid, 0.0)))
 		return best
 	return float((coverage.get(category, {}) as Dictionary).get(sid, 0.0))
+
+
+## Service building that serves a road segment for a coverage key
+## ("health", "police", ... or "education0".."education2"), or -1.
+func serving_building(key: String, sid: int) -> int:
+	return int((_best.get(key, {}) as Dictionary).get(sid, -1))
 
 
 ## Spare supply on the network of a segment for "power" or "water".

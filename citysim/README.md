@@ -1,4 +1,4 @@
-# Şehir Simülasyonu — Faz 1–5 (Temel, Yollar, İmar ve Binalar, Ekonomi, Hizmetler)
+# Şehir Simülasyonu — Faz 1–6 (Temel, Yollar, İmar ve Binalar, Ekonomi, Hizmetler, Trafik)
 
 Godot 4.7.2 (Mobile renderer, Vulkan) ile Android için şehir kurma simülasyonu.
 Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
@@ -18,6 +18,44 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 | Arayüz | `scripts/ui/hud.gd`, `scripts/ui/ui_style.gd` | Mobil şehir oyunu düzeni: sol üstte nüfus/mutluluk, ortada saat ve hız, sağ üstte para ve ayarlar, sağ altta büyük **İnşa Et** düğmesi ve kategori menüsü. İkonlar Lucide (ISC), font Nunito (OFL); lisanslar `assets/ui/` içinde. |
 | Referans sahne (kapalı) | `scripts/world/reference_scene.gd` + `assets/materials/*.gdshader` | Işık testi için bina blokları ve ağaçlar. Varsayılan **kapalı** — harita boş başlar. `data/reference_scene.json` → `"enabled": true` ile açılır. |
 | Testler | `tests/run_tests.gd` | Görselsiz (headless) birim testleri: saat, hız, ay geçişi, jestler, ızgara. |
+
+## Faz 6: Trafik
+
+| Parça | Dosya | Ne yapar |
+|---|---|---|
+| Yol ağı kopyası | `scripts/data/traffic_graph.gd` | Yol ağının paketli dizilerde (CSR) salt okunur kopyası. Oyuncu yol çizerken arka plandaki hesap kendi kopyasıyla çalışır. |
+| Trafik kuralları | `scripts/data/traffic_rules.gd` | BPR sıkışıklık eğrisi (yol doldukça hız düşer), en kısa süre ağaçları, akışı ağaç boyunca biriktirme, iki fazlı sinyal grupları, sağa/sola dönüş, araç hareket modeli (shader ile birebir aynı formül). |
+| Akış ataması | `scripts/data/traffic_assignment.gd` | Günün bütün yolculuklarını sıkışıklığa göre en hızlı yoldan gönderir, yollara yükler ve bir önceki turla yumuşatır; dolu yoldan kaçan sürücüler başka yol bulur. Rotalar önbelleğe alınır, her turda (8 sn) yenilenir. `WorkerThreadPool` iş parçacığında çalışır, oyunu durdurmaz. |
+| Şerit geometrisi | `scripts/data/lane_geometry.gd` | Her şerit ve kavşaktaki her şeritten şeride bağlantı bir çizgi; hepsi tek bir GPU dokusuna paketlenir. Değişmeyen yolların şeritleri yeniden kullanılır. Trafik sağdan akar. |
+| Trafik sistemi | `scripts/systems/traffic_system.gd` | Talep: her çalışan ev → iş → ev, haneler alışverişe, sanayiden dükkânlara kamyon, hizmet binalarından evlere çöp kamyonu, polis, ambulans, itfaiye, cenaze aracı. Sonuç: yol başına günlük araç ve hız, ev-iş arası süre, yol gürültüsü. Yola uzun basınca yol bilgisi, sıkışıklıkta uyarı. |
+| Araçlar | `scripts/world/vehicle_system.gd`, `vehicle_models.gd`, `assets/materials/vehicle.gdshader` | Sedan, hatchback, minibüs, kamyon, polis, ambulans, itfaiye; iki renkli boya, camlar, farlar (gece yanar), stop lambaları (frende yanar), tepe lambası (yanıp söner). Araçlar ekran kartında hareket eder; işlemci sadece bir olay olunca (şerit sonu, ışık değişimi, kuyruk) o aracı günceller. |
+| Trafik ışıkları | `vehicle_system.gd`, `assets/materials/traffic_light.gdshader` | Cadde ve bulvar kavşaklarında iki fazlı ışık (yeşil 14 sn, sarı 3, hepsi kırmızı 1,5). Kırmızıda kuyruk, yeşilde araçlar sırayla kalkar; dolu şeride girmezler (kavşak tıkanmaz). |
+| Katman | `scripts/world/info_overlay.gd` | Katmanlar → Trafik: yollar doluluğa göre yeşil / sarı / kırmızı, evler işe gidiş süresine göre boyanır. |
+
+**Simülasyon LOD (üç kademe):**
+- **Yakın:** kameranın çizim mesafesindeki araçlar çizilir (Düşük 700 m, Orta 1.100 m, Yüksek 1.600 m), tek MultiMesh ile model başına bir çizim.
+- **Uzak:** araçlar veri olarak sürmeye devam eder ama çizilmez (shader onları sıfıra küçültür).
+- **İstatistiksel:** günün bütün yolculukları, görünsün görünmesin, akış atamasında sayılır ve yol hızlarını belirler.
+- Görünen araç sayısı: kalite tavanı (Düşük 300, Orta 800, Yüksek 1.500) ile günlük yolculuk sayısının %20'sinden küçük olanı, günün saatine göre (sabah ve akşam yoğun, gece az). Kameranın baktığı yere yakın yolculuklar öncelikli.
+
+**Mutluluk:** işe gidiş 15 dakikayı geçince dakika başına −0,35 (en fazla −15); yoğun yolun kenarındaki evlere gürültü (en fazla −6). Eve uzun basınca "İşe gidiş: N dk".
+
+**Ölçümler (geliştirme bilgisayarı):** test şehri (51 kavşak, 65 yol, ~900 nüfus) için atama 4 ms, araçlar kare başına ~0,06 ms. Büyük ızgara (900 kavşak, 1.740 yol, 20.000 yolculuk): atama 2,5 sn (arka planda), şerit geometrisi ilk kurulumda 266 ms, yol değişince 69 ms. Telefonda bu sürelerin 3–4 katı beklenir.
+
+**Faz 6 kabul kriterleri:**
+
+| # | Kriter | Nasıl test edilir |
+|---|---|---|
+| 1 | Sabah işe, akşam eve trafik | Konut + iş yeri imar et, nüfus gelsin. Saat 7–9 ve 16–19 arası yollar dolar, gece seyrelir. |
+| 2 | Araçlar sağdan gider ve şerit seçer | Sokak seviyesine yaklaş: araçlar sağ şeritte, sağa dönecekler sağ şeride, sola dönecekler sol şeride geçer, kavşakta kavis çizerek döner. |
+| 3 | Trafik ışıkları | Cadde/bulvar kavşağında direklerde kırmızı-sarı-yeşil; kırmızıda kuyruk, yeşilde sırayla kalkış. Gece farlar ve stop lambaları yanar. |
+| 4 | Sıkışıklık ve alternatif rota | Bütün trafiği tek bir sokağa bağla → Katmanlar → Trafik'te kırmızıya döner, "Trafik sıkışık" uyarısı gelir. Paralel bir cadde çiz → birkaç saniye içinde trafik bölünür, renk düzelir. |
+| 5 | Yol bilgisi | Bir yola uzun bas: şerit sayısı, hız sınırı, günlük araç, yoğunluk, ortalama hız, uzunluk. |
+| 6 | İşe gidiş süresi | Bir eve uzun bas: "İşe gidiş: N dk". Uzak iş yerleri ve sıkışık yollar süreyi ve mutsuzluğu artırır. |
+| 7 | Hizmet araçları | Çöp kamyonu (yeşil-beyaz), polis (tepe lambalı), ambulans, itfaiye, cenaze aracı ilgili binalardan çıkar. |
+| 8 | Kalite ayarı | Ayarlar → Düşük/Orta/Yüksek: araç tavanı ve çizim mesafesi değişir. |
+| 9 | Yol düzenleme | Yol ekle/sil: etkilenmeyen araçlar yoluna devam eder, kesilen yoldakiler kaybolur, yeni rotalar birkaç saniyede gelir. |
+| 10 | Testler | `godot --headless --path citysim -s res://tests/run_tests.gd` → `143 checks, 0 failed`. |
 
 ## Faz 5: Hizmetler ve altyapı (+ grafik geçişi)
 
@@ -180,14 +218,15 @@ Aynı sayfada `SehirSim-GL.apk` da var: aynı oyunun OpenGL (Compatibility) sür
 - Mobile renderer'da FSR yok (yalnızca Forward+), bu yüzden düşük ayarlarda bilinear ölçekleme kullanılıyor.
 
 ## Bilinen eksikler / sonraki fazlara kalanlar
+- **Trafik (Faz 6):** kaza ve yağmurda rota değişimi yok (hava Faz 8). Kavşakta çarpışma kontrolü yok: aynı fazda karşıdan sola dönenle düz giden üst üste geçebilir; ışıksız sokak kavşaklarında öncelik kuralı yok, araçlar durmadan geçer. Şerit değiştirme kavşakta yapılır, yol ortasında değil. Yayalar, bisikletler ve park etmiş araçlar yok; araçlar varınca bina önünde durup kaybolur. Otoyol / dış bağlantı yok, ithalat-ihracat kamyonları şehir dışından gelmez. İş seçimi hâlâ kuş uçuşu mesafeye bakar. Yol düzenlenince değişen yollardaki araçlar kaybolur ve yeni atama bitene kadar (büyük şehirde telefonda 5–10 sn) yeni araç çıkmaz. Toplu taşıma Faz 7'de.
 - **Hizmetler (Faz 5):** ambulans, çöp kamyonu, itfaiye aracı gibi hizmet araçları yolda gezmiyor (araçlar ve trafik Faz 6); kapsama şimdilik yol mesafesiyle hesaplanıyor. Elektrik direkleri ve su boruları görünmüyor, yolları izledikleri varsayılıyor. Çöp alanı ve mezarlık boşaltılamıyor; dolunca yenisi gerekir. Yangın binayı anında harabeye çevirir (söndürme yok). Su kirliliği mesafeye bakar, nehrin akış yönü yok. Rüzgâr türbinleri yola bakar, rüzgâr yönü yok; güneş santrali gece de üretir (hava durumu ve gün-gece üretimi Faz 8).
-- **Yollar:** yol yükseltme (sokak → cadde) yok, şimdilik yık + yeniden çiz. Serbest el çizimi, köprü/tünel, çıkmaz sokak dönüş cebi ve trafik ışığı yok (ışıklar Faz 6). Kavşak köşeleri çok dar açılarda sadeleşir.
+- **Yollar:** yol yükseltme (sokak → cadde) yok, şimdilik yık + yeniden çiz. Serbest el çizimi, köprü/tünel ve çıkmaz sokak dönüş cebi yok; trafik ışıkları sadece cadde/bulvar kavşaklarında. Kavşak köşeleri çok dar açılarda sadeleşir.
 - **Binalar:** Kenney kitinde sadece 5 bina modeli var; çeşitlilik kod ile üretilen binalarla sağlanıyor. Kenney'nin büyük ücretsiz şehir paketleri (kenney.nl) repoya eklenirse kolayca bağlanır. Binalar imarla kendiliğinden gelir; istersen katalogdan elle de yerleştirilir.
 - **Doku siteleri:** ambientCG ve Poly Haven bu geliştirme ortamından erişilemedi. Yol ve kaldırım dokuları shader ile üretildi, ek dosya yok. Kenney'nin ücretsiz (CC0) şehir modelleri Faz 3'te binalar için kullanılacak.
 - Harita boş başlar; inşa araçları (yol çizme) Faz 2'de gelir. Referans bloklar sadece ışık testi için ve varsayılan kapalı.
 - Dinamik çözünürlük GPU darboğazını çözer; FPS düşüklüğü CPU kaynaklıysa (ileride kalabalık simülasyon) çözünürlük düşürmek işe yaramaz — o iş Faz 6'daki simülasyon LOD'unun.
 - Ağaçlar düşük poligonlu yer tutucu; gerçek ağaçlar için LOD + uzakta billboard (impostor) gerekecek — 1000'lerce ağaçta bu şart.
-- Sokak lambaları, araçlar, yağmur/kar, mevsim renkleri yok (Faz 6, 8, 9).
+- Yağmur/kar ve mevsim renkleri yok (Faz 8); sokak lambaları ve araçlar var.
 - Nehir ve göller var (yol ve imar suya girmez), ama arazi yüksekliği yok; şehir alanı düz.
 - Tek kayıt yuvası var (otomatik kayıt); birden çok şehir ve bulut kaydı yok.
 - Listedeki diğer sistemler (RoadNetwork, ZoneSystem, …) ilgili fazlarda eklenecek; boş taslak dosya bırakılmadı.
