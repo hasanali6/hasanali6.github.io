@@ -204,3 +204,54 @@ static func format_int(value: int) -> String:
 		if count % 3 == 0 and i > 0:
 			out = "." + out
 	return ("-" if value < 0 else "") + out
+
+
+static func label(text: String, size: int) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", size)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+
+## Light menu card with a coloured header, a title and a round close button.
+## Returns [card, content VBoxContainer]. The card starts hidden.
+static func card(title_key: String, width: float, font_size: int, min_touch: float) -> Array:
+	var c := PanelContainer.new()
+	c.visible = false
+	c.custom_minimum_size.x = width
+	c.add_theme_stylebox_override("panel", card_box())
+	c.theme = card_theme(font_size - 2)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	c.add_child(col)
+
+	var header := PanelContainer.new()
+	var header_box := flat_box(CARD_HEADER, 26)
+	header_box.corner_radius_bottom_left = 0
+	header_box.corner_radius_bottom_right = 0
+	header_box.content_margin_left = 24
+	header_box.content_margin_right = 12
+	header.add_theme_stylebox_override("panel", header_box)
+	var header_row := HBoxContainer.new()
+	header.add_child(header_row)
+	var title := label(title_key, font_size + 2)
+	title.add_theme_color_override("font_color", Color.WHITE)
+	title.add_theme_constant_override("outline_size", 6)
+	title.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header_row.add_child(title)
+	var close := round_button("x", RED, min_touch * 0.8)
+	close.pressed.connect(func() -> void: c.visible = false)
+	header_row.add_child(close)
+	col.add_child(header)
+
+	var body := MarginContainer.new()
+	for side: String in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		body.add_theme_constant_override(side, 22)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 12)
+	body.add_child(content)
+	col.add_child(body)
+	return [c, content]

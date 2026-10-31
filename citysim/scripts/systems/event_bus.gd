@@ -36,6 +36,21 @@ signal building_inspected(info: Dictionary)
 
 # --- Economy ---
 signal money_changed(balance: int)
+signal company_closed(building_id: int)
+signal company_bankrupt(building_id: int)
+signal workers_laid_off(building_id: int, level: int, count: int)
+signal shops_changed()
+signal citizens_reported(report: Dictionary)
+signal companies_reported(report: Dictionary)
+## Monthly books closed: {income: {...}, expenses: {...}, net}.
+signal budget_settled(ledger: Dictionary)
+signal road_upkeep_changed(per_month: float)
+## RCI demand per zone group in -1..1.
+signal demand_changed(demand: Dictionary)
+## Periodic city statistics for the UI (population, happiness, jobs...).
+signal city_stats_changed(stats: Dictionary)
+signal taxes_changed()
+signal loan_changed()
 
 # --- World queries resolved by the camera ---
 signal ground_long_pressed(world_pos: Vector3)

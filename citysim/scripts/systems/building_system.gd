@@ -1,12 +1,18 @@
 extends Node3D
-## Grows buildings on zoned cells and draws them.
+## Grows buildings on zoned cells, keeps their economic capacity and draws them.
 ##
 ## Growth runs on simulation ticks: every few ticks some zoned, free,
 ## road-touching cells are tried as the front of a lot (width x depth cells
-## from data/zones.json); if the whole lot is zoned the same and free, a
-## building of one of the zone's styles rises there. Buildings level up
-## (taller, more floors) month by month. Until the Phase 4 demand model exists
-## growth uses a flat chance from the data.
+## from data/zones.json). The chance follows the RCI demand of the zone's
+## group, so nothing grows without demand. Each building gets capacity from
+## its zone, floors and lot size: households for homes, job slots by
+## education for companies (EconomyRules).
+##
+## Monthly: buildings level up when they deserve it (full and happy homes,
+## companies profitable for a while); homes left empty while demand is
+## negative and companies that went bankrupt are abandoned (darkened) and
+## collapse after a few months, freeing the lot for something new.
+## Players can also place buildings and parks by hand (BuildTool).
 ##
 ## Rendering: one MultiMesh per mesh kind (Kenney models, procedural house
 ## bodies and roofs, facade boxes per style, factory parts, rooftop boxes).
@@ -18,16 +24,22 @@ const KENNEY_DIR := "res://assets/models/kenney/"
 const KENNEY_MODELS := {
 	"kenney_a": "building-small-a", "kenney_b": "building-small-b", "kenney_c": "building-small-c",
 	"kenney_d": "building-small-d", "kenney_garage": "building-garage",
+	"park_fountain": "pavement-fountain", "park_trees": "grass-trees", "park_trees_tall": "grass-trees-tall",
 }
+const ABANDONED_TINT := Color(0.4, 0.38, 0.36)
 
 @export var zone_system_path: NodePath
 
 var buildings: Dictionary = {}  # id -> Dictionary record
+var demand: Dictionary = {"residential": 0.0, "commercial": 0.0, "office": 0.0, "industrial": 0.0}
 
 var _zones: Node
 var _rng := RandomNumberGenerator.new()
 var _growth: Dictionary
 var _vis: Dictionary
+var _hh_cfg: Dictionary
+var _co_cfg: Dictionary
+var _rules: Dictionary
 var _next_id: int = 1
 var _tick: int = 0
 var _meshes: Dictionary = {}      # mesh key -> MultiMeshInstance3D
@@ -44,6 +56,9 @@ func _ready() -> void:
 	_zones = get_node(zone_system_path)
 	_growth = GameData.section("zones/growth")
 	_vis = GameData.section("zones/visuals")
+	_hh_cfg = GameData.section("economy/households")
+	_co_cfg = GameData.section("economy/companies")
+	_rules = GameData.section("economy/buildings")
 	_rise_seconds = float(_growth["rise_seconds"])
 	_rng.randomize()
 	for c: String in _vis["wall_palette"]:
@@ -59,6 +74,8 @@ func _ready() -> void:
 	EventBus.month_changed.connect(_on_month)
 	EventBus.zone_cells_rebuilt.connect(_on_cells_rebuilt)
 	EventBus.ground_long_pressed.connect(_on_long_press)
+	EventBus.demand_changed.connect(func(d: Dictionary) -> void: demand = d)
+	EventBus.company_bankrupt.connect(_abandon)
 
 
 func _process(delta: float) -> void:
@@ -75,7 +92,14 @@ func _process(delta: float) -> void:
 			_update_instances(id, p)
 
 
-# --- Simulation ------------------------------------------------------------------
+# --- Growth ------------------------------------------------------------------------
+
+func _group_demand(zone_key: String) -> float:
+	var group := str(_zones.zone_types[zone_key]["group"])
+	if group == "mixed":
+		return (float(demand["residential"]) + float(demand["commercial"])) * 0.5
+	return float(demand.get(group, 0.0))
+
 
 func _on_tick(_t: int) -> void:
 	_tick += 1
@@ -90,10 +114,11 @@ func _on_tick(_t: int) -> void:
 		return
 	var grew := false
 	for attempt in int(_growth["attempts_per_interval"]):
-		if _rng.randf() > float(_growth["base_chance"]):
-			continue
 		var cell := candidates[_rng.randi_range(0, candidates.size() - 1)]
 		if grid.building[cell] != ZoneGrid.FREE:
+			continue
+		var chance := float(_growth["base_chance"]) * clampf(_group_demand(_zones.zone_key(grid.zone[cell])), 0.0, 1.0)
+		if _rng.randf() >= chance:
 			continue
 		if _try_grow(cell):
 			grew = true
@@ -118,6 +143,12 @@ func _try_grow(cell: int) -> bool:
 	if lot.is_empty():
 		return false
 	var styles: Array = cfg["styles"]
+	_create(zid, lot, cell, w, d, str(styles[_rng.randi_range(0, styles.size() - 1)]), _floors_for(cfg, 1), false)
+	return true
+
+
+func _create(zid: int, lot: PackedInt32Array, front_cell: int, w: int, d: int, style: String, floors: int, manual: bool) -> int:
+	var grid: ZoneGrid = _zones.grid
 	var id := _next_id
 	_next_id += 1
 	var centre := Vector2.ZERO
@@ -126,16 +157,27 @@ func _try_grow(cell: int) -> bool:
 		grid.building[c] = id
 	centre /= lot.size()
 	var b := {
-		"id": id, "zone": zid, "level": 1, "cells": lot,
-		"centre": centre, "front": grid.fronts[cell], "dir": grid.dirs[cell],
-		"width": w * grid.cell_size, "depth": d * grid.cell_size,
-		"style": str(styles[_rng.randi_range(0, styles.size() - 1)]),
+		"id": id, "zone": zid, "zone_key": _zones.zone_key(zid), "level": 1, "cells": lot,
+		"centre": centre, "front": grid.fronts[front_cell], "dir": grid.dirs[front_cell],
+		"width": w * grid.cell_size, "depth": d * grid.cell_size, "lot": Vector2i(w, d),
+		"style": style, "floors": floors, "manual": manual,
 		"seed": _rng.randf() * 100.0, "palette": _rng.randi(),
+		"occupants": 0, "employees": 0, "abandoned": false, "empty_months": 0, "abandoned_months": 0,
+		"happiness": 0.0, "profit": 0.0, "profit_months": 0,
 	}
-	b["floors"] = _floors_for(cfg, 1)
+	_apply_capacity(b)
 	buildings[id] = b
 	_rising[id] = 0.0
-	return true
+	return id
+
+
+func _apply_capacity(b: Dictionary) -> void:
+	var key: String = b["zone_key"]
+	var group := "" if key == "" else str(_zones.zone_types[key]["group"])
+	var cells := (b["cells"] as PackedInt32Array).size()
+	b["households_cap"] = EconomyRules.households_capacity(key, b["floors"], cells, _hh_cfg) if group in ["residential", "mixed"] else 0
+	b["job_slots"] = EconomyRules.job_slots(key, group, b["floors"], cells, _co_cfg) if group in ["commercial", "office", "industrial", "mixed"] else PackedInt32Array([0, 0, 0])
+	b["company_kind"] = EconomyRules.company_kind(key, group)
 
 
 func _floors_for(cfg: Dictionary, level: int) -> int:
@@ -143,20 +185,59 @@ func _floors_for(cfg: Dictionary, level: int) -> int:
 	return _rng.randi_range(int(r[0]), int(r[1]))
 
 
+# --- Monthly life of buildings ---------------------------------------------------------
+
 func _on_month(_m: int) -> void:
 	var changed := false
 	var max_level := int(_growth["max_level"])
-	for b: Dictionary in buildings.values():
-		if b["level"] < max_level and _rng.randf() < float(_growth["level_up_chance_per_month"]):
+	var grid: ZoneGrid = _zones.grid
+	for id: int in buildings.keys():
+		var b: Dictionary = buildings[id]
+		if b["zone_key"] == "":
+			continue
+		if b["abandoned"]:
+			b["abandoned_months"] += 1
+			if b["abandoned_months"] >= int(_rules["collapse_months"]):
+				for c: int in b["cells"]:
+					grid.building[c] = ZoneGrid.FREE
+				buildings.erase(id)
+				changed = true
+			continue
+		if int(b["households_cap"]) > 0 and int(b["occupants"]) == 0 and float(demand["residential"]) < 0.0:
+			b["empty_months"] += 1
+			if b["empty_months"] >= int(_rules["abandon_empty_months"]):
+				b["abandoned"] = true
+				b["abandoned_months"] = 0
+				changed = true
+				continue
+		else:
+			b["empty_months"] = 0
+		if b["level"] < max_level and _rng.randf() < float(_growth["level_up_chance_per_month"]) and _deserves_level(b):
 			b["level"] += 1
 			b["floors"] = maxi(b["floors"], _floors_for(_zones.zone_config(b["zone"]), b["level"]))
 			# A fixed-size Kenney model is replaced once the building outgrows it.
-			if KENNEY_MODELS.has(b["style"]) and b["floors"] > int(_vis["kenney_max_floors"]):
+			if not b["manual"] and KENNEY_MODELS.has(b["style"]) and b["floors"] > int(_vis["kenney_max_floors"]):
 				b["style"] = str(_vis["kenney_upgrade_style"])
+			_apply_capacity(b)
 			changed = true
 	if changed:
 		_render_all()
 		EventBus.buildings_changed.emit()
+
+
+func _deserves_level(b: Dictionary) -> bool:
+	if int(b["households_cap"]) > 0:
+		return int(b["occupants"]) >= int(b["households_cap"]) and float(b["happiness"]) >= float(_rules["level_up_happiness"])
+	return int(b["profit_months"]) >= int(_rules["level_up_profit_months"])
+
+
+func _abandon(id: int) -> void:
+	if not buildings.has(id) or buildings[id]["abandoned"]:
+		return
+	buildings[id]["abandoned"] = true
+	buildings[id]["abandoned_months"] = 0
+	_render_all()
+	EventBus.buildings_changed.emit()
 
 
 ## After roads change the cells are regenerated; a building keeps standing
@@ -209,15 +290,98 @@ func building_at(p: Vector2) -> int:
 	return grid.building[cell] if cell >= 0 else -1
 
 
+# --- Manual placement ----------------------------------------------------------------------
+
+## Lot for a catalogue item fronting the road at cell, or empty if it does not fit.
+func lot_for(item: Dictionary, cell: int) -> PackedInt32Array:
+	return (_zones.grid as ZoneGrid).find_free_lot(cell, int(item["lot"][0]), int(item["lot"][1]))
+
+
+func place(item: Dictionary, cell: int) -> int:
+	var lot := lot_for(item, cell)
+	if lot.is_empty():
+		return -1
+	var grid: ZoneGrid = _zones.grid
+	var key := str(item.get("zone", ""))
+	var zid: int = _zones.zone_id(key) if key != "" else ZoneGrid.UNZONED
+	for c in lot:
+		grid.zone[c] = zid
+	var floors := int(item.get("floors", 1))
+	if key != "":
+		floors = maxi(floors, _floors_for(_zones.zone_config(zid), 1))
+	var id := _create(zid, lot, cell, int(item["lot"][0]), int(item["lot"][1]), str(item["style"]), floors, true)
+	_render_all()
+	EventBus.zones_changed.emit()
+	EventBus.buildings_changed.emit()
+	return id
+
+
 func _on_long_press(world_pos: Vector3) -> void:
 	var id := building_at(Vector2(world_pos.x, world_pos.z))
 	if id < 0:
 		return
 	var b: Dictionary = buildings[id]
+	var slots: PackedInt32Array = b["job_slots"]
 	EventBus.building_inspected.emit({
-		"zone_key": _zones.zone_config(b["zone"])["name_key"], "level": b["level"],
-		"floors": b["floors"], "width": b["width"], "depth": b["depth"],
+		"zone_key": _zones.zone_config(b["zone"])["name_key"] if b["zone_key"] != "" else "BUILD_PARK",
+		"level": b["level"], "floors": b["floors"], "width": b["width"], "depth": b["depth"],
+		"households": b["occupants"], "households_cap": b["households_cap"],
+		"employees": b["employees"], "jobs": slots[0] + slots[1] + slots[2],
+		"abandoned": b["abandoned"], "profit": b["profit"],
 	})
+
+
+# --- Save / load -------------------------------------------------------------------------------
+
+func save_state() -> Dictionary:
+	var grid: ZoneGrid = _zones.grid
+	var list := []
+	for b: Dictionary in buildings.values():
+		var keys := []
+		for c: int in b["cells"]:
+			keys.append([grid.segment[c], grid.side[c], grid.along[c], grid.depth[c]])
+		var front_cell: int = b["cells"][0]
+		list.append({
+			"id": b["id"], "zone_key": b["zone_key"], "level": b["level"], "style": b["style"], "floors": b["floors"],
+			"manual": b["manual"], "seed": b["seed"], "palette": b["palette"], "lot": [b["lot"].x, b["lot"].y],
+			"abandoned": b["abandoned"], "empty_months": b["empty_months"], "abandoned_months": b["abandoned_months"],
+			"cells": keys, "front": [grid.segment[front_cell], grid.side[front_cell], grid.along[front_cell], grid.depth[front_cell]],
+		})
+	return {"buildings": list, "next_id": _next_id}
+
+
+func load_state(state: Dictionary) -> void:
+	var grid: ZoneGrid = _zones.grid
+	buildings.clear()
+	for i in grid.size():
+		grid.building[i] = ZoneGrid.FREE
+	for rec: Dictionary in state.get("buildings", []):
+		var lot := PackedInt32Array()
+		var ok := true
+		for k: Array in rec["cells"]:
+			var idx := grid.index_of(int(k[0]), int(k[1]), int(k[2]), int(k[3]))
+			if idx < 0 or grid.building[idx] != ZoneGrid.FREE:
+				ok = false
+				break
+			lot.append(idx)
+		if not ok or lot.is_empty():
+			continue
+		var f: Array = rec["front"]
+		var front := grid.index_of(int(f[0]), int(f[1]), int(f[2]), int(f[3]))
+		if front < 0:
+			front = lot[0]
+		var key := str(rec["zone_key"])
+		var zid: int = _zones.zone_id(key) if key != "" else ZoneGrid.UNZONED
+		_next_id = int(rec["id"])
+		var id := _create(zid, lot, front, int(rec["lot"][0]), int(rec["lot"][1]), str(rec["style"]), int(rec["floors"]), bool(rec["manual"]))
+		var b: Dictionary = buildings[id]
+		for field: String in ["level", "seed", "palette", "abandoned", "empty_months", "abandoned_months"]:
+			b[field] = rec[field]
+		_apply_capacity(b)
+		_rising.erase(id)
+	_next_id = maxi(int(state.get("next_id", 1)), _next_id + 1)
+	_render_all()
+	EventBus.buildings_changed.emit()
 
 
 # --- Rendering -------------------------------------------------------------------
@@ -227,7 +391,15 @@ func _build_meshes() -> void:
 		var scene: PackedScene = load(KENNEY_DIR + KENNEY_MODELS[key] + ".glb")
 		var root := scene.instantiate()
 		var mi: MeshInstance3D = root.find_children("*", "MeshInstance3D", true, false)[0]
-		_add_multimesh(key, mi.mesh, false, false)
+		# Let the instance colour tint the model (white = as authored, grey = abandoned).
+		var mesh: Mesh = mi.mesh.duplicate()
+		for sidx in mesh.get_surface_count():
+			var mat := mesh.surface_get_material(sidx)
+			if mat is BaseMaterial3D:
+				var tinted := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
+				tinted.vertex_color_use_as_albedo = true
+				mesh.surface_set_material(sidx, tinted)
+		_add_multimesh(key, mesh, true, false)
 		root.free()
 
 	var unit_box := BoxMesh.new()
@@ -346,11 +518,16 @@ func _parts_for(b: Dictionary, rise: float) -> Array[Dictionary]:
 	rng.seed = int(b["palette"])
 	var wall := _wall_palette[rng.randi_range(0, _wall_palette.size() - 1)]
 
+	if style.begins_with("park"):
+		# Park tiles cover the whole lot.
+		var ps := minf(lot_w, lot_d)
+		parts.append(_part(style, Basis(dx * ps, Vector3.UP * ps * e, fz * ps), centre, 0.0, Color.WHITE, Color()))
+		return parts
 	if KENNEY_MODELS.has(style):
 		# Kenney models are scaled uniformly; stretching them looks wrong.
 		var s := minf(lot_w, lot_d) - float(_vis["kenney_margin_m"]) * 2.0
 		var pos := front_edge - f * (s * 0.5)
-		parts.append(_part(style, Basis(dx * s, Vector3.UP * s * e, fz * s), pos, 0.0, Color.WHITE, Color()))
+		parts.append(_part(style, Basis(dx * s, Vector3.UP * s * e, fz * s), pos, 0.0, _tint(b, Color.WHITE), Color()))
 		return parts
 
 	match style:
@@ -397,7 +574,14 @@ func _parts_for(b: Dictionary, rise: float) -> Array[Dictionary]:
 			var ch := h + 8.0
 			parts.append(_part("chimney", Basis(Vector3.RIGHT * 1.6, Vector3.UP * ch * e, Vector3.BACK * 1.6), stack, ch * e * 0.5,
 				Color(0.72, 0.36, 0.3), Color()))
+	if b["abandoned"]:
+		for part in parts:
+			part["color"] = _tint(b, part["color"])
 	return parts
+
+
+func _tint(b: Dictionary, color: Color) -> Color:
+	return color * ABANDONED_TINT if b["abandoned"] else color
 
 
 func _part(key: String, basis: Basis, pos: Vector2, y: float, color: Color, custom: Color) -> Dictionary:

@@ -1,4 +1,187 @@
 {
-  "start_money": 50000,
-  "road_refund_ratio": 0.75
+  "start_money": 60000,
+  "road_refund_ratio": 0.75,
+  "education_levels": 3,
+  "households": {
+    "per_floor_per_cell": {
+      "res_low": 0.5,
+      "res_mid": 1.0,
+      "res_high": 1.2,
+      "mixed": 0.8
+    },
+    "mixed_ground_floor_commercial": true,
+    "immigrant_adults": [
+      1,
+      2
+    ],
+    "immigrant_children": [
+      0,
+      2
+    ],
+    "senior_chance": 0.18,
+    "immigrant_education_weights": [
+      0.45,
+      0.4,
+      0.15
+    ],
+    "immigrant_money": [
+      2500,
+      7000
+    ],
+    "max_adults": 3,
+    "max_children": 4
+  },
+  "money": {
+    "wage_by_education": [
+      1300,
+      1900,
+      2900
+    ],
+    "pension": 700,
+    "unemployment_aid": 450,
+    "unemployment_aid_until_population": 5000,
+    "goods_per_person": 1.0,
+    "retail_price": 240,
+    "rent_by_zone": {
+      "res_low": 650,
+      "res_mid": 520,
+      "res_high": 480,
+      "mixed": 540
+    },
+    "rent_level_factor": [
+      1.0,
+      1.25,
+      1.55
+    ],
+    "broke_months_to_move": 2,
+    "savings_target_months": 2
+  },
+  "companies": {
+    "jobs_per_floor_per_cell": {
+      "com_low": 1.0,
+      "com_high": 1.3,
+      "office": 2.0,
+      "industry": 1.6,
+      "mixed": 1.0
+    },
+    "education_mix": {
+      "commercial": [
+        0.45,
+        0.45,
+        0.1
+      ],
+      "industrial": [
+        0.6,
+        0.32,
+        0.08
+      ],
+      "office": [
+        0.05,
+        0.35,
+        0.6
+      ]
+    },
+    "industry_units_per_worker": [
+      26.0,
+      32.0,
+      38.0
+    ],
+    "industry_raw_cost_per_unit": 30,
+    "wholesale_price": 110,
+    "export_price": 90,
+    "import_price": 150,
+    "shop_units_per_worker": 30.0,
+    "office_value_per_worker": [
+      1600,
+      2700,
+      4100
+    ],
+    "start_money": 6000,
+    "bankrupt_money": -6000,
+    "bankrupt_months": 3,
+    "hire_margin": 0.08,
+    "fire_margin": -0.05,
+    "hire_step": 0.25,
+    "shop_radius_m": 420.0,
+    "job_radius_m": 1600.0,
+    "min_target": 0.1
+  },
+  "lifecycle": {
+    "birth_chance": 0.035,
+    "child_grows_chance": 0.05,
+    "retire_chance": 0.012,
+    "senior_death_chance": 0.05,
+    "move_out_chance": 0.012,
+    "education_up_chance": 0.0
+  },
+  "migration": {
+    "immigrants_per_month_base": 6,
+    "immigrants_per_month_per_demand": 120,
+    "unhappy_leave_threshold": 25.0,
+    "unhappy_leave_chance": 0.25,
+    "candidates_sampled": 6
+  },
+  "happiness": {
+    "base": 50.0,
+    "employed": 15.0,
+    "unemployed": -12.0,
+    "money_ok": 8.0,
+    "broke": -20.0,
+    "goods_ok": 8.0,
+    "no_shop": -10.0,
+    "tax_per_point_over_default": -1.2,
+    "park_bonus": 8.0,
+    "park_radius_m": 160.0
+  },
+  "taxes": {
+    "min": -10,
+    "max": 30,
+    "default": 10,
+    "groups": [
+      "residential",
+      "commercial",
+      "office",
+      "industrial"
+    ],
+    "residential_by_education": true,
+    "city_share": 0.12
+  },
+  "budget": {
+    "road_upkeep_per_m_per_cost": 0.012,
+    "subsidy_base": 5000,
+    "subsidy_per_citizen": 1.2,
+    "autosave_months": 1
+  },
+  "loan": {
+    "limit_base": 50000,
+    "limit_per_citizen": 20,
+    "interest_min": 0.03,
+    "interest_max": 0.09,
+    "term_months": 24,
+    "step": 5000
+  },
+  "demand": {
+    "update_ticks": 30,
+    "start_residential": 0.85,
+    "start_fade_population": 800,
+    "job_balance_weight": 1.2,
+    "empty_home_weight": 1.5,
+    "happiness_weight": 0.6,
+    "tax_weight": 0.04,
+    "goods_weight": 1.4,
+    "min_commercial_customers": 30,
+    "min_industry_population": 40,
+    "min_office_population": 250,
+    "smoothing": 0.25,
+    "commercial_jobs_per_citizen": 0.14,
+    "industrial_jobs_per_citizen": 0.16,
+    "office_jobs_per_citizen": 0.1,
+    "healthy_vacancy": 0.12
+  },
+  "buildings": {
+    "abandon_empty_months": 4,
+    "collapse_months": 3,
+    "level_up_happiness": 60.0,
+    "level_up_profit_months": 2
+  }
 }

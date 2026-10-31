@@ -107,3 +107,21 @@ func _refresh_overlay() -> void:
 	for i in transforms.size():
 		mm.set_instance_transform(i, transforms[i])
 		mm.set_instance_color(i, colors[i])
+
+
+func save_state() -> Dictionary:
+	var zoned := []
+	for i in grid.size():
+		if grid.zone[i] != ZoneGrid.UNZONED:
+			zoned.append([grid.segment[i], grid.side[i], grid.along[i], grid.depth[i], zone_key(grid.zone[i])])
+	return {"zoned": zoned}
+
+
+## Call after the road network has been restored (cells exist again).
+func load_state(state: Dictionary) -> void:
+	_on_roads_changed()
+	for z: Array in state.get("zoned", []):
+		var i := grid.index_of(int(z[0]), int(z[1]), int(z[2]), int(z[3]))
+		if i >= 0:
+			grid.zone[i] = zone_id(str(z[4]))
+	_refresh_overlay()

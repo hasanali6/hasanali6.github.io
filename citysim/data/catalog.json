@@ -1,0 +1,18 @@
+{
+  "items": [
+    { "id": "house",       "name_key": "CAT_HOUSE",       "style": "house",           "zone": "res_low",  "lot": [1, 2], "floors": 1,  "cost": 1500 },
+    { "id": "apartment_s", "name_key": "CAT_APARTMENT_S", "style": "kenney_c",        "zone": "res_mid",  "lot": [1, 2], "floors": 4,  "cost": 3200 },
+    { "id": "apartment",   "name_key": "CAT_APARTMENT",   "style": "apartment",       "zone": "res_mid",  "lot": [2, 2], "floors": 5,  "cost": 5200 },
+    { "id": "tower",       "name_key": "CAT_TOWER",       "style": "tower",           "zone": "res_high", "lot": [2, 3], "floors": 14, "cost": 14000 },
+    { "id": "shop_a",      "name_key": "CAT_SHOP_A",      "style": "kenney_a",        "zone": "com_low",  "lot": [1, 2], "floors": 2,  "cost": 2200 },
+    { "id": "shop_b",      "name_key": "CAT_SHOP_B",      "style": "kenney_d",        "zone": "com_low",  "lot": [1, 2], "floors": 2,  "cost": 2200 },
+    { "id": "mall",        "name_key": "CAT_MALL",        "style": "tower",           "zone": "com_high", "lot": [2, 3], "floors": 6,  "cost": 11000 },
+    { "id": "office",      "name_key": "CAT_OFFICE",      "style": "office",          "zone": "office",   "lot": [2, 3], "floors": 10, "cost": 16000 },
+    { "id": "factory",     "name_key": "CAT_FACTORY",     "style": "factory",         "zone": "industry", "lot": [3, 3], "floors": 1,  "cost": 9000 },
+    { "id": "workshop",    "name_key": "CAT_WORKSHOP",    "style": "kenney_garage",   "zone": "industry", "lot": [2, 2], "floors": 1,  "cost": 4000 },
+    { "id": "park_trees",  "name_key": "CAT_PARK_TREES",  "style": "park_trees",      "zone": "",         "lot": [1, 1], "floors": 1,  "cost": 800 },
+    { "id": "park_forest", "name_key": "CAT_PARK_FOREST", "style": "park_trees_tall", "zone": "",         "lot": [2, 2], "floors": 1,  "cost": 2400 },
+    { "id": "plaza",       "name_key": "CAT_PLAZA",       "style": "park_fountain",   "zone": "",         "lot": [2, 2], "floors": 1,  "cost": 3500 }
+  ],
+  "snap_radius_m": 14.0
+}

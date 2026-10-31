@@ -17,6 +17,7 @@ const BACK_EXIT_WINDOW := 2.0
 ## Build tray categories: [label key, icon, colour].
 const BUILD_TOOLS: Array = [
 	["TOOL_ROADS", "route", UiStyle.SLATE],
+	["TOOL_BUILDINGS", "building-2", UiStyle.ORANGE],
 	["TOOL_ZONING", "grid-3x3", UiStyle.GREEN],
 	["TOOL_SERVICES", "shield-plus", UiStyle.RED],
 	["TOOL_UTILITIES", "zap", UiStyle.GOLD],
@@ -60,6 +61,10 @@ var _zone_key: String = ""
 var _zone_mode: String = "brush"
 var _building_shown_frame: int = -1
 var _cost_pill: PanelContainer
+var _economy: EconomyPanel
+var _catalog: CatalogPanel
+var _rci: RciBars
+var _money_delta: Label
 var _cost_label: Label
 var _cost_ok_badge: Control
 var _cost_bad_badge: Control
@@ -93,6 +98,10 @@ func _ready() -> void:
 	_place(_road_panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
 	_zone_panel = _build_zone_panel()
 	_place(_zone_panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
+	_catalog = CatalogPanel.new(FONT_SIZE, MIN_TOUCH, _close_catalog)
+	_place(_catalog.panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
+	_rci = _build_rci()
+	_place(_rci.get_parent(), Vector2(0, 0), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_END, Vector2(0, 96))
 	_cost_pill = _build_cost_pill()
 	_layer.add_child(_cost_pill)
 	_place(_tray, Vector2(1, 1), Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_BEGIN, Vector2(-BUILD_SIZE - 16, 0))
@@ -104,6 +113,8 @@ func _ready() -> void:
 	_place(_settings_panel, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
 	_info_panel = _build_info_panel()
 	_place(_info_panel, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+	_economy = EconomyPanel.new(FONT_SIZE, MIN_TOUCH)
+	_place(_economy.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
 
 	EventBus.speed_changed.connect(_on_speed_changed)
 	EventBus.ground_long_pressed.connect(_on_ground_long_pressed)
@@ -113,6 +124,9 @@ func _ready() -> void:
 	EventBus.money_changed.connect(func(balance: int) -> void: _money_label.text = UiStyle.format_int(balance))
 	EventBus.road_preview_changed.connect(_on_road_preview)
 	EventBus.building_inspected.connect(_on_building_inspected)
+	EventBus.city_stats_changed.connect(_on_city_stats)
+	EventBus.demand_changed.connect(func(d: Dictionary) -> void: _rci.set_values(d))
+	EventBus.budget_settled.connect(_on_budget)
 	_on_speed_changed(TimeSystem.get_speed_index())
 	_on_preset_changed(GraphicsSettings.current_preset)
 
@@ -259,6 +273,16 @@ func _build_top_right() -> Control:
 	var money := _pill("coins", UiStyle.GOLD, 120)
 	_money_label = money[1]
 	_money_label.text = UiStyle.format_int(EconomySystem.balance)
+	# Monthly net under the balance, like the treasury line in city builders.
+	var value_col := VBoxContainer.new()
+	value_col.add_theme_constant_override("separation", -6)
+	var parent := _money_label.get_parent()
+	parent.remove_child(_money_label)
+	value_col.add_child(_money_label)
+	_money_delta = _label("", FONT_SIZE - 8)
+	_money_delta.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	value_col.add_child(_money_delta)
+	parent.add_child(value_col)
 	money[0].size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(money[0])
 	var settings := UiStyle.round_button("settings", UiStyle.SLATE, MIN_TOUCH)
@@ -274,11 +298,16 @@ func _build_left_column() -> Control:
 	var col := VBoxContainer.new()
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_theme_constant_override("separation", 14)
-	for entry: Array in [["TOOL_OVERLAYS", "layers", UiStyle.TEAL], ["TOOL_ECONOMY", "chart-no-axes-column", UiStyle.GREEN]]:
-		var b := UiStyle.round_button(entry[1], entry[2], MIN_TOUCH)
-		var key: String = entry[0]
-		b.pressed.connect(func() -> void: show_toast(tr("TOOL_LOCKED") % tr(key)))
-		col.add_child(b)
+	var overlays := UiStyle.round_button("layers", UiStyle.TEAL, MIN_TOUCH)
+	overlays.pressed.connect(func() -> void: show_toast(tr("TOOL_LOCKED") % tr("TOOL_OVERLAYS")))
+	col.add_child(overlays)
+	var economy := UiStyle.round_button("chart-no-axes-column", UiStyle.GREEN, MIN_TOUCH)
+	economy.pressed.connect(func() -> void:
+		_settings_panel.visible = false
+		_info_panel.visible = false
+		_set_tray_open(false)
+		_economy.open())
+	col.add_child(economy)
 	return col
 
 
@@ -313,6 +342,8 @@ func _build_tray() -> PanelContainer:
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		if key == "TOOL_ROADS":
 			b.pressed.connect(_open_road_panel)
+		elif key == "TOOL_BUILDINGS":
+			b.pressed.connect(_open_catalog)
 		elif key == "TOOL_ZONING":
 			b.pressed.connect(_open_zone_panel)
 		else:
@@ -347,43 +378,7 @@ func _build_toast() -> PanelContainer:
 
 ## Light menu card with a coloured header, a title and a round close button.
 func _card(title_key: String, width: float) -> Array:
-	var card := PanelContainer.new()
-	card.visible = false
-	card.custom_minimum_size.x = width
-	card.add_theme_stylebox_override("panel", UiStyle.card_box())
-	card.theme = UiStyle.card_theme(FONT_SIZE - 2)
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 0)
-	card.add_child(col)
-
-	var header := PanelContainer.new()
-	var header_box := UiStyle.flat_box(UiStyle.CARD_HEADER, 26)
-	header_box.corner_radius_bottom_left = 0
-	header_box.corner_radius_bottom_right = 0
-	header_box.content_margin_left = 24
-	header_box.content_margin_right = 12
-	header.add_theme_stylebox_override("panel", header_box)
-	var header_row := HBoxContainer.new()
-	header.add_child(header_row)
-	var title := _label(title_key, FONT_SIZE + 2)
-	title.add_theme_color_override("font_color", Color.WHITE)
-	title.add_theme_constant_override("outline_size", 6)
-	title.add_theme_color_override("font_outline_color", UiStyle.TEXT_OUTLINE)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header_row.add_child(title)
-	var close := UiStyle.round_button("x", UiStyle.RED, MIN_TOUCH * 0.8)
-	close.pressed.connect(func() -> void: card.visible = false)
-	header_row.add_child(close)
-	col.add_child(header)
-
-	var body := MarginContainer.new()
-	for side: String in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		body.add_theme_constant_override(side, 22)
-	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 12)
-	body.add_child(content)
-	col.add_child(body)
-	return [card, content]
+	return UiStyle.card(title_key, width, FONT_SIZE, MIN_TOUCH)
 
 
 func _build_settings_panel() -> PanelContainer:
@@ -435,6 +430,24 @@ func _build_settings_panel() -> PanelContainer:
 	_time_slider.drag_started.connect(func() -> void: _time_dragging = true)
 	_time_slider.drag_ended.connect(func(_changed: bool) -> void: _time_dragging = false)
 	content.add_child(_time_slider)
+
+	var save_row := HBoxContainer.new()
+	save_row.add_theme_constant_override("separation", 10)
+	var save := Button.new()
+	save.text = "SETTINGS_SAVE"
+	save.focus_mode = Control.FOCUS_NONE
+	save.custom_minimum_size.y = MIN_TOUCH * 0.8
+	save.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	save.pressed.connect(func() -> void: _save_system().save_game())
+	save_row.add_child(save)
+	var fresh := Button.new()
+	fresh.text = "SETTINGS_NEW_CITY"
+	fresh.focus_mode = Control.FOCUS_NONE
+	fresh.custom_minimum_size.y = MIN_TOUCH * 0.8
+	fresh.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fresh.pressed.connect(_confirm_new_city)
+	save_row.add_child(fresh)
+	content.add_child(save_row)
 	return parts[0]
 
 
@@ -544,6 +557,7 @@ func _build_zone_panel() -> PanelContainer:
 
 func _open_zone_panel() -> void:
 	_road_panel.visible = false
+	_catalog.panel.visible = false
 	_cost_pill.visible = false
 	_set_tray_open(false)
 	_settings_panel.visible = false
@@ -573,14 +587,82 @@ func _select_zone(key: String, mode: String) -> void:
 
 func _on_building_inspected(info: Dictionary) -> void:
 	_building_shown_frame = Engine.get_process_frames()
-	_info_label.text = "%s\n%s\n%s" % [
-		tr(info["zone_key"]),
-		tr("BUILDING_LEVEL") % [info["level"], info["floors"]],
-		tr("BUILDING_SIZE") % [roundi(info["width"]), roundi(info["depth"])],
-	]
+	var lines := PackedStringArray([tr(info["zone_key"])])
+	if info.get("abandoned", false):
+		lines.append(tr("BUILDING_ABANDONED"))
+	if info["zone_key"] != "BUILD_PARK":
+		lines.append(tr("BUILDING_LEVEL") % [info["level"], info["floors"]])
+	if int(info.get("households_cap", 0)) > 0:
+		lines.append(tr("BUILDING_HOMES") % [info["households"], info["households_cap"]])
+	if int(info.get("jobs", 0)) > 0:
+		lines.append(tr("BUILDING_JOBS") % [info["employees"], info["jobs"]])
+		lines.append(tr("BUILDING_PROFIT") % UiStyle.format_int(roundi(float(info["profit"]))))
+	lines.append(tr("BUILDING_SIZE") % [roundi(info["width"]), roundi(info["depth"])])
+	_info_label.text = "\n".join(lines)
 	_settings_panel.visible = false
 	_set_tray_open(false)
 	_info_panel.visible = true
+
+
+func _build_rci() -> RciBars:
+	var pill := PanelContainer.new()
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var box := UiStyle.pill_box()
+	box.set_corner_radius_all(18)
+	box.set_content_margin_all(6)
+	pill.add_theme_stylebox_override("panel", box)
+	var bars := RciBars.new()
+	for key: String in ["ZONE_RCI_R", "ZONE_RCI_C", "ZONE_RCI_O", "ZONE_RCI_I"]:
+		bars.letters.append(tr(key))
+	bars.colors = [UiStyle.GREEN, UiStyle.BLUE, UiStyle.PURPLE, UiStyle.GOLD]
+	pill.add_child(bars)
+	return bars
+
+
+func _on_city_stats(stats: Dictionary) -> void:
+	_population_label.text = UiStyle.format_int(int(stats.get("population", 0)))
+	_happiness_label.text = "—" if int(stats.get("population", 0)) == 0 else "%d%%" % roundi(float(stats.get("happiness", 50.0)))
+
+
+func _on_budget(ledger: Dictionary) -> void:
+	var net := roundi(float(ledger.get("net", 0.0)))
+	_money_delta.text = ("+" if net >= 0 else "") + UiStyle.format_int(net) + tr("ECON_PER_MONTH")
+	_money_delta.add_theme_color_override("font_color", Color(0.65, 1.0, 0.65) if net >= 0 else Color(1.0, 0.6, 0.6))
+
+
+func _open_catalog() -> void:
+	_road_panel.visible = false
+	_zone_panel.visible = false
+	_cost_pill.visible = false
+	_set_tray_open(false)
+	_settings_panel.visible = false
+	_info_panel.visible = false
+	_build_button.get_parent().visible = false
+	_catalog.open()
+
+
+func _close_catalog() -> void:
+	_catalog.panel.visible = false
+	_cost_pill.visible = false
+	_build_button.get_parent().visible = true
+	EventBus.build_tool_selected.emit("", {})
+
+
+func _save_system() -> Node:
+	return get_tree().current_scene.get_node("SaveSystem")
+
+
+var _new_city_armed: float = -INF
+
+
+## Asks for a second tap within a few seconds before wiping the city.
+func _confirm_new_city() -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _new_city_armed < BACK_EXIT_WINDOW * 2.0:
+		_save_system().new_city()
+	else:
+		_new_city_armed = now
+		show_toast(tr("NOTIFY_NEW_CITY_CONFIRM"))
 
 
 func _build_cost_pill() -> PanelContainer:
@@ -602,6 +684,7 @@ func _build_cost_pill() -> PanelContainer:
 
 func _open_road_panel() -> void:
 	_zone_panel.visible = false
+	_catalog.panel.visible = false
 	_set_tray_open(false)
 	_settings_panel.visible = false
 	_info_panel.visible = false
@@ -725,6 +808,12 @@ func _on_back_requested() -> void:
 		return
 	if _zone_panel.visible:
 		_close_zone_panel()
+		return
+	if _catalog.panel.visible:
+		_close_catalog()
+		return
+	if _economy.card.visible:
+		_economy.card.visible = false
 		return
 	if _settings_panel.visible or _info_panel.visible or _tray.visible:
 		_settings_panel.visible = false

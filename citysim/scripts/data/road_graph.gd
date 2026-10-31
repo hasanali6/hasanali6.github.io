@@ -412,3 +412,38 @@ static func _segment_intersection(p1: Vector2, p2: Vector2, p3: Vector2, p4: Vec
 	if u < 0.0 or u > 1.0 or v < 0.0 or v > 1.0:
 		return null
 	return Vector2(u, v)
+
+
+# --- Save / load ----------------------------------------------------------------
+
+func save_state() -> Dictionary:
+	var node_list := []
+	for node: RoadNode in nodes.values():
+		node_list.append([node.id, node.pos.x, node.pos.y])
+	var seg_list := []
+	for seg: RoadSegment in segments.values():
+		seg_list.append([seg.id, seg.a, seg.b, seg.control.x, seg.control.y, seg.type])
+	return {"nodes": node_list, "segments": seg_list, "next_node": _next_node, "next_segment": _next_segment}
+
+
+func load_state(state: Dictionary) -> void:
+	nodes.clear()
+	segments.clear()
+	for n: Array in state.get("nodes", []):
+		var node := RoadNode.new()
+		node.id = int(n[0])
+		node.pos = Vector2(float(n[1]), float(n[2]))
+		nodes[node.id] = node
+	for s: Array in state.get("segments", []):
+		var seg := RoadSegment.new()
+		seg.id = int(s[0])
+		seg.a = int(s[1])
+		seg.b = int(s[2])
+		seg.control = Vector2(float(s[3]), float(s[4]))
+		seg.type = str(s[5])
+		seg.length = curve_length((nodes[seg.a] as RoadNode).pos, seg.control, (nodes[seg.b] as RoadNode).pos, sample_step)
+		segments[seg.id] = seg
+		(nodes[seg.a] as RoadNode).segments.append(seg.id)
+		(nodes[seg.b] as RoadNode).segments.append(seg.id)
+	_next_node = int(state.get("next_node", 1))
+	_next_segment = int(state.get("next_segment", 1))

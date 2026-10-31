@@ -42,3 +42,19 @@ func get_date_text() -> String:
 func get_clock_text() -> String:
 	var minutes := int(clock.minute_of_day)
 	return "%02d:%02d" % [minutes / 60, minutes % 60]
+
+
+func save_state() -> Dictionary:
+	return {"minute": clock.minute_of_day, "month": clock.month_index, "ticks": clock.tick_count, "speed": clock.speed_index}
+
+
+func load_state(state: Dictionary) -> void:
+	clock.minute_of_day = float(state.get("minute", clock.minute_of_day))
+	clock.month_index = int(state.get("month", 0))
+	clock.tick_count = int(state.get("ticks", 0))
+	set_speed_index(int(state.get("speed", clock.speed_index)))
+
+
+func reset_state() -> void:
+	clock = SimClock.new(GameData.section("time"))
+	EventBus.speed_changed.emit(clock.speed_index)

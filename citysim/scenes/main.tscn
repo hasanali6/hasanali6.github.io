@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://b8c1tymain001"]
+[gd_scene load_steps=17 format=3 uid="uid://b8c1tymain001"]
 
 [ext_resource type="Script" path="res://scripts/world/day_night_cycle.gd" id="1_daynight"]
 [ext_resource type="Script" path="res://scripts/systems/terrain_system.gd" id="2_terrain"]
@@ -10,6 +10,11 @@
 [ext_resource type="Script" path="res://scripts/systems/zone_system.gd" id="8_zones"]
 [ext_resource type="Script" path="res://scripts/systems/building_system.gd" id="9_buildings"]
 [ext_resource type="Script" path="res://scripts/world/zone_tool.gd" id="10_zonetool"]
+[ext_resource type="Script" path="res://scripts/systems/company_system.gd" id="11_companies"]
+[ext_resource type="Script" path="res://scripts/systems/citizen_system.gd" id="12_citizens"]
+[ext_resource type="Script" path="res://scripts/systems/demand_system.gd" id="13_demand"]
+[ext_resource type="Script" path="res://scripts/world/build_tool.gd" id="14_buildtool"]
+[ext_resource type="Script" path="res://scripts/systems/save_system.gd" id="15_save"]
 
 [node name="Main" type="Node3D"]
 
@@ -42,6 +47,34 @@ zone_system_path = NodePath("../ZoneSystem")
 script = ExtResource("10_zonetool")
 zone_system_path = NodePath("../ZoneSystem")
 building_system_path = NodePath("../BuildingSystem")
+
+[node name="CompanySystem" type="Node" parent="."]
+script = ExtResource("11_companies")
+building_system_path = NodePath("../BuildingSystem")
+
+[node name="CitizenSystem" type="Node" parent="."]
+script = ExtResource("12_citizens")
+building_system_path = NodePath("../BuildingSystem")
+company_system_path = NodePath("../CompanySystem")
+
+[node name="DemandSystem" type="Node" parent="."]
+script = ExtResource("13_demand")
+citizen_system_path = NodePath("../CitizenSystem")
+company_system_path = NodePath("../CompanySystem")
+
+[node name="BuildTool" type="Node3D" parent="."]
+script = ExtResource("14_buildtool")
+building_system_path = NodePath("../BuildingSystem")
+zone_system_path = NodePath("../ZoneSystem")
+
+[node name="SaveSystem" type="Node" parent="."]
+script = ExtResource("15_save")
+road_network_path = NodePath("../RoadNetwork")
+zone_system_path = NodePath("../ZoneSystem")
+building_system_path = NodePath("../BuildingSystem")
+company_system_path = NodePath("../CompanySystem")
+citizen_system_path = NodePath("../CitizenSystem")
+demand_system_path = NodePath("../DemandSystem")
 
 [node name="ReferenceScene" type="Node3D" parent="."]
 script = ExtResource("3_reference")

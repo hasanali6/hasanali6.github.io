@@ -232,3 +232,31 @@ func find_lot(i: int, width: int, lot_depth: int, zone_id: int) -> PackedInt32Ar
 				return PackedInt32Array()
 			out.append(j)
 	return out
+
+
+## Cells of a width x lot_depth lot starting at road-touching cell i that are
+## all free (any zone); used for hand-placed buildings and parks.
+func find_free_lot(i: int, width: int, lot_depth: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	if i < 0 or depth[i] != 0:
+		return out
+	for k in range(along[i], along[i] + width):
+		for dep in lot_depth:
+			var j := index_of(segment[i], side[i], k, dep)
+			if j < 0 or building[j] != FREE:
+				return PackedInt32Array()
+			out.append(j)
+	return out
+
+
+## The road-touching cell nearest to p within radius, or -1.
+func front_cell_near(p: Vector2, radius: float) -> int:
+	var best := -1
+	var best_d := radius
+	for i in cells_near(p, radius):
+		if depth[i] == 0:
+			var d := centers[i].distance_to(p)
+			if d < best_d:
+				best_d = d
+				best = i
+	return best

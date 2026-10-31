@@ -68,6 +68,25 @@ func build_road(start: Vector2, end: Vector2, control: Variant, type: String) ->
 	return plan
 
 
+func upkeep_per_month() -> float:
+	var factor := GameData.num("economy/budget/road_upkeep_per_m_per_cost")
+	var total := 0.0
+	for seg: RoadGraph.RoadSegment in graph.segments.values():
+		total += seg.length * float(types[seg.type]["cost_per_m"]) * factor
+	return total
+
+
+func save_state() -> Dictionary:
+	return {"graph": graph.save_state()}
+
+
+## Rebuilds the whole network from a save (visuals included).
+func load_state(state: Dictionary) -> void:
+	var before := _snapshot()
+	graph.load_state(state.get("graph", {}))
+	_refresh_after_edit(before)
+
+
 func demolish(seg_id: int) -> int:
 	if not graph.segments.has(seg_id):
 		return 0
@@ -169,6 +188,7 @@ func _refresh_after_edit(before: Dictionary) -> void:
 	for chunk: Vector2i in dirty_chunks:
 		_rebuild_chunk(chunk)
 	_rebuild_lamps()
+	EventBus.road_upkeep_changed.emit(upkeep_per_month())
 	EventBus.roads_changed.emit()
 
 

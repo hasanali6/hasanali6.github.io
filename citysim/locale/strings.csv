@@ -79,3 +79,64 @@ MODE_FILL,Doldur,Fill
 MODE_ERASE,Sil,Erase
 BUILDING_LEVEL,Seviye %d · %d kat,Level %d · %d floors
 BUILDING_SIZE,Arsa %d × %d m,Lot %d × %d m
+TOOL_BUILDINGS,Binalar,Buildings
+BUILD_CATALOG,Bina ve park yerleştir,Place buildings and parks
+BUILD_PARK,Park,Park
+BUILD_ERR_ROAD,Bir yola yakın yerleştir,Place it next to a road
+BUILD_ERR_SPACE,Yer yok,No space
+CAT_HOUSE,Ev,House
+CAT_APARTMENT_S,Küçük apartman,Small apartment
+CAT_APARTMENT,Apartman,Apartment
+CAT_TOWER,Konut kulesi,Residential tower
+CAT_SHOP_A,Dükkân,Shop
+CAT_SHOP_B,Market,Corner store
+CAT_MALL,Alışveriş merkezi,Mall
+CAT_OFFICE,Ofis kulesi,Office tower
+CAT_FACTORY,Fabrika,Factory
+CAT_WORKSHOP,Atölye,Workshop
+CAT_PARK_TREES,Küçük park,Small park
+CAT_PARK_FOREST,Koru,Grove
+CAT_PLAZA,Çeşmeli meydan,Fountain plaza
+ZONE_RCI_R,K,R
+ZONE_RCI_C,T,C
+ZONE_RCI_O,O,O
+ZONE_RCI_I,S,I
+ECON_TITLE,Ekonomi,Economy
+ECON_TAB_BUDGET,Bütçe,Budget
+ECON_TAB_TAXES,Vergiler,Taxes
+ECON_TAB_LOAN,Kredi,Loan
+ECON_INCOME,Gelir (geçen ay),Income (last month)
+ECON_EXPENSES,Gider (geçen ay),Expenses (last month)
+ECON_IN_RESIDENTIAL,Konut vergisi,Residential tax
+ECON_IN_COMMERCIAL,Ticari vergi,Commercial tax
+ECON_IN_OFFICE,Ofis vergisi,Office tax
+ECON_IN_INDUSTRIAL,Sanayi vergisi,Industrial tax
+ECON_IN_SUBSIDY,Devlet desteği,State subsidy
+ECON_OUT_ROADS,Yol bakımı,Road upkeep
+ECON_OUT_LOAN,Kredi taksidi,Loan instalment
+ECON_CONSTRUCTION,İnşaat harcaması,Construction
+ECON_NET,Aylık net,Monthly net
+ECON_PER_MONTH,/ay,/mo
+ECON_TAX_RESIDENTIAL,Konut (genel),Residential (all)
+ECON_TAX_EDU_0,  İlköğretim,  Basic education
+ECON_TAX_EDU_1,  Lise,  High school
+ECON_TAX_EDU_2,  Üniversite,  University
+ECON_TAX_COMMERCIAL,Ticari,Commercial
+ECON_TAX_OFFICE,Ofis,Office
+ECON_TAX_INDUSTRIAL,Sanayi,Industrial
+ECON_TAX_HINT,Yüksek vergi daha çok gelir getirir ama talebi ve mutluluğu düşürür.,Higher taxes earn more but lower demand and happiness.
+ECON_LOAN_TAKE,+5.000 borç al,"Borrow 5,000"
+ECON_LOAN_REPAY,5.000 öde,"Repay 5,000"
+ECON_LOAN_REPAY_ALL,Tamamını öde,Repay all
+ECON_LOAN_DEBT,Borç: %s / limit %s,Debt: %s / limit %s
+ECON_LOAN_RATE,Yıllık faiz: %.1f%%,Annual interest: %.1f%%
+ECON_LOAN_PAYMENT,Aylık taksit: %s (%d ay kaldı),Monthly instalment: %s (%d months left)
+BUILDING_ABANDONED,Terk edilmiş,Abandoned
+BUILDING_HOMES,Hane: %d / %d,Households: %d / %d
+BUILDING_JOBS,Çalışan: %d / %d,Workers: %d / %d
+BUILDING_PROFIT,Aylık kâr: %s,Monthly profit: %s
+SETTINGS_SAVE,Kaydet,Save
+SETTINGS_NEW_CITY,Yeni şehir,New city
+NOTIFY_SAVED,Şehir kaydedildi,City saved
+NOTIFY_LOADED,Şehir yüklendi,City loaded
+NOTIFY_NEW_CITY_CONFIRM,Şehri silip baştan başlamak için tekrar bas,Tap again to wipe the city and start over

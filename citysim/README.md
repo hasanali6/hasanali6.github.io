@@ -1,4 +1,4 @@
-# Şehir Simülasyonu — Faz 1 (Temel) + Faz 2 (Yollar) + Faz 3 (İmar ve Binalar)
+# Şehir Simülasyonu — Faz 1–4 (Temel, Yollar, İmar ve Binalar, Ekonomi)
 
 Godot 4.7.2 (Mobile renderer, Vulkan) ile Android için şehir kurma simülasyonu.
 Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
@@ -18,6 +18,27 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 | Arayüz | `scripts/ui/hud.gd`, `scripts/ui/ui_style.gd` | Mobil şehir oyunu düzeni: sol üstte nüfus/mutluluk, ortada saat ve hız, sağ üstte para ve ayarlar, sağ altta büyük **İnşa Et** düğmesi ve kategori menüsü. İkonlar Lucide (ISC), font Nunito (OFL); lisanslar `assets/ui/` içinde. |
 | Referans sahne (kapalı) | `scripts/world/reference_scene.gd` + `assets/materials/*.gdshader` | Işık testi için bina blokları ve ağaçlar. Varsayılan **kapalı** — harita boş başlar. `data/reference_scene.json` → `"enabled": true` ile açılır. |
 | Testler | `tests/run_tests.gd` | Görselsiz (headless) birim testleri: saat, hız, ay geçişi, jestler, ızgara. |
+
+## Faz 4: Ekonomi çekirdeği (+ elle yerleştirme ve kayıt)
+
+| Parça | Dosya | Ne yapar |
+|---|---|---|
+| Haneler | `scripts/data/household_data.gd`, `scripts/systems/citizen_system.gd` | Haneler paketli dizilerde: yetişkin/çocuk/yaşlı, yetişkin başına eğitim (3 seviye) ve iş, para, mutluluk. Göç gelir/gider; doğum, büyüme, emeklilik, ölüm, evden ayrılıp yeni hane kurma. |
+| Konut / iş / alışveriş seçimi | aynı | Göçmen birkaç boş evi örnekler; kira, yakında dükkân ve park puanına göre seçer. İşçi yakın şirketleri örnekler, eğitimine uygun işi tercih eder; fazla eğitimli alt seviye işe girebilir. Her hane en yakın dükkândan alışveriş yapar. |
+| Şirketler | `scripts/systems/company_system.gd` | Her ticari/ofis/sanayi/karma binada bir şirket. Sanayi mal üretir (önce şehrin dükkânlarına, kalan ihraç), dükkân hanelere satar (yerel mal yetmezse ithal eder, işçi başına satış kapasitesi var), ofis hizmet üretir. Kâra göre işçi alır/çıkarır; borç batağında kalan iflas eder, bina terk edilir. |
+| Bütçe | `scripts/systems/economy_system.gd`, `scripts/ui/economy_panel.gd` | Aylık: konut vergisi (eğitim seviyesine göre ayrı oran), ticari/ofis/sanayi vergisi (kârdan), azalan devlet desteği; gider olarak yol bakımı ve kredi taksiti. Vergi aralığı %-10…%30. Tek ayarlanabilir kredi; limit nüfusla büyür, faiz kullanılan limitle artar, taksit otomatik. |
+| RCI talep | `scripts/data/economy_rules.gd`, `scripts/systems/demand_system.gd` | Boş iş/işsiz dengesi, boş konut, mutluluk, vergi, mal eksikliği, ithalat ve eğitimli işsizlerden konut/ticari/ofis/sanayi talebi. Binalar sadece talep varken büyür; göç ayrı bir "çekicilik" değerine bakar. |
+| Binaların hayatı | `scripts/systems/building_system.gd` | Kapasite: konut = kat × hücre × yoğunluk hane; iş = kat × hücre × yoğunluk, eğitim karışımına göre. Seviye atlama: konut dolu ve mutluysa, şirket birkaç ay kârdaysa. Talep yokken boş kalan ev ve iflas eden şirket terk edilir (karartılır), birkaç ay sonra yıkılır. |
+| Elle yerleştirme | `data/catalog.json`, `scripts/world/build_tool.gd`, `scripts/ui/catalog_panel.gd` | İnşa Et → Binalar: ev, apartman, kule, dükkân, AVM, ofis, fabrika, atölye, park, koru, çeşmeli meydan. Yola yakın sürükle → yeşil önizleme → bırak. Parkların çevresindeki hanelerin mutluluğu artar. |
+| Kayıt | `scripts/systems/save_system.gd` | Her ay ve uygulama arka plana atılınca / kapanınca otomatik kayıt; açılışta otomatik yükleme. Ayarlar → Kaydet / Yeni şehir (iki kez dokun). Kayıt sürümlü. |
+
+**Simülasyon LOD:** Her hane ayda tam bir kez güncellenir ama bu iş ayın tiklerine eşit dağıtılır. 10.000 hanede bile tik başına birkaç hane işlenir, kare süresi şehir büyüklüğünden bağımsız kalır. Şirketlerin aylık defteri ay sonunda kapanır (sayıları binlerle sınırlı).
+
+**Arayüz:** Sol üstte nüfus ve ortalama mutluluk; altında K/T/O/S talep çubukları. Para altında aylık net. Sol yeşil düğme ekonomi paneli (Bütçe / Vergiler / Kredi). Bir binaya uzun basınca hane veya çalışan sayısı ve aylık kâr.
+
+**Faz 4 kabul kriterleri:** konut imar edilince göçmen gelir, nüfus ve mutluluk görünür · iş yeri olmadan işsizlik artar, konut talebi düşer, sanayi/ticari talebi yükselir · vergi artınca gelir artar, talep ve mutluluk düşer · ay sonunda bütçe kesilir, para altında aylık net görünür · kredi alınır, taksit her ay düşer · zarar eden şirket işçi çıkarır, sonunda iflas edip bina terk edilir · uygulama kapanıp açılınca şehir yerinde durur. Otomatik testler: `93 checks, 0 failed`; 10 aylık entegrasyon testinde nüfus 0 → ~800, aylık net ~+11.000.
+
+**Bilinçli basitleştirmeler:** eğitim seviyesi göçle geliyor, okullar Faz 5'te yükseltecek · arsa değeri yok (kira bina seviyesine bağlı) · işe uzaklık kuş uçuşu (trafik süresi Faz 6) · sanayinin tek ürünü "mal", hammadde zinciri ve ürün tipine göre vergi daha sonra · hizmet bütçeleri ve elektrik/su ücretleri Faz 5. Tüm denge sayıları `data/economy.json`'da.
 
 ## Faz 3: İmar ve binalar
 
@@ -124,8 +145,7 @@ Aynı sayfada `SehirSim-GL.apk` da var: aynı oyunun OpenGL (Compatibility) sür
 
 ## Bilinen eksikler / sonraki fazlara kalanlar
 - **Yollar:** yol yükseltme (sokak → cadde) yok, şimdilik yık + yeniden çiz. Serbest el çizimi, köprü/tünel, çıkmaz sokak dönüş cebi ve trafik ışığı yok (ışıklar Faz 6). Kavşak köşeleri çok dar açılarda sadeleşir.
-- **Kayıt:** yol ağı, imar ve binalar henüz kaydedilmiyor (Faz 8).
-- **Binalar:** Kenney kitinde sadece 5 bina modeli var; çeşitlilik kod ile üretilen binalarla sağlanıyor. Kenney'nin büyük ücretsiz şehir paketleri (kenney.nl) repoya eklenirse kolayca bağlanır. Elle bina yerleştirme yok, binalar imarla kendiliğinden gelir.
+- **Binalar:** Kenney kitinde sadece 5 bina modeli var; çeşitlilik kod ile üretilen binalarla sağlanıyor. Kenney'nin büyük ücretsiz şehir paketleri (kenney.nl) repoya eklenirse kolayca bağlanır. Binalar imarla kendiliğinden gelir; istersen katalogdan elle de yerleştirilir.
 - **Doku siteleri:** ambientCG ve Poly Haven bu geliştirme ortamından erişilemedi. Yol ve kaldırım dokuları shader ile üretildi, ek dosya yok. Kenney'nin ücretsiz (CC0) şehir modelleri Faz 3'te binalar için kullanılacak.
 - Harita boş başlar; inşa araçları (yol çizme) Faz 2'de gelir. Referans bloklar sadece ışık testi için ve varsayılan kapalı.
 - Dinamik çözünürlük GPU darboğazını çözer; FPS düşüklüğü CPU kaynaklıysa (ileride kalabalık simülasyon) çözünürlük düşürmek işe yaramaz — o iş Faz 6'daki simülasyon LOD'unun.

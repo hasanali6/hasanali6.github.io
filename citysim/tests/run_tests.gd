@@ -28,6 +28,8 @@ func _initialize() -> void:
 	_test_road_mesh()
 	_test_zone_cells()
 	_test_zone_restore_and_lots()
+	_test_households()
+	_test_economy_rules()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -370,3 +372,57 @@ func _test_zone_restore_and_lots() -> void:
 	for c in grid.size():
 		zoned_after += 1 if grid.zone[c] == 1 else 0
 	_check(zoned_after > zoned_before * 0.6, "zoning survives a road being split (%d -> %d)" % [zoned_before, zoned_after])
+
+
+func _economy() -> Dictionary:
+	return DataLoader.load_json("res://data/economy.json")
+
+
+func _test_households() -> void:
+	var h := HouseholdData.new()
+	var a := h.add(7, 2, 1, 0, [1, 2], 3000.0)
+	var b := h.add(8, 1, 0, 1, [0], 1000.0)
+	_check(h.count == 2 and h.members(a) == 3 and h.members(b) == 2, "households store members")
+	h.job[a * HouseholdData.MAX_ADULTS + 1] = HouseholdData.job_code(42, 2)
+	_check(h.employed(a) == 1, "employment counted per adult")
+	var freed := h.remove_adult(a, 0)
+	_check(freed == HouseholdData.NO_JOB and h.adults[a] == 1 and h.job[a * HouseholdData.MAX_ADULTS] == HouseholdData.job_code(42, 2),
+		"removing an adult shifts the remaining ones")
+	_check(HouseholdData.job_company(HouseholdData.job_code(42, 2)) == 42 and HouseholdData.job_level(HouseholdData.job_code(42, 2)) == 2, "job code round-trips")
+	h.remove(b)
+	var c := h.add(9, 1, 0, 0, [0], 0.0)
+	_check(c == b and h.count == 2, "dead slots are reused")
+
+
+func _test_economy_rules() -> void:
+	var e := _economy()
+	_check(EconomyRules.households_capacity("res_mid", 4, 4, e["households"]) == 16, "residential capacity = floors x cells x density")
+	_check(EconomyRules.households_capacity("mixed", 3, 4, e["households"]) == roundi(0.8 * 2 * 4), "mixed keeps the ground floor for shops")
+	var slots := EconomyRules.job_slots("office", "office", 5, 6, e["companies"])
+	_check(slots[0] + slots[1] + slots[2] == 60 and slots[2] > slots[0], "office jobs favour educated workers")
+	_check(EconomyRules.rent("res_low", 2, e["money"]) > EconomyRules.rent("res_low", 1, e["money"]), "higher level means higher rent")
+	var pay := EconomyRules.loan_payment(24000.0, 0.06, 24)
+	_check(pay > 1000.0 and pay < 1100.0, "loan instalment is an annuity (%.1f)" % pay)
+	_check(EconomyRules.loan_payment(0.0, 0.06, 24) == 0.0, "no loan, no payment")
+	_check(EconomyRules.subsidy(0, e["budget"]) > EconomyRules.subsidy(3000, e["budget"]), "state subsidy shrinks as the city grows")
+	var h_good := EconomyRules.happiness(1.0, true, false, true, 10.0, false, e["happiness"], 10.0)
+	var h_bad := EconomyRules.happiness(0.0, true, true, false, 25.0, false, e["happiness"], 10.0)
+	_check(h_good > 70.0 and h_bad < 20.0, "happiness reacts to jobs, money, shops and taxes")
+	var taxes := {"residential": 10.0, "commercial": 10.0, "office": 10.0, "industrial": 10.0}
+	var empty_city := {"population": 0, "workers": 0, "unemployed": 0, "unemployed_by_edu": [0, 0, 0], "vacant_jobs": 0,
+		"homes": 0, "empty_homes": 0, "happiness": 50.0, "goods_unmet_ratio": 0.0, "import_ratio": 0.0,
+		"commercial_jobs": 0, "industrial_jobs": 0, "office_jobs": 0}
+	var d0 := EconomyRules.demand(empty_city, taxes, e["demand"], 10.0)
+	_check(d0["residential"] > 0.5 and d0["commercial"] < 0.0, "a new city wants homes first")
+	var first_house := empty_city.duplicate()
+	first_house.merge({"homes": 1, "empty_homes": 1}, true)
+	_check(EconomyRules.demand(first_house, taxes, e["demand"], 10.0)["migration"] > 0.5, "an empty first house still attracts newcomers")
+	var town := empty_city.duplicate()
+	town.merge({"population": 1500, "workers": 700, "unemployed": 250, "unemployed_by_edu": [150, 80, 20],
+		"homes": 520, "empty_homes": 10, "goods_unmet_ratio": 0.6, "commercial_jobs": 20, "industrial_jobs": 10}, true)
+	var d1 := EconomyRules.demand(town, taxes, e["demand"], 10.0)
+	_check(d1["commercial"] > 0.3 and d1["industrial"] > 0.3, "unemployment and missing shops raise C and I demand")
+	_check(d1["residential"] < d0["residential"], "unemployment lowers residential demand")
+	var taxed := taxes.duplicate()
+	taxed["residential"] = 30.0
+	_check(EconomyRules.demand(town, taxed, e["demand"], 10.0)["residential"] < d1["residential"], "high taxes lower demand")
