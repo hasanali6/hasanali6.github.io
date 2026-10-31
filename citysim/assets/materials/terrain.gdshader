@@ -67,9 +67,11 @@ void fragment() {
 	float border = 1.0 - smoothstep(border_w, border_w * 2.0, abs(outside));
 	col = mix(col, border_color, border * 0.55);
 
-	float grid = grid_line(p, 1.0) * grid_strength * (1.0 - smoothstep(grid_fade_distance * 0.5, grid_fade_distance, dist));
-	grid *= 1.0 - locked;
-	col = mix(col, grid_color, grid);
+	if (grid_strength > 0.0) {
+		float grid = grid_line(p, 1.0) * grid_strength * (1.0 - smoothstep(grid_fade_distance * 0.5, grid_fade_distance, dist));
+		grid *= 1.0 - locked;
+		col = mix(col, grid_color, grid);
+	}
 
 	ALBEDO = col;
 	ROUGHNESS = clamp(base_roughness - fine * 0.06 + dirt_mask * 0.03, 0.0, 1.0);

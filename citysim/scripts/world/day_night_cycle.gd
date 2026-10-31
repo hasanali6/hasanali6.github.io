@@ -12,8 +12,6 @@ var _sky_mat: ProceduralSkyMaterial
 var _keys: Array = []
 var _latitude: float
 var _azimuth_offset: float
-var _sun_disk: float
-var _moon_disk: float
 var _sky_update_delta: float
 var _night_full: float
 var _night_zero: float
@@ -23,6 +21,7 @@ var _shadows_allowed: bool = true
 var _shadow_cap: float
 var _shadow_per_view: float
 var _shadow_min: float
+var _shadow_refit_ratio: float
 var _last_sky_height: float = INF
 
 
@@ -31,14 +30,13 @@ func _ready() -> void:
 	var cfg := GameData.section("environment")
 	_latitude = deg_to_rad(float(cfg["latitude_deg"]))
 	_azimuth_offset = deg_to_rad(float(cfg["sun_azimuth_offset_deg"]))
-	_sun_disk = float(cfg["sun_disk_angle_deg"])
-	_moon_disk = float(cfg["moon_disk_angle_deg"])
 	_sky_update_delta = float(cfg["sky_update_min_height_delta"])
 	_night_full = float(cfg["night_factor_full_at_height"])
 	_night_zero = float(cfg["night_factor_zero_at_height"])
 	_shadow_min_energy = float(cfg["shadow_min_light_energy"])
 	_shadow_per_view = float(cfg["shadow_distance_per_view_m"])
 	_shadow_min = float(cfg["shadow_distance_min_m"])
+	_shadow_refit_ratio = float(cfg["shadow_refit_ratio"])
 	_keys = _parse_keys(cfg["keys"])
 	_build_environment(cfg)
 	_setup_sun(cfg)
@@ -62,7 +60,8 @@ func _update_shadow_distance() -> void:
 	var down := maxf(-cam.global_basis.z.y, 0.1)
 	var view_distance := cam.global_position.y / down
 	var target := clampf(view_distance * _shadow_per_view, _shadow_min, _shadow_cap)
-	if absf(target - _sun.directional_shadow_max_distance) > target * 0.05:
+	# Only switch on big changes: every switch re-fits the shadow map and makes shadows jump.
+	if absf(target - _sun.directional_shadow_max_distance) > target * _shadow_refit_ratio:
 		_sun.directional_shadow_max_distance = target
 
 
@@ -135,7 +134,9 @@ func _setup_sun(cfg: Dictionary) -> void:
 	_sun.shadow_blur = float(cfg["shadow_blur"])
 	_sun.shadow_bias = float(cfg["shadow_bias"])
 	_sun.shadow_normal_bias = float(cfg["shadow_normal_bias"])
-	_sun.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_AND_SKY
+	# The sky colours are driven by the data keys; keeping the light out of the
+	# sky shader stops the radiance map from re-filtering every frame as the sun moves.
+	_sun.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
 
 
 func _apply_graphics(_preset: String) -> void:
@@ -171,7 +172,6 @@ func _update_lighting(force: bool) -> void:
 	var want_shadow: bool = _shadows_allowed and key["light"] > _shadow_min_energy and (is_day or _shadows_at_night)
 	if _sun.shadow_enabled != want_shadow:
 		_sun.shadow_enabled = want_shadow
-	_sky_mat.sun_angle_max = _sun_disk if is_day else _moon_disk
 
 	var night := 1.0 - smoothstep(_night_full, _night_zero, height)
 	RenderingServer.global_shader_parameter_set("night_factor", night)

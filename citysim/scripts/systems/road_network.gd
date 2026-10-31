@@ -204,6 +204,8 @@ func _rebuild_chunk(chunk: Vector2i) -> void:
 	var mi: MeshInstance3D = _chunks.get(chunk)
 	if mi == null:
 		mi = MeshInstance3D.new()
+		# Roads are flat; 18 cm curbs only produce shimmering shadow aliasing.
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.name = "RoadChunk_%d_%d" % [chunk.x, chunk.y]
 		add_child(mi)
 		_chunks[chunk] = mi
@@ -216,6 +218,8 @@ func _build_lamp_nodes() -> void:
 	var cfg := GameData.section("roads/lamps")
 	var light := DataLoader.to_color(cfg["light_color"])
 	_lamps = MultiMeshInstance3D.new()
+	# Thin poles are thinner than a shadow-map texel; their shadows flicker as the sun moves.
+	_lamps.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_lamps.name = "StreetLamps"
 	_lamps.multimesh = _new_multimesh(_build_lamp_mesh(cfg, light))
 	add_child(_lamps)

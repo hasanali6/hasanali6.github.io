@@ -1,8 +1,6 @@
 {
   "latitude_deg": 41.0,
   "sun_azimuth_offset_deg": 20.0,
-  "sun_disk_angle_deg": 1.6,
-  "moon_disk_angle_deg": 0.9,
   "sky_curve": 0.12,
   "ground_curve": 0.03,
   "sky_update_min_height_delta": 0.02,
@@ -14,6 +12,7 @@
   "shadow_normal_bias": 2.0,
   "shadow_distance_per_view_m": 2.2,
   "shadow_distance_min_m": 80.0,
+  "shadow_refit_ratio": 0.3,
   "tonemapper": "aces",
   "tonemap_white": 6.0,
   "saturation": 1.12,
