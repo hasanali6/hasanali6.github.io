@@ -1,12 +1,7 @@
 keys,tr,en
 APP_TITLE,Şehir Simülasyonu,City Simulation
-SPEED_PAUSE,Dur,Pause
-SPEED_1,1x,1x
-SPEED_2,2x,2x
-SPEED_3,3x,3x
-LABEL_POPULATION,Nüfus,Population
-LABEL_MONEY,Para,Money
-LABEL_FPS,"FPS: %d · 3D %d%%","FPS: %d · 3D %d%%"
+LABEL_BUILD,İnşa Et,Build
+LABEL_PERF,FPS %d · GPU %.1f ms · CPU %.1f ms · %s · 3D %d%%,FPS %d · GPU %.1f ms · CPU %.1f ms · %s · 3D %d%%
 TOOL_ROADS,Yollar,Roads
 TOOL_ZONING,İmar,Zoning
 TOOL_SERVICES,Hizmetler,Services
@@ -16,8 +11,6 @@ TOOL_DISTRICTS,Bölgeler,Districts
 TOOL_ECONOMY,Ekonomi,Economy
 TOOL_OVERLAYS,Katmanlar,Overlays
 TOOL_LOCKED,"""%s"" sonraki fazlarda açılacak.","""%s"" will unlock in a later phase."
-BTN_SETTINGS,Ayarlar,Settings
-BTN_CLOSE,Kapat,Close
 SETTINGS_TITLE,Ayarlar,Settings
 SETTINGS_QUALITY,Grafik kalitesi,Graphics quality
 QUALITY_LOW,Düşük,Low
@@ -25,7 +18,7 @@ QUALITY_MEDIUM,Orta,Medium
 QUALITY_HIGH,Yüksek,High
 SETTINGS_GRID,İmar ızgarası (8 m),Zoning grid (8 m)
 SETTINGS_TIME,Günün saati,Time of day
-SETTINGS_SHOW_FPS,FPS göster,Show FPS
+SETTINGS_SHOW_FPS,Performans bilgisi,Performance info
 INFO_TITLE,Konum bilgisi,Location info
 INFO_POSITION,"Konum: %.0f m, %.0f m","Position: %.0f m, %.0f m"
 INFO_CELL,"Hücre: %d, %d","Cell: %d, %d"

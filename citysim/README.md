@@ -14,8 +14,8 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 | Kamera | `scripts/systems/camera_controller.gd` | Harita görünümünden sokak seviyesine yumuşak geçiş; eğim zoom'a bağlı, sınırlı. |
 | Arazi | `scripts/systems/terrain_system.gd`, `assets/materials/terrain.gdshader` | 4 km × 4 km oynanabilir düz arazi + kilitli çevre, 8 m imar ızgarası (açılıp kapanır). |
 | Gün-gece | `scripts/world/day_night_cycle.gd` | Güneş/ay yönü, renk sıcaklığı (Kelvin), gökyüzü, sis, pozlama, global `night_factor`. |
-| Grafik kalitesi | `scripts/systems/graphics_settings.gd` | Düşük / Orta / Yüksek ön ayarlar (`data/graphics.json`). Seçim kaydedilir. 60 FPS altına düşünce 3D çözünürlüğü otomatik düşüren dinamik çözünürlük. |
-| Arayüz | `scripts/ui/hud.gd` | Üst çubuk (tarih, saat, hız, FPS), alt araç çubuğu, ayarlar, konum bilgisi, bildirim. |
+| Grafik kalitesi | `scripts/systems/graphics_settings.gd` | Düşük / Orta / Yüksek ön ayarlar (`data/graphics.json`). Seçim kaydedilir. Dinamik çözünürlük ölçülen GPU süresine bakar; 90/144 Hz ekranlarda FPS kilidi kaldırılır (aksi halde 45/72'ye takılır). |
+| Arayüz | `scripts/ui/hud.gd`, `scripts/ui/ui_style.gd` | Mobil şehir oyunu düzeni: sol üstte nüfus/mutluluk, ortada saat ve hız, sağ üstte para ve ayarlar, sağ altta büyük **İnşa Et** düğmesi ve kategori menüsü. İkonlar Lucide (ISC), font Nunito (OFL); lisanslar `assets/ui/` içinde. |
 | Referans sahne (kapalı) | `scripts/world/reference_scene.gd` + `assets/materials/*.gdshader` | Işık testi için bina blokları ve ağaçlar. Varsayılan **kapalı** — harita boş başlar. `data/reference_scene.json` → `"enabled": true` ile açılır. |
 | Testler | `tests/run_tests.gd` | Görselsiz (headless) birim testleri: saat, hız, ay geçişi, jestler, ızgara. |
 
@@ -36,10 +36,10 @@ iki parmakla yukarı/aşağı kaydır = eğim · uzun bas = konum bilgisi · ger
 | 4 | Zoom ile eğim yumuşakça değişir | En yakına zoom yap: kamera sokak seviyesine iner; en uzağa: harita görünümü. |
 | 5 | Gün-gece döngüsü çalışır | Ayarlar → "Günün saati" kaydırıcısı. Sabah/akşam ışığı sıcak, öğlen nötr, gece pencereler rastgele yanar. |
 | 6 | Hız düğmeleri çalışır | Dur → saat durur. 3x → saat 1x'in üç katı hızda ilerler. Gün bitince ay değişir. |
-| 7 | Butona dokunmak kamerayı oynatmaz | Alt çubuktaki bir araca dokun → sadece bildirim çıkar, harita kaymaz. |
+| 7 | Butona dokunmak kamerayı oynatmaz | İnşa Et → bir kategoriye dokun → sadece bildirim çıkar, harita kaymaz. |
 | 8 | Kalite ayarları uygulanır | Ayarlar → Düşük/Orta/Yüksek. Gölge ve görüntü keskinliği değişir, uygulama yeniden açıldığında seçim hatırlanır. |
 | 9 | Uzun basma bilgi verir | Zemine uzun bas → konum (m), hücre (8 m) ve "oynanabilir alan / kilitli" bilgisi. |
-| 10 | APK telefonda açılır, yatay ekran, Türkçe arayüz, 60 FPS | Aşağıdaki adımlarla kur. Sağ üstte `FPS: 60 · 3D 75%` gibi görünür. FPS 60'ın altındaysa 3D yüzdesi kendiliğinden düşer; hâlâ düşükse Ayarlar → Düşük. |
+| 10 | APK telefonda açılır, yatay ekran, Türkçe arayüz, akıcı | Sol altta `FPS 60 · GPU 9.8 ms · CPU 3.1 ms · 120 Hz · 3D 75%` gibi bir satır var. GPU 14 ms'yi aşarsa 3D yüzdesi kendiliğinden düşer. CPU yüksekse sorun ekran kartında değil işlemcidedir. |
 
 ## APK nasıl alınır
 
@@ -51,6 +51,8 @@ Bu repoda `.github/workflows/citysim-android.yml` var. `citysim/` içinde bir de
 4. APK'yı hem Actions "Artifacts" bölümüne hem de **Releases → `citysim-latest`** sürümüne koyar.
 
 Telefondan: repo sayfası → Releases → `citysim-latest` → `SehirSim.apk` indir → "Bilinmeyen kaynaklardan yükleme" iznini ver → kur.
+
+Aynı sayfada `SehirSim-GL.apk` da var: aynı oyunun OpenGL (Compatibility) sürümü, ayrı paket adıyla (`Şehir Sim (GL)`) kurulur. Bazı telefonlarda Vulkan'dan hızlıdır; ikisini karşılaştırmak için.
 
 ### Yol B — Kendi bilgisayarında (Godot editörü)
 1. **Godot 4.7.2** (standart sürüm, .NET değil) indir.

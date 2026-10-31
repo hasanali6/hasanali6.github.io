@@ -1,6 +1,7 @@
 {
   "default_preset": "medium",
-  "max_fps": 60,
+  "target_fps": 60,
+  "refresh_divisor_tolerance": 0.05,
   "preset_order": [
     "low",
     "medium",
@@ -55,10 +56,11 @@
   },
   "dynamic_resolution": {
     "enabled": true,
-    "target_fps": 57,
-    "check_interval_s": 1.0,
-    "raise_after_s": 4.0,
+    "check_interval_s": 0.5,
+    "raise_after_s": 3.0,
     "min_scale": 0.5,
-    "step": 0.05
+    "step": 0.05,
+    "gpu_budget_ratio": 0.85,
+    "raise_below_ratio": 0.7
   }
 }

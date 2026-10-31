@@ -90,10 +90,30 @@ jobs:
           test -s "$PROJECT_DIR/export/SehirSim.apk"
           ls -lh "$PROJECT_DIR/export/SehirSim.apk"
 
+      - name: Export OpenGL (Compatibility renderer) test APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          set -euo pipefail
+          # Same game, OpenGL ES renderer and a separate package id so both can
+          # be installed side by side to compare performance on the device.
+          GL_DIR="$RUNNER_TEMP/citysim-gl"
+          cp -r "$PROJECT_DIR" "$GL_DIR"
+          sed -i 's|^renderer/rendering_method.mobile=.*|renderer/rendering_method.mobile="gl_compatibility"|' "$GL_DIR/project.godot"
+          sed -i 's|^package/unique_name=.*|package/unique_name="io.github.hasanali6.sehirsim.gl"|; s|^package/name=.*|package/name="Şehir Sim (GL)"|' "$GL_DIR/export_presets.cfg"
+          ~/godot/godot --headless --path "$GL_DIR" --import
+          ~/godot/godot --headless --path "$GL_DIR" --export-debug "Android" "$GITHUB_WORKSPACE/$PROJECT_DIR/export/SehirSim-GL.apk"
+          test -s "$PROJECT_DIR/export/SehirSim-GL.apk"
+          ls -lh "$PROJECT_DIR/export/SehirSim-GL.apk"
+
       - uses: actions/upload-artifact@v4
         with:
           name: SehirSim-apk
-          path: citysim/export/SehirSim.apk
+          path: |
+            citysim/export/SehirSim.apk
+            citysim/export/SehirSim-GL.apk
 
       - name: Publish rolling pre-release (direct phone download)
         env:
@@ -103,11 +123,11 @@ jobs:
           TAG=citysim-latest
           git tag -f "$TAG" "$GITHUB_SHA"
           git push -f origin "refs/tags/$TAG"
-          NOTES="Otomatik derleme: ${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}. Debug imzalı APK (arm64-v8a)."
+          NOTES="Otomatik derleme: ${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}. Debug imzalı APK (arm64-v8a). SehirSim.apk = Vulkan (Mobile), SehirSim-GL.apk = OpenGL (Compatibility) karşılaştırma sürümü."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" --prerelease --notes "$NOTES"
-            gh release upload "$TAG" "$PROJECT_DIR/export/SehirSim.apk" --clobber
+            gh release upload "$TAG" "$PROJECT_DIR/export/SehirSim.apk" "$PROJECT_DIR/export/SehirSim-GL.apk" --clobber
           else
-            gh release create "$TAG" "$PROJECT_DIR/export/SehirSim.apk" --prerelease \
+            gh release create "$TAG" "$PROJECT_DIR/export/SehirSim.apk" "$PROJECT_DIR/export/SehirSim-GL.apk" --prerelease \
               --title "Şehir Simülasyonu (son derleme)" --notes "$NOTES"
           fi
