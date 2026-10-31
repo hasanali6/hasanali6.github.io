@@ -152,6 +152,9 @@ func _refresh() -> void:
 		_buffer = mm.buffer
 		_cells_dirty = false
 	var seg_colors := {}
+	if _buffer.size() < n * 16:
+		_cells_dirty = true   # headless renderers keep no buffer
+		return
 	for i in n:
 		var col := _cell_color(i, grid, records, seg_colors)
 		var o := i * 16 + 12

@@ -1,0 +1,26 @@
+{
+  "states": {
+    "clear":  {"name_key": "WEATHER_CLEAR",  "icon": "sun",        "clouds": 0.0,  "rain": 0.0, "snowfall": 0.0, "light": 1.0,  "sun_power": 1.0,  "wind": 0.9, "speed": 1.0,  "capacity": 1.0},
+    "cloudy": {"name_key": "WEATHER_CLOUDY", "icon": "cloud",      "clouds": 0.75, "rain": 0.0, "snowfall": 0.0, "light": 0.72, "sun_power": 0.5,  "wind": 1.1, "speed": 1.0,  "capacity": 1.0},
+    "rain":   {"name_key": "WEATHER_RAIN",   "icon": "cloud-rain", "clouds": 1.0,  "rain": 1.0, "snowfall": 0.0, "light": 0.42, "sun_power": 0.25, "wind": 1.25, "speed": 0.88, "capacity": 0.85},
+    "snow":   {"name_key": "WEATHER_SNOW",   "icon": "snowflake",  "clouds": 0.9,  "rain": 0.0, "snowfall": 1.0, "light": 0.68, "sun_power": 0.3,  "wind": 1.0, "speed": 0.8,  "capacity": 0.8}
+  },
+  "season_of_month": ["winter", "winter", "spring", "spring", "spring", "summer", "summer", "summer", "autumn", "autumn", "autumn", "winter"],
+  "season_names": {"spring": "SEASON_SPRING", "summer": "SEASON_SUMMER", "autumn": "SEASON_AUTUMN", "winter": "SEASON_WINTER"},
+  "season_weights": {
+    "spring": {"clear": 0.45, "cloudy": 0.3, "rain": 0.25},
+    "summer": {"clear": 0.72, "cloudy": 0.18, "rain": 0.1},
+    "autumn": {"clear": 0.32, "cloudy": 0.36, "rain": 0.32},
+    "winter": {"clear": 0.28, "cloudy": 0.3, "rain": 0.1, "snow": 0.32}
+  },
+  "autumn_by_month": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.5, 0.9, 1.0, 0.45],
+  "duration_hours": [3.0, 9.0],
+  "transition_hours": 1.2,
+  "wet_per_hour": 0.9,
+  "dry_per_hour": 0.22,
+  "snow_cover_per_hour": 0.18,
+  "snow_melt_per_hour": 0.12,
+  "winter_melt_factor": 0.15,
+  "autumn_per_hour": 0.05,
+  "max_step_hours": 2.0
+}

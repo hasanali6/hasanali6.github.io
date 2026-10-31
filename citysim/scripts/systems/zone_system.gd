@@ -19,6 +19,8 @@ var _show_all: bool = false
 var _playable_half: float
 
 
+var _overlay_queued: bool = false
+
 func _ready() -> void:
 	_net = get_node(road_network_path)
 	grid = ZoneGrid.new(GameData.section("zones/cells"))
@@ -46,8 +48,8 @@ func _ready() -> void:
 	add_child(_overlay)
 
 	EventBus.roads_changed.connect(_on_roads_changed)
-	EventBus.zones_changed.connect(_refresh_overlay)
-	EventBus.buildings_changed.connect(_refresh_overlay)
+	EventBus.zones_changed.connect(_queue_overlay)
+	EventBus.buildings_changed.connect(_queue_overlay)
 	EventBus.build_tool_selected.connect(func(tool: String, _o: Dictionary) -> void:
 		_show_all = tool == "zone"
 		_refresh_overlay())
@@ -83,7 +85,15 @@ func _on_roads_changed() -> void:
 	_refresh_overlay()
 
 
+## Many changes in one frame (painting, growth) redraw the overlay once.
+func _queue_overlay() -> void:
+	if not _overlay_queued:
+		_overlay_queued = true
+		_refresh_overlay.call_deferred()
+
+
 func _refresh_overlay() -> void:
+	_overlay_queued = false
 	var size := grid.cell_size * float(_overlay_cfg["inset"])
 	var h := float(_overlay_cfg["height_m"])
 	var alpha_zone := float(_overlay_cfg["alpha_tool"] if _show_all else _overlay_cfg["alpha_idle"])

@@ -16,6 +16,7 @@ var _scroll: ScrollContainer
 var _buttons: Dictionary = {}
 var _items: Dictionary = {}
 var _first: String = ""
+var _current: String = ""
 
 
 func _init(font_size: int, min_touch: float, on_close: Callable) -> void:
@@ -82,15 +83,28 @@ func open(title_key: String, items: Array) -> void:
 		b.pressed.connect(_select.bind(id))
 		_buttons[id] = b
 		_row.add_child(b)
-		if _first == "":
+		var locked := not ProgressionSystem.is_unlocked(_unlock_id(item))
+		UiStyle.set_locked(b, locked)
+		if _first == "" and not locked:
 			_first = id
 	_scroll.scroll_horizontal = 0
 	panel.visible = true
+	_current = ""
 	if _first != "":
 		_select(_first)
 
 
+func _unlock_id(item: Dictionary) -> String:
+	return ("svc:" if item.has("service") else "item:") + str(item["id"])
+
+
 func _select(id: String) -> void:
+	var item: Dictionary = _items[id]
+	if ProgressionSystem.warn_if_locked(_unlock_id(item), item["name_key"]):
+		for k: String in _buttons:
+			(_buttons[k] as Button).set_pressed_no_signal(k == _current)
+		return
+	_current = id
 	for k: String in _buttons:
 		(_buttons[k] as Button).set_pressed_no_signal(k == id)
 	EventBus.build_tool_selected.emit("place", {"item": _items[id]})

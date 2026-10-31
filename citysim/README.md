@@ -1,4 +1,4 @@
-# Şehir Simülasyonu — Faz 1–7 (Temel, Yollar, İmar ve Binalar, Ekonomi, Hizmetler, Trafik, Toplu Taşıma ve Bölgeler)
+# Şehir Simülasyonu — Faz 1–8 (Temel, Yollar, İmar ve Binalar, Ekonomi, Hizmetler, Trafik, Toplu Taşıma ve Bölgeler, İlerleme ve Hava)
 
 Godot 4.7.2 (Mobile renderer, Vulkan) ile Android için şehir kurma simülasyonu.
 Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
@@ -18,6 +18,41 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 | Arayüz | `scripts/ui/hud.gd`, `scripts/ui/ui_style.gd` | Mobil şehir oyunu düzeni: sol üstte nüfus/mutluluk, ortada saat ve hız, sağ üstte para ve ayarlar, sağ altta büyük **İnşa Et** düğmesi ve kategori menüsü. İkonlar Lucide (ISC), font Nunito (OFL); lisanslar `assets/ui/` içinde. |
 | Referans sahne (kapalı) | `scripts/world/reference_scene.gd` + `assets/materials/*.gdshader` | Işık testi için bina blokları ve ağaçlar. Varsayılan **kapalı** — harita boş başlar. `data/reference_scene.json` → `"enabled": true` ile açılır. |
 | Testler | `tests/run_tests.gd` | Görselsiz (headless) birim testleri: saat, hız, ay geçişi, jestler, ızgara. |
+
+## Faz 8: İlerleme, kayıt, hava ve mevsim, optimizasyon, kalite
+
+| Parça | Dosya | Ne yapar |
+|---|---|---|
+| Kilometre taşları | `scripts/systems/progression_system.gd`, `scripts/data/progression_rules.gd`, `data/progression.json` | Mezra (0) → Köy (300) → Kasaba (1.000) → İlçe (2.500) → Şehir (5.000) → Büyük Şehir (10.000) → Metropol (25.000) → Megakent (50.000). Her taşta para ödülü, daha yüksek kredi limiti ve yeni araçlar. Kilitli yol/imar/bina/hizmet/hat düğmeleri gri görünür; dokununca "… olunca açılır" der. |
+| Harita genişlemesi | `road_tool.gd`, `terrain.gdshader` | Başta merkezdeki 2,4 km × 2,4 km'ye yol yapılır, Kasaba'da 3,2 km, Şehir'de tüm 4 km açılır. Kilitli kısım hafif gölgeli, sınırı kesik çizgili. |
+| İlerleme sekmesi | `scripts/ui/economy_panel.gd` | Ekonomi → İlerleme: unvan, sonraki taşa ilerleme çubuğu, ödül ve açılacaklar listesi. |
+| Kayıt yuvaları | `scripts/systems/save_system.gd`, `scripts/ui/saves_panel.gd` | Ayarlar → Kayıtlar: otomatik kayıt + 3 yuva. Her biri tarih, unvan, nüfus ve para gösterir. Yükleme sahneyi temizden açar (eski şehirden iz kalmaz). Kayıt biçimi sürümlü; eski kayıtlar açılır. |
+| Hava ve mevsim | `scripts/systems/weather_system.gd`, `data/weather.json` | Açık, bulutlu, yağmurlu, karlı (kar sadece kışın). Mevsim takvimden: bir oyun günü bir ay, mevsim 3 gün sürer. Yağmurda yollar ıslanır (koyu, parlak, su birikintili), sonra kurur; kar yağınca zemin, kaldırım, çatı ve ağaçlar beyazlar, kar yavaş erir; sonbaharda yaprak döken ağaçlar sarı-turuncu-kırmızı olur. Saatin yanında hava ikonu ve mevsim adı. |
+| Hava etkileri | `traffic_system.gd`, `traffic_rules.gd`, `service_system.gd`, `day_night_cycle.gd` | Yağmurda araçlar %12, karda %20 yavaş, yollar daha çabuk tıkanır (rota değişir). Bulutta güneş santrali az üretir, rüzgârda türbin biraz fazla. Işık kararır, gölgeler yumuşar, sis artar. |
+| Yağmur/kar efekti | `scripts/world/weather_effects.gd` | Kameranın önünde GPU parçacıkları; yükseğe çıkınca seyrelir. Ayarlar → "Hava durumu" ile kapatılabilir. |
+
+**Optimizasyon turu (ölçülen):**
+- Bina çizimi: bina parçaları önbellekte, her MultiMesh tek seferde dolduruluyor ve bir karedeki bütün değişiklikler tek çizimde birleşiyor → test şehrinde bina başına süre yarıya indi (4–7 ms → ~2 ms), büyüyen şehirde art arda çizim yok.
+- İmar katmanı ve ağaç temizleme de birleştirildi (ağaçlar en fazla yarım saniyede bir yeniden hesaplanıyor; önceden her bina büyümesinde 3–4 ms).
+- Hat araç sayısı artık anında okunuyor (önceden her yarım saniyede bütün araçlar taranıyordu).
+- Görselsiz oyun döngüsü (test şehri, 4 hat, yağmur): karelerin %95'i kare sınırında (16,7 ms), 900 karede tek bir 23 ms'lik sıçrama.
+
+**Kalite ayarları:** Düşük / Orta / Yüksek artık yağmur-kar parçacıklarını da belirliyor (Düşük kapalı, Orta 1.500, Yüksek 3.000). Gölge, çizim mesafesi, araç tavanı, gece gölgesi önceki gibi.
+
+**Faz 8 kabul kriterleri:**
+
+| # | Kriter | Nasıl test edilir |
+|---|---|---|
+| 1 | Sınırlı başlangıç | Yeni şehir: sadece sokak/tek yön sokak, düşük konut, düşük ticari, sanayi ve temel hizmetler açık; cadde, bulvar, ofis, otobüs vb. gri. Gri düğmeye dokun → "Köy (300 nüfus) olunca açılır". |
+| 2 | Kilometre taşı | Nüfus 300'ü geçince "Tebrikler! Şehrin artık bir Köy" bildirimi, +5.000, cadde ve otobüs açılır, kredi limiti artar. |
+| 3 | Harita sınırı | Kesik çizginin dışına yol çizmeye çalış → "Harita burada henüz kilitli". Kasaba olunca çizgi genişler. |
+| 4 | İlerleme sekmesi | Ekonomi → İlerleme: unvan, ilerleme çubuğu, sonraki ödül ve açılacaklar. |
+| 5 | Kayıt yuvaları | Ayarlar → Kayıtlar → Yuva 1 Kaydet. Biraz oyna, Yuva 1 → Yükle'ye iki kez dokun → şehir o anki hâline döner. |
+| 6 | Hava | Oyunu 1x'te bırak: birkaç dakikada bir hava değişir, ikon güncellenir. Yağmurda yollar parlar ve damlalar düşer, durunca kurur. |
+| 7 | Mevsim | Aralık–Şubat kış: kar yağabilir, şehir beyazlar. Eylül–Kasım ağaçlar sararır. |
+| 8 | Hava trafiği etkiler | Yağmurda Katmanlar → Trafik daha kırmızı, işe gidiş süresi biraz uzar. |
+| 9 | Ayarlar | "Hava durumu" kapatılınca yağmur/kar durur. Düşük kalitede parçacık yok. |
+| 10 | Testler | `godot --headless --path citysim -s res://tests/run_tests.gd` → `164 checks, 0 failed`. |
 
 ## Faz 7: Toplu taşıma, bölgeler ve politikalar
 
@@ -255,6 +290,7 @@ Aynı sayfada `SehirSim-GL.apk` da var: aynı oyunun OpenGL (Compatibility) sür
 - Mobile renderer'da FSR yok (yalnızca Forward+), bu yüzden düşük ayarlarda bilinear ölçekleme kullanılıyor.
 
 ## Bilinen eksikler / sonraki fazlara kalanlar
+- **İlerleme, kayıt, hava (Faz 8):** harita karoları tek tek satın alınmıyor; açık alan kilometre taşlarıyla kare olarak büyüyor. Kilitlemeler sadece yeni inşaatı etkiler; eski kayıttaki caddeler/bulvarlar yerinde kalır. Bulut kaydı ve şehir adı yok. Kaza, sel, yıldırım yok; su yüzeyinde yağmur halkaları yok. Kar trafikte yolları kapatmaz, kar küreme aracı yok. Mevsimler ekonomiyi (ısınma, turizm) etkilemiyor.
 - **Toplu taşıma ve bölgeler (Faz 7):** metro, tren, liman ve şehir dışı bağlantıları yok (dış bağlantılar ve otoyol sonraki fazlarda). Aktarma yok: bir yolculuk tek hatla yapılır. Yolcular sayısal; durakta bekleyen ya da araca binen yaya görünmüyor. Otobüs ve tramvay diğer trafikle aynı sağ şeritte gider (ayrı otobüs/tramvay şeridi yok) ve U dönüşü yapamaz, bu yüzden her hat bir döngü olmalı. Var olan hattın durakları düzenlenemez; sil ve yeniden çiz. Tramvay için ayrı ray yolu yok, cadde/bulvarda asfalta gömülü ray çizilir. Hat ve politika ücretleri ilk ayar; denge oynanarak ayarlanacak (küçük kasabada hatlar zarar eder, bu bilinçli). Bölgeler sadece politika içindir, bölge başına vergi yok. Yüksek bina yasağı var olan yüksek binaları yıkmaz, sadece büyümeyi durdurur.
 - **Trafik (Faz 6):** kaza ve yağmurda rota değişimi yok (hava Faz 8). Kavşakta çarpışma kontrolü yok: aynı fazda karşıdan sola dönenle düz giden üst üste geçebilir; ışıksız sokak kavşaklarında öncelik kuralı yok, araçlar durmadan geçer. Şerit değiştirme kavşakta yapılır, yol ortasında değil. Yayalar, bisikletler ve park etmiş araçlar yok; araçlar varınca bina önünde durup kaybolur. Otoyol / dış bağlantı yok, ithalat-ihracat kamyonları şehir dışından gelmez. İş seçimi hâlâ kuş uçuşu mesafeye bakar. Yol düzenlenince değişen yollardaki araçlar kaybolur ve yeni atama bitene kadar (büyük şehirde telefonda 5–10 sn) yeni araç çıkmaz.
 - **Hizmetler (Faz 5):** ambulans, çöp kamyonu, itfaiye aracı gibi hizmet araçları yolda gezmiyor (araçlar ve trafik Faz 6); kapsama şimdilik yol mesafesiyle hesaplanıyor. Elektrik direkleri ve su boruları görünmüyor, yolları izledikleri varsayılıyor. Çöp alanı ve mezarlık boşaltılamıyor; dolunca yenisi gerekir. Yangın binayı anında harabeye çevirir (söndürme yok). Su kirliliği mesafeye bakar, nehrin akış yönü yok. Rüzgâr türbinleri yola bakar, rüzgâr yönü yok; güneş santrali gece de üretir (hava durumu ve gün-gece üretimi Faz 8).

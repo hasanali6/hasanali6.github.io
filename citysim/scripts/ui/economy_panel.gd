@@ -6,9 +6,11 @@ extends RefCounted
 ##   Hizmetler : budget per service category (50..150 %), electricity and
 ##               water fees, and how much of the utility capacity is in use.
 ##   Kredi     : the single loan: amount, limit, interest, instalment, borrow/repay.
+##   İlerleme  : population milestones, progress to the next one and what it
+##               unlocks.
 
 const ROW_HEIGHT := 40.0
-const INCOME_KEYS := ["residential", "commercial", "office", "industrial", "subsidy", "power_fees", "water_fees", "tickets", "parking"]
+const INCOME_KEYS := ["residential", "commercial", "office", "industrial", "subsidy", "power_fees", "water_fees", "tickets", "parking", "milestones"]
 
 var card: PanelContainer
 
@@ -24,6 +26,9 @@ var _svc_sliders: Dictionary = {}
 var _svc_values: Dictionary = {}
 var _utility_label: Label
 var _loan_label: Label
+var _progress_label: Label
+var _progress_bar: ProgressBar
+var _milestone_list: Label
 var _categories: Dictionary
 
 
@@ -38,7 +43,7 @@ func _init(font_size: int, min_touch: float) -> void:
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 10)
 	var group := ButtonGroup.new()
-	for key: String in ["budget", "taxes", "services", "loan"]:
+	for key: String in ["budget", "taxes", "services", "loan", "progress"]:
 		var b := Button.new()
 		b.text = "ECON_TAB_" + key.to_upper()
 		b.toggle_mode = true
@@ -55,6 +60,7 @@ func _init(font_size: int, min_touch: float) -> void:
 	_pages["taxes"] = _build_taxes()
 	_pages["services"] = _build_services()
 	_pages["loan"] = _build_loan()
+	_pages["progress"] = _build_progress()
 	for page: Control in _pages.values():
 		content.add_child(page)
 	_show("budget")
@@ -66,6 +72,10 @@ func _init(font_size: int, min_touch: float) -> void:
 		if card.visible:
 			_refresh_utilities())
 	EventBus.loan_changed.connect(_refresh_loan)
+	EventBus.progression_changed.connect(_refresh_progress)
+	EventBus.city_stats_changed.connect(func(_s: Dictionary) -> void:
+		if card.visible and _pages["progress"].visible:
+			_refresh_progress())
 	EventBus.money_changed.connect(func(_b: int) -> void: _refresh_loan())
 
 
@@ -74,6 +84,7 @@ func open() -> void:
 	_refresh_taxes()
 	_refresh_services()
 	_refresh_loan()
+	_refresh_progress()
 	card.visible = true
 
 
@@ -334,3 +345,58 @@ func _refresh_loan() -> void:
 		tr("ECON_LOAN_RATE") % (EconomySystem.loan_rate * 100.0),
 		tr("ECON_LOAN_PAYMENT") % [UiStyle.format_int(roundi(EconomySystem.loan_payment)), EconomySystem.loan_months_left],
 	]
+
+
+# --- Progress ---------------------------------------------------------------------
+
+func _build_progress() -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 10)
+	_progress_label = UiStyle.label("", _font - 2)
+	_progress_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_progress_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(_progress_label)
+	_progress_bar = ProgressBar.new()
+	_progress_bar.min_value = 0.0
+	_progress_bar.max_value = 1.0
+	_progress_bar.step = 0.001
+	_progress_bar.show_percentage = false
+	_progress_bar.custom_minimum_size.y = 22
+	var fill := UiStyle.flat_box(UiStyle.GREEN, 10)
+	var bg := UiStyle.flat_box(Color(0.78, 0.81, 0.85), 10)
+	_progress_bar.add_theme_stylebox_override("fill", fill)
+	_progress_bar.add_theme_stylebox_override("background", bg)
+	col.add_child(_progress_bar)
+	_milestone_list = UiStyle.label("", _font - 6)
+	_milestone_list.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_milestone_list.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(_milestone_list)
+	return col
+
+
+func _refresh_progress() -> void:
+	var level := ProgressionSystem.level
+	var ms := ProgressionSystem.milestones()
+	var current: Dictionary = ms[level]
+	var pop := ProgressionSystem.population
+	var text := tr("PROGRESS_CURRENT") % [tr(current["name_key"]), UiStyle.format_int(pop)]
+	if level + 1 < ms.size():
+		var next: Dictionary = ms[level + 1]
+		text += "\n" + tr("PROGRESS_NEXT") % [tr(next["name_key"]), UiStyle.format_int(int(next["population"])),
+			UiStyle.format_int(int(next["reward"]))]
+		var names := PackedStringArray()
+		for id: String in next.get("unlocks", []):
+			names.append(tr(ProgressionSystem.unlock_name_key(id)))
+		if next.has("area_half_m"):
+			names.append(tr("PROGRESS_AREA") % (float(next["area_half_m"]) * 2.0 / 1000.0))
+		if not names.is_empty():
+			text += "\n" + tr("PROGRESS_UNLOCKS") % ", ".join(names)
+	else:
+		text += "\n" + tr("PROGRESS_MAX")
+	_progress_label.text = text
+	_progress_bar.value = ProgressionSystem.progress()
+	var lines := PackedStringArray()
+	for i in ms.size():
+		var m: Dictionary = ms[i]
+		lines.append("%s %s · %s" % ["✔" if i <= level else "○", tr(m["name_key"]), UiStyle.format_int(int(m["population"]))])
+	_milestone_list.text = "   ".join(lines)

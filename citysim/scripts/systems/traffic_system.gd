@@ -126,6 +126,7 @@ func _ready() -> void:
 	EventBus.month_changed.connect(func(_m: int) -> void: _wanted = true)
 	EventBus.transit_changed.connect(func() -> void: _wanted = true)
 	EventBus.districts_changed.connect(func() -> void: _wanted = true)
+	EventBus.weather_changed.connect(func(_i: Dictionary) -> void: _wanted = true)
 
 
 func _exit_tree() -> void:
@@ -334,6 +335,8 @@ func _start_job(threaded: bool) -> void:
 	var job := TrafficAssignment.new()
 	job.graph = graph
 	job.cfg = _cfg.duplicate(true)
+	job.cfg["weather_speed"] = WeatherSystem.speed
+	job.cfg["weather_capacity"] = WeatherSystem.capacity
 	var origins := PackedInt32Array()
 	var dests := PackedInt32Array()
 	var counts := PackedFloat32Array()
@@ -449,7 +452,7 @@ func lane_speed(seg_id: int, dir: int) -> float:
 	if s < 0:
 		return 10.0
 	var f := _factors[s * 2 + dir] if results_current() else 1.0
-	return graph.seg_speed[s] * f
+	return graph.seg_speed[s] * f * WeatherSystem.speed
 
 
 ## 0..1 traffic noise along a road (less where trucks are banned).

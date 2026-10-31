@@ -8,6 +8,9 @@ shader_type spatial;
 // 0..1 while an info overlay is shown: the ground turns grey so the
 // overlay colours stand out.
 global uniform float overlay_dim;
+global uniform float wetness;
+global uniform float snow_cover;
+global uniform float autumn;
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform sampler2D noise_normal : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform vec3 grass_a : source_color = vec3(0.36, 0.42, 0.27);
@@ -17,6 +20,7 @@ uniform vec3 dirt : source_color = vec3(0.42, 0.35, 0.27);
 uniform vec3 border_color : source_color = vec3(0.85, 0.82, 0.75);
 uniform vec3 grid_color : source_color = vec3(0.95, 0.94, 0.9);
 uniform float playable_half = 2000.0;
+uniform float unlocked_half = 2000.0;   // buildable square (grows with milestones)
 uniform float locked_darken = 0.78;
 uniform float locked_desaturate = 0.55;
 uniform float cell_size = 8.0;
@@ -79,6 +83,13 @@ void fragment() {
 	float bank = 1.0 - smoothstep(bank_width * 0.4, bank_width, wd + (fine - 0.5) * 3.0);
 	col = mix(col, mix(wet_sand_color, sand_color, smoothstep(0.0, bank_width * 0.5, wd)), bank);
 
+	// Seasons and weather: drier, browner grass in autumn, snow that settles
+	// unevenly, darker ground when wet.
+	col = mix(col, mix(col, dry_grass * vec3(1.1, 0.92, 0.7), 0.65), autumn * 0.55);
+	float snow_n = smoothstep(0.15, 0.75, snow_cover * 1.5 - 0.35 + (mid - 0.5) * 0.7 + (fine - 0.5) * 0.3 * near);
+	col = mix(col, vec3(0.9, 0.92, 0.95), snow_n);
+	col *= 1.0 - wetness * 0.14 * (1.0 - snow_n);
+
 	// Locked land outside the playable square.
 	float outside = max(abs(p.x), abs(p.y)) - playable_half;
 	float locked = smoothstep(0.0, 60.0, outside);
@@ -87,6 +98,18 @@ void fragment() {
 	float border_w = fwidth(outside) * 1.5 + 0.6;
 	float border = 1.0 - smoothstep(border_w, border_w * 2.0, abs(outside));
 	col = mix(col, border_color, border * 0.55);
+	// Land not opened yet by milestones: lightly shaded, dashed border.
+	if (unlocked_half < playable_half - 1.0) {
+		float out2 = max(abs(p.x), abs(p.y)) - unlocked_half;
+		float shut = smoothstep(0.0, 40.0, out2) * (1.0 - locked);
+		col = mix(col, mix(col, vec3(lum), locked_desaturate * 0.5) * mix(1.0, locked_darken, 0.6), shut);
+		float bw = fwidth(out2) * 1.5 + 0.8;
+		float along = abs(p.x) > abs(p.y) ? p.y : p.x;
+		float dash = step(0.5, fract(along / 24.0));
+		float line2 = (1.0 - smoothstep(bw, bw * 2.0, abs(out2))) * dash;
+		col = mix(col, border_color, line2 * 0.6);
+		locked = max(locked, shut * 0.6);
+	}
 
 	if (grid_strength > 0.0) {
 		float grid = grid_line(p, 1.0) * grid_strength * (1.0 - smoothstep(grid_fade_distance * 0.5, grid_fade_distance, dist));
@@ -95,6 +118,6 @@ void fragment() {
 	}
 
 	ALBEDO = mix(col, vec3(dot(col, vec3(0.3, 0.55, 0.15))) * 0.85, overlay_dim * 0.8);
-	ROUGHNESS = clamp(base_roughness - fine * 0.06 + dirt_mask * 0.03, 0.0, 1.0);
+	ROUGHNESS = clamp(base_roughness - fine * 0.06 + dirt_mask * 0.03 - wetness * 0.3 * (1.0 - snow_n), 0.0, 1.0);
 	SPECULAR = 0.35;
 }

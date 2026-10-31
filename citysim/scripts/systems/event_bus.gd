@@ -84,6 +84,15 @@ signal district_draft_changed(info: Dictionary)
 ## Monthly district books: {recycling}.
 signal district_reported(report: Dictionary)
 
+# --- Progression, weather, saves ---
+## A population milestone was reached: {name_key, reward, unlocks}.
+signal milestone_reached(level: int, info: Dictionary)
+## The milestone level changed (also after loading): locks and area follow.
+signal progression_changed()
+## Weather or season changed: {state, season, rain, snow, clouds, autumn}.
+signal weather_changed(info: Dictionary)
+signal saves_changed()
+
 # --- World queries resolved by the camera ---
 signal ground_long_pressed(world_pos: Vector3)
 

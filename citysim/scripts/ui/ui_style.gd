@@ -193,6 +193,12 @@ static func badge(icon_name: String, color: Color, size: float) -> PanelContaine
 	return panel
 
 
+## Greys out a tool that a milestone has not unlocked yet (it stays
+## pressable so it can say what unlocks it).
+static func set_locked(c: Control, locked: bool) -> void:
+	c.modulate = Color(0.55, 0.56, 0.6, 0.8) if locked else Color.WHITE
+
+
 ## Formats an integer with Turkish thousands separators: 1234567 -> "1.234.567".
 static func format_int(value: int) -> String:
 	var digits := str(absi(value))

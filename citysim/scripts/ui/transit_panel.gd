@@ -147,6 +147,8 @@ func _small(text: String) -> Button:
 
 func open() -> void:
 	panel.visible = true
+	for k: String in _type_buttons:
+		UiStyle.set_locked(_type_buttons[k], not ProgressionSystem.is_unlocked("transit:" + k))
 	if _selected < 0 and not _transit.lines.is_empty():
 		_selected = int((_transit.lines[0] as Dictionary)["id"])
 	_select_type(_type)
@@ -154,6 +156,8 @@ func open() -> void:
 
 
 func _select_type(type: String) -> void:
+	if ProgressionSystem.warn_if_locked("transit:" + type, str(GameData.value("transit/types/%s/name_key" % type))):
+		type = _type if ProgressionSystem.is_unlocked("transit:" + _type) else "bus"
 	_type = type
 	for k: String in _type_buttons:
 		(_type_buttons[k] as Button).set_pressed_no_signal(k == type)

@@ -184,9 +184,12 @@ func _evaluate(a: Vector2, b: Vector2, control: Variant) -> Dictionary:
 	var pts: Array[Vector2] = [a, b]
 	if control != null:
 		pts.append(control)
+	var open_half := ProgressionSystem.area_half()
 	for p in pts:
 		if not MapGrid.is_inside(Vector3(p.x, 0, p.y), _playable_half):
 			return {"valid": false, "error": "ROAD_ERR_OUTSIDE", "cost": 0, "length": 0.0}
+		if not MapGrid.is_inside(Vector3(p.x, 0, p.y), open_half):
+			return {"valid": false, "error": "ROAD_ERR_LOCKED_AREA", "cost": 0, "length": 0.0}
 	var plan: Dictionary = (_net.graph as RoadGraph).plan_road(a, b, control)
 	if not plan["ok"]:
 		return {"valid": false, "error": plan["error"], "cost": 0, "length": 0.0}

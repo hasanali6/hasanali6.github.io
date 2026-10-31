@@ -1,4 +1,4 @@
-[gd_scene load_steps=24 format=3 uid="uid://b8c1tymain001"]
+[gd_scene load_steps=25 format=3 uid="uid://b8c1tymain001"]
 
 [ext_resource type="Script" path="res://scripts/world/day_night_cycle.gd" id="1_daynight"]
 [ext_resource type="Script" path="res://scripts/systems/terrain_system.gd" id="2_terrain"]
@@ -22,6 +22,7 @@
 [ext_resource type="Script" path="res://scripts/world/vehicle_system.gd" id="20_vehicles"]
 [ext_resource type="Script" path="res://scripts/systems/transit_system.gd" id="21_transit"]
 [ext_resource type="Script" path="res://scripts/systems/district_system.gd" id="22_districts"]
+[ext_resource type="Script" path="res://scripts/world/weather_effects.gd" id="23_weather"]
 
 [node name="Main" type="Node3D"]
 
@@ -136,6 +137,9 @@ terrain_path = NodePath("../Terrain")
 road_network_path = NodePath("../RoadNetwork")
 zone_system_path = NodePath("../ZoneSystem")
 building_system_path = NodePath("../BuildingSystem")
+
+[node name="WeatherEffects" type="Node3D" parent="."]
+script = ExtResource("23_weather")
 
 [node name="ReferenceScene" type="Node3D" parent="."]
 script = ExtResource("3_reference")

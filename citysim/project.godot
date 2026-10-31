@@ -26,6 +26,8 @@ TimeSystem="*res://scripts/systems/time_system.gd"
 GraphicsSettings="*res://scripts/systems/graphics_settings.gd"
 InputController="*res://scripts/systems/input_controller.gd"
 EconomySystem="*res://scripts/systems/economy_system.gd"
+ProgressionSystem="*res://scripts/systems/progression_system.gd"
+WeatherSystem="*res://scripts/systems/weather_system.gd"
 
 [display]
 
@@ -69,6 +71,18 @@ overlay_dim={
 "value": 0.0
 }
 traffic_time={
+"type": "float",
+"value": 0.0
+}
+wetness={
+"type": "float",
+"value": 0.0
+}
+snow_cover={
+"type": "float",
+"value": 0.0
+}
+autumn={
 "type": "float",
 "value": 0.0
 }

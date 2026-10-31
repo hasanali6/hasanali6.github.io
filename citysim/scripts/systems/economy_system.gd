@@ -39,6 +39,7 @@ var _services: Dictionary = {}
 var _transit: Dictionary = {}
 var _districts: Dictionary = {}
 var _parking_per_day: float = 0.0
+var _bonus: float = 0.0
 var _svc_budget_cfg: Dictionary
 var _fee_cfg: Dictionary
 
@@ -75,6 +76,13 @@ func try_spend(amount: int) -> bool:
 	_construction += amount
 	EventBus.money_changed.emit(balance)
 	return true
+
+
+## One-off income such as a milestone reward (shown in next month's books).
+func add_bonus(amount: int) -> void:
+	balance += amount
+	_bonus += amount
+	EventBus.money_changed.emit(balance)
 
 
 func refund(amount: int) -> void:
@@ -136,8 +144,9 @@ func set_utility_fee(kind: String, value: float) -> void:
 
 # --- Loan ------------------------------------------------------------------------------
 
+## Grows with population milestones (ProgressionSystem).
 func loan_limit() -> int:
-	return EconomyRules.loan_limit(_population, _loan_cfg)
+	return ProgressionSystem.loan_limit()
 
 
 ## Sets the outstanding loan to `amount` (rounded to the step). Taking more
@@ -174,6 +183,7 @@ func _settle() -> void:
 		"tickets": float(_transit.get("tickets", 0.0)),
 		# One game day is one month: the day's parking fees are the month's.
 		"parking": _parking_per_day,
+		"milestones": _bonus,
 	}
 	var instalment := 0.0
 	if loan > 0.0 and loan_months_left > 0:
@@ -199,7 +209,8 @@ func _settle() -> void:
 	for v: float in expenses.values():
 		total_out += v
 	var net := total_in - total_out
-	balance += roundi(net)
+	# The milestone reward is already in the treasury; it only shows in the books.
+	balance += roundi(net - _bonus)
 	last_ledger = {
 		"income": income, "expenses": expenses, "net": net,
 		"construction": _construction, "refunds": _refunds,
@@ -209,6 +220,7 @@ func _settle() -> void:
 	_services = {}
 	_transit = {}
 	_districts = {}
+	_bonus = 0.0
 	EventBus.money_changed.emit(balance)
 	EventBus.budget_settled.emit(last_ledger)
 
@@ -235,6 +247,7 @@ func reset_state() -> void:
 	_transit = {}
 	_districts = {}
 	_parking_per_day = 0.0
+	_bonus = 0.0
 	service_budgets = {}
 	utility_fees = {}
 

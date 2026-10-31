@@ -6,6 +6,9 @@ shader_type spatial;
 //   UV2.x   = distance to the nearest junction mouth (crosswalk zone)
 render_mode cull_disabled;
 
+global uniform float wetness;
+global uniform float snow_cover;
+
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform vec3 asphalt_color : source_color = vec3(0.23, 0.24, 0.27);
 uniform vec3 marking_color : source_color = vec3(0.95, 0.95, 0.93);
@@ -75,7 +78,18 @@ void fragment() {
 	vec3 col = asphalt_color * (0.9 + wear * 0.2) * (0.94 + grain * 0.12);
 	float paint = clamp(white + yellow, 0.0, 1.0) * (0.85 + wear * 0.15);
 	vec3 paint_col = yellow > white ? center_color : marking_color;
-	ALBEDO = mix(col, paint_col, paint);
-	ROUGHNESS = mix(0.86 - wear * 0.1, 0.6, paint);
-	SPECULAR = 0.35;
+	vec3 base = mix(col, paint_col, paint);
+	float rough = mix(0.86 - wear * 0.1, 0.6, paint);
+	// Rain: darker, glossy asphalt with puddles in the worn hollows.
+	float puddle = smoothstep(0.56, 0.72, wear + (grain - 0.5) * 0.25) * wetness;
+	base *= 1.0 - wetness * 0.32 - puddle * 0.25;
+	rough = mix(rough, 0.06, clamp(wetness * 0.7 + puddle * 0.8, 0.0, 0.95));
+	// Snow: the driven lanes stay mostly clear, the curbs fill up.
+	float edge = lanes > 0.5 ? smoothstep(half_road - 1.4, half_road, abs(x)) : 0.2;
+	float snow_amt = snow_cover * clamp(0.16 + edge * 0.75 + (wear - 0.5) * 0.35, 0.0, 1.0);
+	base = mix(base, vec3(0.9, 0.92, 0.95), snow_amt);
+	rough = mix(rough, 0.72, snow_amt);
+	ALBEDO = base;
+	ROUGHNESS = rough;
+	SPECULAR = mix(0.35, 0.6, wetness);
 }

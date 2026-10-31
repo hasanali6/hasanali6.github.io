@@ -44,6 +44,7 @@ var _extras_lots: Dictionary = {}
 var _chunks: Dictionary = {}        # chunk -> {kind: MultiMeshInstance3D}
 var _meshes: Dictionary = {}
 var _dirty: Dictionary = {}
+var _lots_pending: bool = false
 var _rebuild_queued: bool = false
 
 
@@ -164,7 +165,17 @@ func _on_roads_changed() -> void:
 	_queue_rebuild()
 
 
+## Buildings change a few times a second while a town grows; the trees on
+## their lots are re-checked at most every half second.
 func _on_buildings_changed() -> void:
+	if _lots_pending:
+		return
+	_lots_pending = true
+	get_tree().create_timer(0.5).timeout.connect(_refresh_lots)
+
+
+func _refresh_lots() -> void:
+	_lots_pending = false
 	var grid: ZoneGrid = _zones.grid
 	var blocked := PackedByteArray()
 	blocked.resize(_pos.size())

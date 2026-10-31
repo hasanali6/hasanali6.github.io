@@ -32,6 +32,7 @@ const MAP_AABB := AABB(Vector3(-2600, -20, -2600), Vector3(5200, 80, 5200))
 
 var active: int = 0
 var line_active: int = 0     # of which buses and trams
+var _line_count: Dictionary = {}   # line id -> vehicles serving it
 var trips_done: int = 0      # vehicles that reached their destination
 var trips_lost: int = 0      # vehicles removed because their route broke
 
@@ -927,6 +928,7 @@ func spawn_line_vehicle(line_id: int, route: PackedInt32Array, stops: PackedVect
 	_end_s[v] = 0.0
 	active += 1
 	line_active += 1
+	_line_count[line_id] = int(_line_count.get(line_id, 0)) + 1
 	var fifo: Array = _fifo.get(pid, [])
 	var at := fifo.size()
 	for i in fifo.size():
@@ -951,11 +953,7 @@ func despawn_line(line_id: int) -> void:
 
 ## Vehicles currently serving a line.
 func line_vehicles(line_id: int) -> int:
-	var n := 0
-	for v in _alive.size():
-		if _alive[v] == 1 and _line[v] == line_id:
-			n += 1
-	return n
+	return int(_line_count.get(line_id, 0))
 
 
 func _despawn(v: int, resolve: bool = true) -> void:
@@ -973,6 +971,7 @@ func _despawn(v: int, resolve: bool = true) -> void:
 	active -= 1
 	if _line[v] >= 0:
 		line_active -= 1
+		_line_count[_line[v]] = maxi(int(_line_count.get(_line[v], 0)) - 1, 0)
 		_line[v] = -1
 	if resolve and on_lane:
 		_resolve(pid)

@@ -40,6 +40,9 @@ func _ready() -> void:
 	_build_mountains()
 
 	EventBus.grid_overlay_toggled.connect(set_grid_visible)
+	EventBus.progression_changed.connect(func() -> void:
+		_material.set_shader_parameter("unlocked_half", ProgressionSystem.area_half()))
+	_material.set_shader_parameter("unlocked_half", ProgressionSystem.area_half())
 	EventBus.graphics_preset_changed.connect(_apply_graphics)
 	_apply_graphics(GraphicsSettings.current_preset)
 

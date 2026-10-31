@@ -4,6 +4,9 @@ shader_type spatial;
 // space.
 render_mode cull_disabled;
 
+global uniform float wetness;
+global uniform float snow_cover;
+
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform vec3 base_color : source_color = vec3(0.79, 0.8, 0.83);
 uniform float tile = 1.6;
@@ -22,7 +25,9 @@ void fragment() {
 	float joint = (1.0 - clamp(min(d.x, d.y) - 0.5, 0.0, 1.0)) * clamp(1.5 - max(w.x, w.y) * 6.0, 0.0, 1.0);
 	float n = texture(noise_tex, v_world.xz / 13.0).r;
 	vec3 col = base_color * (0.93 + n * 0.12);
-	ALBEDO = col * (1.0 - joint * 0.18);
-	ROUGHNESS = 0.9;
+	col *= (1.0 - joint * 0.18) * (1.0 - wetness * 0.28);
+	float snow_amt = snow_cover * clamp(0.6 + (n - 0.5) * 0.8, 0.0, 1.0);
+	ALBEDO = mix(col, vec3(0.9, 0.92, 0.95), snow_amt);
+	ROUGHNESS = mix(mix(0.9, 0.25, wetness), 0.75, snow_amt);
 	SPECULAR = 0.4;
 }

@@ -346,7 +346,13 @@ func _compute_supply() -> void:
 		var t: Dictionary = entry[1]
 		var s := _network(network_of_segment.get(entry[2], -1))
 		var eff := budget_efficiency(str(t["category"]))
-		s["power"] += float(t.get("power", 0.0)) * eff
+		# Weather: solar farms make less under clouds, turbines more in wind.
+		var weather := 1.0
+		if str(t["id"]) == "solar_farm":
+			weather = WeatherSystem.sun_power
+		elif str(t["id"]) == "wind_turbine":
+			weather = WeatherSystem.wind
+		s["power"] += float(t.get("power", 0.0)) * eff * weather
 		s["water"] += float(t.get("water", 0.0)) * eff
 		s["sewage"] += float(t.get("sewage", 0.0)) * eff
 		if bool(t.get("water_pollution", false)):

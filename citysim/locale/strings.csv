@@ -260,3 +260,42 @@ ECON_OUT_TRANSIT,Toplu taşıma,Public transport
 ECON_OUT_RECYCLING,Geri dönüşüm,Recycling
 OVERLAY_TRANSIT,Toplu taşıma,Transit
 OVERLAY_LEGEND_TRANSIT,"%d hat · %s yolcu/gün · yolculukların %%%d'i toplu taşımayla. Yeşil: durağa yakın, kırmızı: uzak, gri: durak yok.","%d lines · %s riders/day · %d%% of trips by transit. Green: near a stop, red: far, grey: no stop."
+MILESTONE_0,Mezra,Hamlet
+MILESTONE_1,Köy,Village
+MILESTONE_2,Kasaba,Town
+MILESTONE_3,İlçe,Borough
+MILESTONE_4,Şehir,City
+MILESTONE_5,Büyük Şehir,Large City
+MILESTONE_6,Metropol,Metropolis
+MILESTONE_7,Megakent,Megalopolis
+LOCKED_NEEDS,%s (%s nüfus),%s (%s people)
+LOCKED_TOAST,%s kilitli: şehir %s olunca açılır,%s is locked: unlocks at %s
+NOTIFY_MILESTONE,Tebrikler! Şehrin artık bir %s (ödül +%s).,Congratulations! Your city is now a %s (reward +%s).
+NOTIFY_MILESTONE_UNLOCKS,Yeni: %s,New: %s
+ROAD_ERR_LOCKED_AREA,Harita burada henüz kilitli; nüfus arttıkça açılır,The map is still locked here; it opens as the population grows
+ECON_TAB_PROGRESS,İlerleme,Progress
+ECON_IN_MILESTONES,Kilometre taşı ödülü,Milestone reward
+PROGRESS_CURRENT,Unvan: %s · Nüfus: %s,Rank: %s · Population: %s
+PROGRESS_NEXT,Sonraki: %s — %s nüfus (ödül %s),Next: %s — %s people (reward %s)
+PROGRESS_UNLOCKS,Açılacaklar: %s,Unlocks: %s
+PROGRESS_AREA,inşa alanı %.1f km,build area %.1f km
+PROGRESS_MAX,En üst kademe: her şey açık.,Top rank: everything is unlocked.
+SAVES_TITLE,Kayıtlar,Saves
+SAVES_HINT,Otomatik kayıt her ay ve uygulama arka plana geçince yapılır. Bir kaydı yüklemek için Yükle'ye iki kez dokun.,The autosave runs every month and when the app goes to the background. Tap Load twice to load a save.
+SAVES_AUTO,Otomatik kayıt,Autosave
+SAVES_SLOT,Yuva %d,Slot %d
+SAVES_EMPTY,Boş,Empty
+SAVES_META,%s · %s · %s kişi · %s para,%s · %s · %s people · %s money
+SAVES_SAVE,Kaydet,Save
+SAVES_LOAD,Yükle,Load
+SAVES_CONFIRM_LOAD,Yüklemek için tekrar dokun (kaydedilmemiş ilerleme gider),Tap again to load (unsaved progress is lost)
+SETTINGS_SAVES,Kayıtlar,Saves
+SETTINGS_WEATHER,"Hava durumu (yağmur, kar)","Weather (rain, snow)"
+WEATHER_CLEAR,Açık,Clear
+WEATHER_CLOUDY,Bulutlu,Cloudy
+WEATHER_RAIN,Yağmurlu,Rainy
+WEATHER_SNOW,Karlı,Snowy
+SEASON_SPRING,İlkbahar,Spring
+SEASON_SUMMER,Yaz,Summer
+SEASON_AUTUMN,Sonbahar,Autumn
+SEASON_WINTER,Kış,Winter

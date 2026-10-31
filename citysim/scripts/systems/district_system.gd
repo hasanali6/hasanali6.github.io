@@ -423,6 +423,7 @@ func _rebuild_visuals() -> void:
 		label.outline_modulate = Color(col.darkened(0.55), 0.9)
 		label.no_depth_test = true
 		label.font = UiStyle.font(800)
+		label.visibility_range_end = 1800.0
 		var c := TransitRules.polygon_centroid(pts)
 		label.position = Vector3(c.x, 30.0, c.y)
 		_root.add_child(label)

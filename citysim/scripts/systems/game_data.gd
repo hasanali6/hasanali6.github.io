@@ -5,6 +5,7 @@ extends Node
 const FILES: PackedStringArray = [
 	"game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene",
 	"roads", "economy", "zones", "catalog", "vegetation", "services", "traffic", "transit", "districts",
+	"progression", "weather", "audio",
 ]
 
 var _db: Dictionary = {}

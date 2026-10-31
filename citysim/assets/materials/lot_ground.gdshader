@@ -9,6 +9,9 @@ shader_type spatial;
 
 global uniform float night_factor;
 global uniform float overlay_dim;
+global uniform float wetness;
+global uniform float snow_cover;
+global uniform float autumn;
 
 uniform vec3 grass : source_color = vec3(0.38, 0.7, 0.3);
 uniform vec3 hedge : source_color = vec3(0.17, 0.45, 0.2);
@@ -103,6 +106,13 @@ void fragment() {
 		walk = max(walk, band(abs(p.y - v_size.y * 0.3), 0.8, aa));
 		col = mix(col, paving * 0.95, walk);
 	}
+	if (kind == 0 || kind == 6 || kind >= 8) {
+		col = mix(col, col * vec3(1.15, 0.95, 0.6), autumn * 0.45);
+	}
+	col *= 1.0 - wetness * 0.2;
+	float snow_amt = snow_cover * clamp(0.7 + (n - 0.5) * 0.6, 0.0, 1.0);
+	col = mix(col, vec3(0.9, 0.92, 0.95), snow_amt);
+	rough = mix(mix(rough, 0.3, wetness * 0.8), 0.75, snow_amt);
 	col = mix(col, vec3(dot(col, vec3(0.3, 0.55, 0.15))) * 0.85, overlay_dim * 0.8);
 	ALBEDO = col * mix(1.0, 0.85, night_factor);
 	ROUGHNESS = rough;

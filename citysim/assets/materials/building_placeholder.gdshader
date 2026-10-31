@@ -8,6 +8,8 @@ shader_type spatial;
 // before it can alias in the distance.
 
 global uniform float night_factor;
+global uniform float wetness;
+global uniform float snow_cover;
 
 uniform vec3 glass_color : source_color = vec3(0.3, 0.36, 0.4);
 uniform vec3 light_color : source_color = vec3(1.0, 0.8, 0.54);
@@ -102,6 +104,12 @@ void fragment() {
 		emission = lamp * light_energy * lit_window;
 	}
 
+	// Weather: rain darkens the walls, snow settles on flat roofs.
+	wall *= 1.0 - wetness * 0.12;
+	roughness = mix(roughness, roughness * 0.6, wetness);
+	float roof_snow = snow_cover * step(0.5, v_normal.y);
+	wall = mix(wall, vec3(0.9, 0.92, 0.95), roof_snow);
+	roughness = mix(roughness, 0.75, roof_snow);
 	ALBEDO = wall;
 	ROUGHNESS = roughness;
 	METALLIC = metallic;

@@ -36,6 +36,8 @@ func _initialize() -> void:
 	_test_traffic_assignment()
 	_test_lane_geometry()
 	_test_transit_rules()
+	_test_progression()
+	_test_weather_traffic()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -56,7 +58,7 @@ func _input_config() -> Dictionary:
 
 
 func _test_data_files() -> void:
-	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy", "zones", "services", "vegetation", "catalog", "traffic", "transit", "districts"]:
+	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy", "zones", "services", "vegetation", "catalog", "traffic", "transit", "districts", "progression", "weather", "audio"]:
 		_check(not DataLoader.load_json("res://data/%s.json" % f).is_empty(), "data file %s loads" % f)
 	var db := DataLoader.load_files(PackedStringArray(["graphics"]))
 	for preset: String in DataLoader.lookup(db, "graphics/preset_order"):
@@ -697,3 +699,66 @@ func _test_transit_rules() -> void:
 		if e >> 1 == banned:
 			truck_on_banned = true
 	_check(not truck_on_banned and job.rev_trees.has(top * 2) and job.rev_trees.has(top * 2 + 1), "trucks route around a heavy-traffic ban")
+
+
+func _test_progression() -> void:
+	var ms: Array = DataLoader.load_json("res://data/progression.json")["milestones"]
+	_check(ProgressionRules.level_for(0, ms) == 0 and ProgressionRules.level_for(299, ms) == 0 and ProgressionRules.level_for(300, ms) == 1
+		and ProgressionRules.level_for(1000000, ms) == ms.size() - 1, "milestones follow the population")
+	var increasing := true
+	for i in range(1, ms.size()):
+		var a: Dictionary = ms[i - 1]
+		var b: Dictionary = ms[i]
+		if int(b["population"]) <= int(a["population"]) or int(b["loan_limit"]) < int(a["loan_limit"]):
+			increasing = false
+	_check(increasing, "each milestone needs more people and allows a larger loan")
+	_check(ProgressionRules.is_unlocked("road:street", 0, ms) and not ProgressionRules.is_unlocked("road:boulevard", 0, ms)
+		and ProgressionRules.is_unlocked("road:boulevard", ProgressionRules.unlock_level("road:boulevard", ms), ms),
+		"a new town builds streets; boulevards come later")
+	_check(ProgressionRules.is_unlocked("bulldoze", 0, ms), "ids no milestone lists are always open")
+	_check(ProgressionRules.area_half(0, ms, 2000.0) < ProgressionRules.area_half(ms.size() - 1, ms, 2000.0)
+		and is_equal_approx(ProgressionRules.area_half(ms.size() - 1, ms, 2000.0), 2000.0), "the buildable area grows to the whole map")
+	_check(is_equal_approx(ProgressionRules.progress(650, 1, ms), (650.0 - 300.0) / 700.0) and ProgressionRules.progress(10, ms.size() - 1, ms) == 1.0,
+		"progress to the next milestone")
+	# Every unlock id names something that exists.
+	var roads: Dictionary = DataLoader.load_json("res://data/roads.json")["types"]
+	var zones: Dictionary = DataLoader.load_json("res://data/zones.json")["types"]
+	var items := {}
+	for it: Dictionary in DataLoader.load_json("res://data/catalog.json")["items"]:
+		items["item:" + str(it["id"])] = true
+	for it: Dictionary in DataLoader.load_json("res://data/services.json")["types"]:
+		items["svc:" + str(it["id"])] = true
+	var transit: Dictionary = DataLoader.load_json("res://data/transit.json")["types"]
+	var bad := []
+	for m: Dictionary in ms:
+		for id: String in m["unlocks"]:
+			var parts := id.split(":")
+			var ok := id == "districts" or items.has(id) or (parts[0] == "road" and roads.has(parts[1])) \
+				or (parts[0] == "zone" and zones.has(parts[1])) or (parts[0] == "transit" and transit.has(parts[1]))
+			if not ok:
+				bad.append(id)
+	_check(bad.is_empty(), "every unlock names a real road, zone, item or service %s" % [bad])
+
+
+func _test_weather_traffic() -> void:
+	var cfg := _traffic_cfg()
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(0, 7000), Vector2(400, 7000), null), "street")
+	var tg := TrafficGraph.build(g, _roads()["types"], cfg)
+	var ones := TrafficRules.factors_for(tg, PackedFloat32Array(), cfg)
+	var dry := TrafficRules.edge_costs(tg, ones, cfg)
+	var wet_cfg := cfg.duplicate(true)
+	wet_cfg["weather_speed"] = 0.8
+	var wet := TrafficRules.edge_costs(tg, ones, wet_cfg)
+	_check(wet[0] > dry[0] * 1.2, "rain slows the drive (%.1f s vs %.1f s)" % [wet[0], dry[0]])
+	var volumes := PackedFloat32Array([600.0 * 8.0, 0.0])
+	var cap_cfg := cfg.duplicate(true)
+	cap_cfg["weather_capacity"] = 0.8
+	_check(TrafficRules.factors_for(tg, volumes, cap_cfg)[0] < TrafficRules.factors_for(tg, volumes, cfg)[0],
+		"a busy road jams sooner in bad weather")
+	var w: Dictionary = DataLoader.load_json("res://data/weather.json")
+	var months: Array = w["season_of_month"]
+	var weights: Dictionary = w["season_weights"]
+	_check(months.size() == 12 and months.all(func(s): return weights.has(s)) and (w["autumn_by_month"] as Array).size() == 12
+		and not (weights["summer"] as Dictionary).has("snow") and (weights["winter"] as Dictionary).has("snow"),
+		"every month has a season; snow only in winter")

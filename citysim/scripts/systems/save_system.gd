@@ -1,11 +1,16 @@
 extends Node
 ## Saves and restores the whole city. Autosaves every few game months and
 ## whenever the app is sent to the background or closed (Android may kill a
-## backgrounded game). The file is a versioned binary Variant dictionary in
-## user://saves/. On start the autosave is loaded if it exists.
+## backgrounded game), plus three manual slots. Each save is a versioned
+## binary Variant dictionary in user://saves/ with a small JSON file beside
+## it (date, population, money, milestone) so the slot list opens fast.
+## On start the autosave is loaded if it exists; loading a slot reloads the
+## scene first so nothing of the previous city is left behind.
 
 const SAVE_DIR := "user://saves/"
 const AUTOSAVE := "user://saves/autosave.save"
+const PENDING := "user://saves/pending_load.txt"
+const SLOT_COUNT := 3
 
 @export var road_network_path: NodePath
 @export var zone_system_path: NodePath
@@ -37,20 +42,31 @@ func _on_month(_m: int) -> void:
 		save_game.call_deferred()
 
 
+static func slot_path(slot: int) -> String:
+	return SAVE_DIR + "slot_%d.save" % slot
+
+
+static func meta_path(save_path: String) -> String:
+	return save_path.get_basename() + ".json"
+
+
 func save_game(path: String = AUTOSAVE) -> bool:
 	if _loading:
 		return false
 	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	var citizens := get_node(citizen_system_path)
 	var state := {
 		"version": GameData.integer("game/save_version"),
 		"saved_unix": Time.get_unix_time_from_system(),
 		"time": TimeSystem.save_state(),
 		"economy": EconomySystem.save_state(),
+		"progression": ProgressionSystem.save_state(),
+		"weather": WeatherSystem.save_state(),
 		"roads": get_node(road_network_path).save_state(),
 		"zones": get_node(zone_system_path).save_state(),
 		"buildings": get_node(building_system_path).save_state(),
 		"companies": get_node(company_system_path).save_state(),
-		"citizens": get_node(citizen_system_path).save_state(),
+		"citizens": citizens.save_state(),
 		"demand": get_node(demand_system_path).save_state(),
 		"services": get_node(service_system_path).save_state(),
 	}
@@ -63,8 +79,17 @@ func save_game(path: String = AUTOSAVE) -> bool:
 		push_error("SaveSystem: cannot write %s" % path)
 		return false
 	file.store_var(state)
+	file.close()
+	var meta := {
+		"saved_unix": state["saved_unix"], "population": int(citizens.population), "balance": EconomySystem.balance,
+		"level": ProgressionSystem.level, "date": TimeSystem.get_date_text(),
+	}
+	var mf := FileAccess.open(meta_path(path), FileAccess.WRITE)
+	if mf != null:
+		mf.store_string(JSON.stringify(meta))
 	_months_since_save = 0
 	EventBus.notification_posted.emit("save", tr("NOTIFY_SAVED"))
+	EventBus.saves_changed.emit()
 	return true
 
 
@@ -92,20 +117,64 @@ func load_game(path: String = AUTOSAVE) -> bool:
 		get_node(district_system_path).load_state(state.get("districts", {}))
 	if not transit_system_path.is_empty():
 		get_node(transit_system_path).load_state(state.get("transit", {}))
+	# Saves from before milestones start at the one their population reached.
+	ProgressionSystem.load_state(state.get("progression", {}), int(get_node(citizen_system_path).population))
+	WeatherSystem.load_state(state.get("weather", {}))
 	_loading = false
 	EventBus.notification_posted.emit("save", tr("NOTIFY_LOADED"))
 	return true
 
 
+## Loads a save into a fresh scene: the scene reloads and picks it up on start.
+func request_load(path: String) -> bool:
+	if not FileAccess.file_exists(path):
+		return false
+	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	var f := FileAccess.open(PENDING, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_string(path)
+	f.close()
+	_loading = true
+	get_tree().reload_current_scene()
+	return true
+
+
+## Autosave and slots for the UI: [{key, path, exists, meta}].
+func list_saves() -> Array:
+	var out := [{"key": "auto", "path": AUTOSAVE}]
+	for s in range(1, SLOT_COUNT + 1):
+		out.append({"key": "slot", "slot": s, "path": slot_path(s)})
+	for entry: Dictionary in out:
+		var path: String = entry["path"]
+		entry["exists"] = FileAccess.file_exists(path)
+		entry["meta"] = {}
+		if entry["exists"] and FileAccess.file_exists(meta_path(path)):
+			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(meta_path(path)))
+			if typeof(parsed) == TYPE_DICTIONARY:
+				entry["meta"] = parsed
+	return out
+
+
 func _load_on_start() -> void:
+	if FileAccess.file_exists(PENDING):
+		var path := FileAccess.get_file_as_string(PENDING).strip_edges()
+		DirAccess.remove_absolute(PENDING)
+		if load_game(path):
+			# The loaded city carries on as the autosave.
+			save_game.call_deferred()
+			return
 	load_game()
 
 
-## Wipes the autosave and restarts with an empty map.
+## Wipes the autosave and restarts with an empty map (slots are kept).
 func new_city() -> void:
-	if FileAccess.file_exists(AUTOSAVE):
-		DirAccess.remove_absolute(AUTOSAVE)
+	for path in [AUTOSAVE, meta_path(AUTOSAVE)]:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(path)
 	_loading = true
 	TimeSystem.reset_state()
 	EconomySystem.reset_state()
+	ProgressionSystem.reset_state()
+	WeatherSystem.reset_state()
 	get_tree().reload_current_scene()

@@ -40,6 +40,8 @@ var _layer: Control
 var _safe: MarginContainer
 var _clock_label: Label
 var _date_label: Label
+var _weather_icon: TextureRect
+var _season_label: Label
 var _population_label: Label
 var _happiness_label: Label
 var _money_label: Label
@@ -73,6 +75,7 @@ var _building_shown_frame: int = -1
 var _cost_pill: PanelContainer
 var _economy: EconomyPanel
 var _catalog: CatalogPanel
+var _saves: SavesPanel
 var _transit_panel: TransitPanel
 var _district_panel: DistrictPanel
 var _rci: RciBars
@@ -85,6 +88,7 @@ var _overlay_panel: PanelContainer
 var _overlay_buttons: Dictionary = {}
 var _overlay_legend: Label
 var _overlay_key: String = ""
+var _tray_locks: Dictionary = {}       # tray button -> unlock id
 var _cell_size: float
 var _playable_half: float
 
@@ -138,6 +142,8 @@ func _ready() -> void:
 	_place(_info_panel, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
 	_economy = EconomyPanel.new(FONT_SIZE, MIN_TOUCH)
 	_place(_economy.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+	_saves = SavesPanel.new(get_parent().get_node("SaveSystem"), FONT_SIZE, MIN_TOUCH)
+	_place(_saves.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
 
 	EventBus.speed_changed.connect(_on_speed_changed)
 	EventBus.ground_long_pressed.connect(_on_ground_long_pressed)
@@ -164,8 +170,12 @@ func _ready() -> void:
 	EventBus.services_changed.connect(func() -> void:
 		if _overlay_panel.visible:
 			_refresh_overlay_legend())
+	EventBus.progression_changed.connect(_refresh_locks)
+	EventBus.weather_changed.connect(_on_weather)
+	_on_weather(WeatherSystem.info())
 	_on_speed_changed(TimeSystem.get_speed_index())
 	_on_preset_changed(GraphicsSettings.current_preset)
+	_refresh_locks()
 
 
 func _process(delta: float) -> void:
@@ -280,6 +290,15 @@ func _build_time_controls() -> Control:
 	_date_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	clock_row.add_child(_clock_label)
 	clock_row.add_child(_date_label)
+	_weather_icon = TextureRect.new()
+	_weather_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_weather_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_weather_icon.custom_minimum_size = Vector2(34, 34)
+	_weather_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clock_row.add_child(_weather_icon)
+	_season_label = _label("", FONT_SIZE - 6)
+	_season_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	clock_row.add_child(_season_label)
 	clock_pill.add_child(clock_row)
 	col.add_child(clock_pill)
 
@@ -392,9 +411,15 @@ func _build_tray() -> PanelContainer:
 		elif key == "TOOL_ZONING":
 			b.pressed.connect(_open_zone_panel)
 		elif key == "TOOL_TRANSIT":
-			b.pressed.connect(_open_transit_panel)
+			b.pressed.connect(func() -> void:
+				if not ProgressionSystem.warn_if_locked("transit:bus", "TOOL_TRANSIT"):
+					_open_transit_panel())
+			_tray_locks[b] = "transit:bus"
 		elif key == "TOOL_DISTRICTS":
-			b.pressed.connect(_open_district_panel)
+			b.pressed.connect(func() -> void:
+				if not ProgressionSystem.warn_if_locked("districts", "TOOL_DISTRICTS"):
+					_open_district_panel())
+			_tray_locks[b] = "districts"
 		else:
 			b.pressed.connect(func() -> void: show_toast(tr("TOOL_LOCKED") % tr(key)))
 		col.add_child(b)
@@ -460,6 +485,14 @@ func _build_settings_panel() -> PanelContainer:
 	_grid_check = grid
 	content.add_child(grid)
 
+	var weather := CheckButton.new()
+	weather.text = "SETTINGS_WEATHER"
+	weather.custom_minimum_size.y = MIN_TOUCH * 0.8
+	weather.focus_mode = Control.FOCUS_NONE
+	weather.button_pressed = WeatherSystem.enabled
+	weather.toggled.connect(WeatherSystem.set_enabled)
+	content.add_child(weather)
+
 	var perf := CheckButton.new()
 	perf.text = "SETTINGS_SHOW_FPS"
 	perf.custom_minimum_size.y = MIN_TOUCH * 0.8
@@ -483,11 +516,13 @@ func _build_settings_panel() -> PanelContainer:
 	var save_row := HBoxContainer.new()
 	save_row.add_theme_constant_override("separation", 10)
 	var save := Button.new()
-	save.text = "SETTINGS_SAVE"
+	save.text = "SETTINGS_SAVES"
 	save.focus_mode = Control.FOCUS_NONE
 	save.custom_minimum_size.y = MIN_TOUCH * 0.8
 	save.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	save.pressed.connect(func() -> void: _save_system().save_game())
+	save.pressed.connect(func() -> void:
+		_settings_panel.visible = false
+		_saves.open())
 	save_row.add_child(save)
 	var fresh := Button.new()
 	fresh.text = "SETTINGS_NEW_CITY"
@@ -552,7 +587,11 @@ func _build_road_panel() -> PanelContainer:
 		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		b.add_theme_font_size_override("font_size", FONT_SIZE - 6)
 		b.button_group = type_group
-		b.pressed.connect(func() -> void: _select_road(type, _road_mode))
+		b.pressed.connect(func() -> void:
+			if ProgressionSystem.warn_if_locked("road:" + type, cfg["name_key"]):
+				_select_road(_road_type, _road_mode)
+				return
+			_select_road(type, _road_mode))
 		_road_type_buttons[type] = b
 		types_row.add_child(b)
 	col.add_child(types_row)
@@ -599,7 +638,11 @@ func _build_zone_panel() -> PanelContainer:
 		var b := UiStyle.chip_button(cfg["short_key"], color.darkened(0.25), color.lightened(0.15), Vector2(118, MIN_TOUCH))
 		b.add_theme_font_size_override("font_size", FONT_SIZE - 6)
 		b.button_group = group
-		b.pressed.connect(func() -> void: _select_zone(key, _zone_mode if _zone_mode != "erase" else "brush"))
+		b.pressed.connect(func() -> void:
+			if ProgressionSystem.warn_if_locked("zone:" + key, cfg["name_key"]):
+				_select_zone(_zone_key, _zone_mode)
+				return
+			_select_zone(key, _zone_mode if _zone_mode != "erase" else "brush"))
 		_zone_buttons[key] = b
 		row.add_child(b)
 	col.add_child(row)
@@ -637,6 +680,21 @@ func _select_zone(key: String, mode: String) -> void:
 	for k: String in _zone_mode_buttons:
 		(_zone_mode_buttons[k] as Button).set_pressed_no_signal(k == mode)
 	EventBus.build_tool_selected.emit("zone", {"zone": key, "mode": mode})
+
+
+func _on_weather(info: Dictionary) -> void:
+	_weather_icon.texture = UiStyle.icon(str(info["icon"]))
+	_season_label.text = tr(str(info["season_key"]))
+
+
+## Greys out the tools the current milestone has not unlocked.
+func _refresh_locks() -> void:
+	for type: String in _road_type_buttons:
+		UiStyle.set_locked(_road_type_buttons[type], not ProgressionSystem.is_unlocked("road:" + type))
+	for key: String in _zone_buttons:
+		UiStyle.set_locked(_zone_buttons[key], not ProgressionSystem.is_unlocked("zone:" + key))
+	for b: Control in _tray_locks:
+		UiStyle.set_locked(b, not ProgressionSystem.is_unlocked(_tray_locks[b]))
 
 
 func _on_building_inspected(info: Dictionary) -> void:
@@ -1098,6 +1156,9 @@ func _on_back_requested() -> void:
 		return
 	if _economy.card.visible:
 		_economy.card.visible = false
+		return
+	if _saves.card.visible:
+		_saves.card.visible = false
 		return
 	if _settings_panel.visible or _info_panel.visible or _tray.visible:
 		_settings_panel.visible = false

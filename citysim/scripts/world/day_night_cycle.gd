@@ -4,6 +4,8 @@ extends WorldEnvironment
 ## exposure and the global `night_factor` shader parameter from the clock.
 ## One DirectionalLight is reused: it is the sun by day and the moon by night,
 ## swapping at the horizon where its energy is zero.
+## Weather (WeatherSystem) dims the light, greys the sky, softens shadows
+## and thickens the fog under clouds, rain and snow.
 
 @export var sun_path: NodePath
 
@@ -23,6 +25,8 @@ var _shadow_per_view: float
 var _shadow_min: float
 var _shadow_refit_ratio: float
 var _last_sky_height: float = INF
+var _last_clouds: float = -1.0
+var _fog_base: float
 
 
 func _ready() -> void:
@@ -115,6 +119,7 @@ func _build_environment(cfg: Dictionary) -> void:
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_EXPONENTIAL
 	env.fog_density = float(cfg["fog_density"])
+	_fog_base = env.fog_density
 	env.fog_sky_affect = float(cfg["fog_sky_affect"])
 	env.fog_aerial_perspective = float(cfg["fog_aerial_perspective"])
 	env.fog_sun_scatter = float(cfg["fog_sun_scatter"])
@@ -167,27 +172,38 @@ func _update_lighting(force: bool) -> void:
 	var light_dir := sun_dir if is_day else -sun_dir
 
 	_sun.global_transform = Transform3D(Basis.looking_at(-light_dir, Vector3.FORWARD if absf(light_dir.y) > 0.99 else Vector3.UP), Vector3.ZERO)
-	_sun.light_color = kelvin_to_color(key["kelvin"])
-	_sun.light_energy = key["light"]
-	var want_shadow: bool = _shadows_allowed and key["light"] > _shadow_min_energy and (is_day or _shadows_at_night)
+	var clouds := WeatherSystem.clouds
+	_sun.light_color = kelvin_to_color(key["kelvin"]).lerp(Color(0.86, 0.89, 0.94), clouds * 0.6)
+	_sun.light_energy = key["light"] * WeatherSystem.light
+	_sun.shadow_opacity = 1.0 - clouds * 0.7
+	var want_shadow: bool = _shadows_allowed and _sun.light_energy > _shadow_min_energy and (is_day or _shadows_at_night)
 	if _sun.shadow_enabled != want_shadow:
 		_sun.shadow_enabled = want_shadow
 
 	var night := 1.0 - smoothstep(_night_full, _night_zero, height)
 	RenderingServer.global_shader_parameter_set("night_factor", night)
 
-	if force or absf(height - _last_sky_height) >= _sky_update_delta:
+	if force or absf(height - _last_sky_height) >= _sky_update_delta or absf(clouds - _last_clouds) >= 0.02:
 		_last_sky_height = height
-		_sky_mat.sky_top_color = key["top"]
-		_sky_mat.sky_horizon_color = key["horizon"]
-		_sky_mat.ground_horizon_color = key["horizon"]
+		_last_clouds = clouds
+		var grey := clouds * 0.75
+		_sky_mat.sky_top_color = _overcast(key["top"], grey)
+		_sky_mat.sky_horizon_color = _overcast(key["horizon"], grey)
+		_sky_mat.ground_horizon_color = _overcast(key["horizon"], grey)
 		_sky_mat.ground_bottom_color = key["ground"]
-		_sky_mat.sky_energy_multiplier = key["sky"]
+		_sky_mat.sky_energy_multiplier = key["sky"] * lerpf(1.0, 0.8, clouds)
 		_sky_mat.ground_energy_multiplier = key["sky"]
-		environment.ambient_light_color = key["ambient_color"]
-		environment.ambient_light_energy = key["ambient"]
-		environment.fog_light_color = key["fog"]
+		environment.ambient_light_color = _overcast(key["ambient_color"], grey * 0.6)
+		environment.ambient_light_energy = key["ambient"] * lerpf(1.0, 0.9, clouds)
+		environment.fog_light_color = _overcast(key["fog"], grey)
+		environment.fog_density = _fog_base * (1.0 + clouds * 0.6 + WeatherSystem.rain * 3.5 + WeatherSystem.snowfall * 4.0)
 		environment.tonemap_exposure = key["exposure"]
+
+
+## A sky or light colour pulled towards overcast grey (same brightness).
+static func _overcast(c: Color, amount: float) -> Color:
+	var lum := c.r * 0.3 + c.g * 0.59 + c.b * 0.11
+	return c.lerp(Color(lum, lum * 1.02, lum * 1.06), amount)
 
 
 ## Interpolates the data keys at the given sun height.

@@ -20,7 +20,8 @@
       "terrain_detail": false,
       "tree_shadows": false,
       "vehicle_cap": 300,
-      "vehicle_draw_distance_m": 700.0
+      "vehicle_draw_distance_m": 700.0,
+      "weather_particles": 0
     },
     "medium": {
       "render_scale": 0.75,
@@ -38,7 +39,8 @@
       "terrain_detail": true,
       "tree_shadows": true,
       "vehicle_cap": 800,
-      "vehicle_draw_distance_m": 1100.0
+      "vehicle_draw_distance_m": 1100.0,
+      "weather_particles": 1500
     },
     "high": {
       "render_scale": 0.9,
@@ -56,7 +58,8 @@
       "terrain_detail": true,
       "tree_shadows": true,
       "vehicle_cap": 1500,
-      "vehicle_draw_distance_m": 1600.0
+      "vehicle_draw_distance_m": 1600.0,
+      "weather_particles": 3000
     }
   },
   "dynamic_resolution": {

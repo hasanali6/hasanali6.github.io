@@ -33,6 +33,7 @@ const KENNEY_MODELS := {
 const ABANDONED_TINT := Color(0.4, 0.38, 0.36)
 const LOT_SHADER := preload("res://assets/materials/lot_ground.gdshader")
 const CONTACT_SHADER := preload("res://assets/materials/contact_shadow.gdshader")
+const ROOF_SHADER := preload("res://assets/materials/roof.gdshader")
 const LOT_GARDEN := 0
 const LOT_PLAZA := 1
 const LOT_PARKING := 2
@@ -47,6 +48,8 @@ var demand: Dictionary = {"residential": 0.0, "commercial": 0.0, "office": 0.0, 
 var _zones: Node
 var _rng := RandomNumberGenerator.new()
 var _districts: Node
+var _part_cache: Dictionary = {}   # building id -> [signature, parts at full height]
+var _render_queued: bool = false
 var _growth: Dictionary
 var _vis: Dictionary
 var _hh_cfg: Dictionary
@@ -108,7 +111,8 @@ func _process(delta: float) -> void:
 			p = 1.0
 		else:
 			_rising[id] = p
-		if buildings.has(id):
+		# A full redraw is coming this frame and will place it anyway.
+		if buildings.has(id) and not _render_queued:
 			_update_instances(id, p)
 
 
@@ -516,16 +520,15 @@ func _build_meshes() -> void:
 	_add_multimesh("contact", contact, false, true)
 	(_meshes["contact"] as MultiMeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-	var roof_mat := StandardMaterial3D.new()
-	roof_mat.vertex_color_use_as_albedo = true
-	roof_mat.roughness = 0.85
+	var roof_mat := ShaderMaterial.new()
+	roof_mat.shader = ROOF_SHADER
 	var roof := _gable_mesh()
 	roof.surface_set_material(0, roof_mat)
 	_add_multimesh("house_roof", roof, true, false)
 
-	var plain := StandardMaterial3D.new()
-	plain.vertex_color_use_as_albedo = true
-	plain.roughness = 0.8
+	var plain := ShaderMaterial.new()
+	plain.shader = ROOF_SHADER
+	plain.set_shader_parameter("roughness", 0.8)
 	var top_box := BoxMesh.new()
 	top_box.material = plain
 	_add_multimesh("roof_box", top_box, true, false)
@@ -838,35 +841,96 @@ func set_overlay_tint(tints: Dictionary) -> void:
 const UNTINTED := ["lot", "contact", "smoke", "solar", "basin"]
 
 
+## Redraws every building once this frame (calls in between are merged).
 func _render_all() -> void:
+	if not _render_queued:
+		_render_queued = true
+		_render_now.call_deferred()
+
+
+func _render_now() -> void:
+	_render_queued = false
+	# Parts of finished buildings are cached (they only change when a building
+	# levels up, changes style or is abandoned) and each MultiMesh is filled
+	# with one buffer write, so a growing city stays cheap to redraw.
 	var per_key: Dictionary = {}
 	_instances.clear()
 	for id: int in buildings:
+		var b: Dictionary = buildings[id]
+		var rise: float = _rising.get(id, 1.0)
+		var parts: Array
+		if rise >= 1.0:
+			var sig := "%s|%d|%d|%s" % [b["style"], int(b["floors"]), int(b["level"]), b["abandoned"]]
+			var cached: Array = _part_cache.get(id, [])
+			if cached.size() == 2 and cached[0] == sig:
+				parts = cached[1]
+			else:
+				parts = _parts_for(b, 1.0)
+				_part_cache[id] = [sig, parts]
+		else:
+			parts = _parts_for(b, rise)
+		var tinted := _overlay_tint.has(id)
 		var entries := []
-		var parts := _parts_for(buildings[id], _rising.get(id, 1.0))
-		if _overlay_tint.has(id):
-			var tint: Color = _overlay_tint[id]
-			for part in parts:
-				if not part["key"] in UNTINTED:
-					part["color"] = tint
-		for part in parts:
+		for part: Dictionary in parts:
 			var key: String = part["key"]
 			if not per_key.has(key):
 				per_key[key] = []
-			entries.append([key, (per_key[key] as Array).size()])
-			(per_key[key] as Array).append(part)
+			var list: Array = per_key[key]
+			entries.append([key, list.size()])
+			if tinted and not key in UNTINTED:
+				var copy := part.duplicate()
+				copy["color"] = _overlay_tint[id]
+				list.append(copy)
+			else:
+				list.append(part)
 		_instances[id] = entries
+	if _part_cache.size() > buildings.size():
+		for id: int in _part_cache.keys():
+			if not buildings.has(id):
+				_part_cache.erase(id)
 	for key: String in _meshes:
 		var mm := (_meshes[key] as MultiMeshInstance3D).multimesh
 		var list: Array = per_key.get(key, [])
 		mm.instance_count = list.size()
-		for i in list.size():
-			var part: Dictionary = list[i]
-			mm.set_instance_transform(i, part["xf"])
-			if mm.use_colors:
-				mm.set_instance_color(i, part["color"])
-			if mm.use_custom_data:
-				mm.set_instance_custom_data(i, part["custom"])
+		if list.is_empty():
+			continue
+		var colors := mm.use_colors
+		var custom := mm.use_custom_data
+		var stride := 12 + (4 if colors else 0) + (4 if custom else 0)
+		var buf := PackedFloat32Array()
+		buf.resize(list.size() * stride)
+		var k := 0
+		for part: Dictionary in list:
+			var xf: Transform3D = part["xf"]
+			var bs := xf.basis
+			buf[k] = bs.x.x
+			buf[k + 1] = bs.y.x
+			buf[k + 2] = bs.z.x
+			buf[k + 3] = xf.origin.x
+			buf[k + 4] = bs.x.y
+			buf[k + 5] = bs.y.y
+			buf[k + 6] = bs.z.y
+			buf[k + 7] = xf.origin.y
+			buf[k + 8] = bs.x.z
+			buf[k + 9] = bs.y.z
+			buf[k + 10] = bs.z.z
+			buf[k + 11] = xf.origin.z
+			var o := k + 12
+			if colors:
+				var c: Color = part["color"]
+				buf[o] = c.r
+				buf[o + 1] = c.g
+				buf[o + 2] = c.b
+				buf[o + 3] = c.a
+				o += 4
+			if custom:
+				var d: Color = part["custom"]
+				buf[o] = d.r
+				buf[o + 1] = d.g
+				buf[o + 2] = d.b
+				buf[o + 3] = d.a
+			k += stride
+		mm.buffer = buf
 
 
 func _update_instances(id: int, rise: float) -> void:

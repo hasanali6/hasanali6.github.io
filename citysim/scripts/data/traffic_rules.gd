@@ -27,8 +27,10 @@ static func factors_for(g: TrafficGraph, volumes: PackedFloat32Array, cfg: Dicti
 	var alpha := float(cfg["bpr_alpha"])
 	var beta := float(cfg["bpr_beta"])
 	var floor_factor := float(cfg["min_speed_factor"])
+	# Rain and snow: roads carry fewer vehicles before they jam.
+	var weather := float(cfg.get("weather_capacity", 1.0))
 	for e in g.edge_count():
-		out[e] = speed_factor(volumes[e] * peak, g.seg_capacity[e >> 1], alpha, beta, floor_factor)
+		out[e] = speed_factor(volumes[e] * peak, g.seg_capacity[e >> 1] * weather, alpha, beta, floor_factor)
 	return out
 
 
@@ -38,6 +40,7 @@ static func edge_costs(g: TrafficGraph, factors: PackedFloat32Array, cfg: Dictio
 	var delays: Dictionary = cfg["junction_delay_s"]
 	var lit := float(delays["lit"])
 	var plain := float(delays["plain"])
+	var weather := float(cfg.get("weather_speed", 1.0))
 	var out := PackedFloat32Array()
 	out.resize(g.edge_count())
 	for e in g.edge_count():
@@ -48,7 +51,7 @@ static func edge_costs(g: TrafficGraph, factors: PackedFloat32Array, cfg: Dictio
 			delay = lit
 		elif g.node_degree[to] >= 3:
 			delay = plain
-		out[e] = g.seg_len[s] / maxf(g.seg_speed[s] * factors[e], 0.1) + delay
+		out[e] = g.seg_len[s] / maxf(g.seg_speed[s] * factors[e] * weather, 0.1) + delay
 	return out
 
 
