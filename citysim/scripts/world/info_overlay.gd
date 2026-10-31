@@ -6,7 +6,9 @@ extends Node3D
 ## glance. The ground and trees fade to grey (global shader parameter
 ## overlay_dim) so the colours stand out. Refreshes are throttled while the
 ## city keeps changing. The traffic layer colours the roads themselves by
-## how full they are and homes by their commute time.
+## how full they are and homes by their commute time; the transit layer
+## shows how near each street is to a bus or tram stop (lines show as
+## ribbons, drawn by the TransitSystem).
 
 const OVERLAY_SHADER := preload("res://assets/materials/info_overlay.gdshader")
 const BAD := Color(0.9, 0.24, 0.2)
@@ -23,6 +25,7 @@ const COVERAGE_LAYERS := ["health", "education", "police", "fire", "garbage", "d
 @export var building_system_path: NodePath
 @export var service_system_path: NodePath
 @export var traffic_system_path: NodePath
+@export var transit_system_path: NodePath
 
 var current: String = ""
 
@@ -37,6 +40,7 @@ var _dim: float = 0.0
 var _cells_dirty: bool = true   # cell transforms must be rebuilt
 var _buffer := PackedFloat32Array()
 var _traffic: Node
+var _transit: Node
 var _roads: MultiMeshInstance3D
 var _road_seg := PackedInt32Array()
 var _road_buffer := PackedFloat32Array()
@@ -73,6 +77,9 @@ func _ready() -> void:
 	add_child(_roads)
 	if not traffic_system_path.is_empty():
 		_traffic = get_node(traffic_system_path)
+	if not transit_system_path.is_empty():
+		_transit = get_node(transit_system_path)
+	EventBus.transit_changed.connect(_queue)
 	EventBus.lanes_rebuilt.connect(func() -> void:
 		_roads_dirty = true
 		_queue())
@@ -222,6 +229,11 @@ func _cell_color(i: int, grid: ZoneGrid, records: Dictionary, seg_colors: Dictio
 		if not seg_colors.has(sid):
 			seg_colors[sid] = Color(ramp(_services.segment_coverage(sid, current)), CELL_ALPHA)
 		return seg_colors[sid]
+	if current == "transit":
+		if not seg_colors.has(sid):
+			var access: float = 0.0 if _transit == null else _transit.segment_access(sid)
+			seg_colors[sid] = Color(ramp(access), CELL_ALPHA) if access > 0.0 else Color(NONE, CELL_ALPHA * 0.4)
+		return seg_colors[sid]
 	var owner := grid.building[i]
 	var b: Dictionary = records.get(owner, {}) if owner != ZoneGrid.FREE else {}
 	match current:
@@ -260,6 +272,10 @@ func _building_color(b: Dictionary) -> Color:
 		"happiness":
 			if int(b.get("occupants", 0)) > 0:
 				return ramp(float(b.get("happiness", 0.0)) / 100.0)
+		"transit":
+			if _transit != null and _services.is_consumer(b):
+				var access: float = _transit.segment_access(int(b.get("segment", -1)))
+				return ramp(access) if access > 0.0 else NONE
 		"traffic":
 			var commute := float(b.get("commute", -1.0))
 			if int(b.get("occupants", 0)) > 0 and commute >= 0.0:

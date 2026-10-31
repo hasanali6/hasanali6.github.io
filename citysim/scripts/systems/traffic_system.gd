@@ -14,6 +14,13 @@ extends Node
 ## commute time per home/work pair, road noise, and the shortest-time trees
 ## the visible vehicles use as their cached routes.
 ##
+## Mode choice: commuters and shoppers whose two ends are served by a
+## transit line compare the trip by car (driving time, finding a spot and
+## any parking fee) with the bus or tram (walking, waiting, riding, ticket)
+## and some leave the car at home; full lines turn riders back to cars.
+## District policies weigh in: trucks avoid heavy-traffic bans and paid
+## parking makes driving dearer.
+##
 ## Also owns the driving-lane geometry (LaneGeometry), answers long presses
 ## on roads and warns about traffic jams.
 
@@ -36,10 +43,14 @@ const NO_CATEGORY := 15
 @export var citizen_system_path: NodePath
 @export var company_system_path: NodePath
 @export var service_system_path: NodePath
+@export var transit_system_path: NodePath
+@export var district_system_path: NodePath
 
 var graph: TrafficGraph                  # matches the current roads
 var lanes := LaneGeometry.new()
 var last_stats: Dictionary = {"avg_commute": 0.0, "jammed": 0, "trips": 0.0, "ms": 0}
+## Latest mode choice, per day: {parking, riders {line id: rides}, raw, person_trips}.
+var last_mobility: Dictionary = {}
 
 var _net: Node
 var _zones: Node
@@ -47,7 +58,10 @@ var _buildings: Node
 var _citizens: Node
 var _companies: Node
 var _services: Node
+var _transit: Node
+var _districts: Node
 var _cfg: Dictionary
+var _mode_cfg: Dictionary
 var _types: Dictionary
 var _mesh_cfg: Dictionary
 var _rng := RandomNumberGenerator.new()
@@ -75,7 +89,17 @@ var _trip_forward := PackedByteArray()
 var _trip_time := PackedFloat32Array()
 var _trip_node := PackedInt32Array()
 var _trip_exit := PackedInt32Array()
-var _commute: Dictionary = {}            # Vector2i(home seg id, job seg id) -> minutes
+var _trip_heavy := PackedByteArray()
+var _commute: Dictionary = {}            # Vector2i(home seg id, job seg id) -> minutes by car
+var _od_minutes: Dictionary = {}         # Vector2i(seg id, seg id) -> minutes by car (person trips)
+var _transit_mix: Dictionary = {}        # Vector2i(home seg id, job seg id) -> Vector2(transit share, minutes)
+# Mode choice of the demand round being gathered.
+var _next_mix: Dictionary = {}
+var _pairs: Dictionary = {}              # Vector2i -> Vector2(transit share, parking fee) this round
+var _riders: Dictionary = {}             # line id -> rides per day
+var _raw_riders: Dictionary = {}         # line id -> rides wanted before crowding
+var _parking: float = 0.0
+var _person_trips: float = 0.0
 var _groups: Dictionary = {}             # spawn group -> [trip indices PackedInt32Array, cumulative PackedFloat32Array]
 var _jam_month: int = -1
 
@@ -87,7 +111,12 @@ func _ready() -> void:
 	_citizens = get_node(citizen_system_path)
 	_companies = get_node(company_system_path)
 	_services = get_node(service_system_path)
+	if not transit_system_path.is_empty():
+		_transit = get_node(transit_system_path)
+	if not district_system_path.is_empty():
+		_districts = get_node(district_system_path)
 	_cfg = GameData.section("traffic")
+	_mode_cfg = GameData.section("transit/mode_choice")
 	_types = GameData.section("roads/types")
 	_mesh_cfg = GameData.section("roads/mesh")
 	_rng.randomize()
@@ -95,6 +124,8 @@ func _ready() -> void:
 	EventBus.roads_changed.connect(_rebuild_graph)
 	EventBus.ground_long_pressed.connect(_on_long_press)
 	EventBus.month_changed.connect(func(_m: int) -> void: _wanted = true)
+	EventBus.transit_changed.connect(func() -> void: _wanted = true)
+	EventBus.districts_changed.connect(func() -> void: _wanted = true)
 
 
 func _exit_tree() -> void:
@@ -153,6 +184,12 @@ func _start_demand() -> void:
 			_seg_of[id] = grid.segment[cells[0]]
 	_demand_stage = 1
 	_demand_cursor = 0
+	_next_mix = {}
+	_pairs = {}
+	_riders = {}
+	_raw_riders = {}
+	_parking = 0.0
+	_person_trips = 0.0
 
 
 func _add_trip(o: int, d: int, kind: int, category: int, count: float) -> void:
@@ -160,6 +197,60 @@ func _add_trip(o: int, d: int, kind: int, category: int, count: float) -> void:
 		return
 	var key := Vector3i(o, d, kind * 16 + category)
 	_demand[key] = float(_demand.get(key, 0.0)) + count
+
+
+## Minutes by car between two roads: last round's routed time, or a guess
+## from the straight-line distance before the first round.
+func _car_minutes(o: int, d: int) -> float:
+	var m := float(_od_minutes.get(Vector2i(o, d), -1.0))
+	if m >= 0.0:
+		return m
+	var a := _segment_mid(o)
+	var b := _segment_mid(d)
+	if a == Vector2.INF or b == Vector2.INF:
+		return 10.0
+	return a.distance_to(b) * 1.3 / float(_cfg["commute"]["fallback_speed_ms"]) / 60.0
+
+
+## Transit share and parking fee of a round trip between two roads.
+## Pairs a line serves are also kept in _next_mix as Vector3(share, transit
+## minutes, line id).
+func _mode_split(o: int, d: int) -> Vector2:
+	var key := Vector2i(o, d)
+	if _pairs.has(key):
+		return _pairs[key]
+	var fee := 0.0
+	if _districts != null:
+		fee = float(_districts.parking_fee(d))
+	var share := 0.0
+	if _transit != null and _transit.has_service():
+		var t: Vector3 = _transit.transit_minutes(o, d)
+		if t.x >= 0.0:
+			var car := _car_minutes(o, d) + float(_mode_cfg["car_extra_minutes"]) + fee / float(_mode_cfg["money_per_minute"])
+			share = TransitRules.transit_share(car, t.x, _mode_cfg) * float(_transit.crowding(int(t.y)))
+			_next_mix[key] = Vector3(share, t.z, t.y)
+	var out := Vector2(share, fee)
+	_pairs[key] = out
+	return out
+
+
+## A person's round trip (home -> work or shop -> home): part of it rides
+## transit, the rest drives and pays for parking at the destination.
+func _person_trip(o: int, d: int, out_kind: int, back_kind: int, count: float) -> void:
+	if o < 0 or d < 0 or o == d or count <= 0.0:
+		return
+	var split := _mode_split(o, d)
+	_person_trips += count * 2.0
+	if split.x > 0.0:
+		var entry: Vector3 = _next_mix[Vector2i(o, d)]
+		var line := int(entry.z)
+		var raw := split.x / maxf(float(_transit.crowding(line)), 0.001)
+		_raw_riders[line] = float(_raw_riders.get(line, 0.0)) + raw * count * 2.0
+		_riders[line] = float(_riders.get(line, 0.0)) + split.x * count * 2.0
+	var cars := count * (1.0 - split.x)
+	_parking += cars * split.y
+	_add_trip(o, d, out_kind, NO_CATEGORY, cars)
+	_add_trip(d, o, back_kind, NO_CATEGORY, cars)
 
 
 func _step_demand(budget: int) -> void:
@@ -179,8 +270,7 @@ func _step_demand(budget: int) -> void:
 					if code == HouseholdData.NO_JOB:
 						continue
 					var work: int = _seg_of.get(HouseholdData.job_company(code), -1)
-					_add_trip(home, work, KIND_COMMUTE_OUT, NO_CATEGORY, per_worker)
-					_add_trip(work, home, KIND_COMMUTE_BACK, NO_CATEGORY, per_worker)
+					_person_trip(home, work, KIND_COMMUTE_OUT, KIND_COMMUTE_BACK, per_worker)
 			_demand_cursor = end
 			if end >= data.capacity():
 				_demand_stage = 2
@@ -203,8 +293,7 @@ func _step_demand(budget: int) -> void:
 				if households == 0:
 					continue
 				var shop: int = _seg_of.get(int(homes[bid]["shop"]), -1)
-				_add_trip(home_seg, shop, KIND_SHOP_OUT, NO_CATEGORY, households * shop_rate)
-				_add_trip(shop, home_seg, KIND_SHOP_BACK, NO_CATEGORY, households * shop_rate)
+				_person_trip(home_seg, shop, KIND_SHOP_OUT, KIND_SHOP_BACK, households * shop_rate)
 				var people := float(records[bid].get("residents", households * 2))
 				for c in SERVICE_CATEGORIES.size():
 					var cat := SERVICE_CATEGORIES[c]
@@ -239,6 +328,9 @@ func _step_demand(budget: int) -> void:
 
 func _start_job(threaded: bool) -> void:
 	_demand_stage = 0
+	_transit_mix = _next_mix
+	last_mobility = {"parking": _parking, "riders": _riders, "raw": _raw_riders, "person_trips": _person_trips}
+	EventBus.mobility_reported.emit(last_mobility)
 	var job := TrafficAssignment.new()
 	job.graph = graph
 	job.cfg = _cfg.duplicate(true)
@@ -246,6 +338,7 @@ func _start_job(threaded: bool) -> void:
 	var dests := PackedInt32Array()
 	var counts := PackedFloat32Array()
 	var forwards := PackedByteArray()
+	var heavy := PackedByteArray()
 	var groups := PackedInt32Array()
 	var commute := PackedByteArray()
 	var meta_o := PackedInt32Array()
@@ -260,6 +353,7 @@ func _start_job(threaded: bool) -> void:
 		dests.append(graph.seg_index[key.y])
 		counts.append(float(_demand[key]))
 		forwards.append(1 if forward else 0)
+		heavy.append(1 if kind == KIND_FREIGHT else 0)
 		groups.append(GROUP_OF_KIND[kind])
 		commute.append(1 if kind == KIND_COMMUTE_OUT else 0)
 		meta_o.append(key.x)
@@ -269,6 +363,9 @@ func _start_job(threaded: bool) -> void:
 	job.trip_dest = dests
 	job.trip_count = counts
 	job.trip_forward = forwards
+	job.trip_heavy = heavy
+	if _districts != null:
+		job.heavy_penalty = _districts.heavy_penalty(graph)
 	job.trip_group = groups
 	job.trip_commute = commute
 	job.trip_seg_o = meta_o
@@ -303,10 +400,12 @@ func _adopt(job: TrafficAssignment) -> void:
 	_trip_code = job.get_meta("code")
 	_trip_count = job.trip_count
 	_trip_forward = job.trip_forward
+	_trip_heavy = job.trip_heavy
 	_trip_time = job.trip_time
 	_trip_node = job.trip_node
 	_trip_exit = job.trip_exit
 	_commute = job.commute
+	_od_minutes = job.od_minutes
 	_groups = job.groups
 	var jam: Dictionary = _cfg["jam"]
 	last_stats = {"avg_commute": job.avg_commute, "jammed": job.jammed, "trips": job.total_trips, "ms": job.elapsed_ms}
@@ -353,14 +452,23 @@ func lane_speed(seg_id: int, dir: int) -> float:
 	return graph.seg_speed[s] * f
 
 
-## 0..1 traffic noise along a road.
+## 0..1 traffic noise along a road (less where trucks are banned).
 func noise(seg_id: int) -> float:
-	return clampf(segment_daily(seg_id) / float(_cfg["noise"]["daily_volume_full"]), 0.0, 1.0)
+	var n := clampf(segment_daily(seg_id) / float(_cfg["noise"]["daily_volume_full"]), 0.0, 1.0)
+	if _districts != null:
+		n *= float(_districts.noise_factor(seg_id))
+	return n
 
 
-## Minutes from a home's road to a workplace's road, or -1 if not known yet.
+## Minutes from a home's road to a workplace's road, or -1 if not known yet:
+## the drive, blended with the bus or tram ride for those who take it.
 func commute_minutes(home_seg: int, job_seg: int) -> float:
-	return float(_commute.get(Vector2i(home_seg, job_seg), -1.0))
+	var key := Vector2i(home_seg, job_seg)
+	var car := float(_commute.get(key, -1.0))
+	if not _transit_mix.has(key):
+		return car
+	var mix: Vector3 = _transit_mix[key]
+	return mix.y if car < 0.0 else lerpf(car, mix.y, mix.x)
 
 
 func trips_ready() -> bool:
@@ -428,9 +536,10 @@ func route(i: int) -> PackedInt32Array:
 	var g := _result_graph
 	var node := _trip_node[i]
 	var edges := PackedInt32Array()
+	var heavy := _trip_heavy[i] if i < _trip_heavy.size() else 0
 	if _trip_forward[i] == 1:
 		var anchor: int = g.seg_index[_trip_o[i]]
-		var via: PackedInt32Array = _fwd_trees.get(anchor, PackedInt32Array())
+		var via: PackedInt32Array = _fwd_trees.get(anchor * 2 + heavy, PackedInt32Array())
 		if via.is_empty():
 			return out
 		var path := TrafficRules.path_to(g, via, node)
@@ -440,7 +549,7 @@ func route(i: int) -> PackedInt32Array:
 		edges.append(_trip_exit[i])
 	else:
 		var anchor: int = g.seg_index[_trip_d[i]]
-		var via: PackedInt32Array = _rev_trees.get(anchor, PackedInt32Array())
+		var via: PackedInt32Array = _rev_trees.get(anchor * 2 + heavy, PackedInt32Array())
 		if via.is_empty():
 			return out
 		var path := TrafficRules.path_from(g, via, node)

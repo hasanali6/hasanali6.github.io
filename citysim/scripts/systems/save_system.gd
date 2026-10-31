@@ -14,6 +14,8 @@ const AUTOSAVE := "user://saves/autosave.save"
 @export var citizen_system_path: NodePath
 @export var demand_system_path: NodePath
 @export var service_system_path: NodePath
+@export var transit_system_path: NodePath
+@export var district_system_path: NodePath
 
 var _months_since_save: int = 0
 var _loading: bool = false
@@ -52,6 +54,10 @@ func save_game(path: String = AUTOSAVE) -> bool:
 		"demand": get_node(demand_system_path).save_state(),
 		"services": get_node(service_system_path).save_state(),
 	}
+	if not transit_system_path.is_empty():
+		state["transit"] = get_node(transit_system_path).save_state()
+	if not district_system_path.is_empty():
+		state["districts"] = get_node(district_system_path).save_state()
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		push_error("SaveSystem: cannot write %s" % path)
@@ -81,6 +87,11 @@ func load_game(path: String = AUTOSAVE) -> bool:
 	get_node(demand_system_path).load_state(state["demand"])
 	# Saves from before city services have no "services" entry.
 	get_node(service_system_path).load_state(state.get("services", {}))
+	# Saves from before transport and districts have neither entry.
+	if not district_system_path.is_empty():
+		get_node(district_system_path).load_state(state.get("districts", {}))
+	if not transit_system_path.is_empty():
+		get_node(transit_system_path).load_state(state.get("transit", {}))
 	_loading = false
 	EventBus.notification_posted.emit("save", tr("NOTIFY_LOADED"))
 	return true

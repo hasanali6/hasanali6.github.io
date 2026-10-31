@@ -39,12 +39,14 @@ const LOT_PARKING := 2
 const LOT_YARD := 3
 
 @export var zone_system_path: NodePath
+@export var district_system_path: NodePath
 
 var buildings: Dictionary = {}  # id -> Dictionary record
 var demand: Dictionary = {"residential": 0.0, "commercial": 0.0, "office": 0.0, "industrial": 0.0}
 
 var _zones: Node
 var _rng := RandomNumberGenerator.new()
+var _districts: Node
 var _growth: Dictionary
 var _vis: Dictionary
 var _hh_cfg: Dictionary
@@ -67,6 +69,8 @@ var _service_names: Dictionary = {}  # service id -> name key
 
 func _ready() -> void:
 	_zones = get_node(zone_system_path)
+	if not district_system_path.is_empty():
+		_districts = get_node(district_system_path)
 	_growth = GameData.section("zones/growth")
 	_vis = GameData.section("zones/visuals")
 	_hh_cfg = GameData.section("economy/households")
@@ -159,8 +163,17 @@ func _try_grow(cell: int) -> bool:
 	if lot.is_empty():
 		return false
 	var styles: Array = cfg["styles"]
-	_create(zid, lot, cell, w, d, str(styles[_rng.randi_range(0, styles.size() - 1)]), _floors_for(cfg, 1), false)
+	var floors := _floors_for(cfg, 1)
+	var cap := _floor_cap(grid.centers[cell])
+	if cap > 0:
+		floors = mini(floors, cap)
+	_create(zid, lot, cell, w, d, str(styles[_rng.randi_range(0, styles.size() - 1)]), floors, false)
 	return true
+
+
+## Floor limit of a high-rise ban district at p (0 = none).
+func _floor_cap(p: Vector2) -> int:
+	return 0 if _districts == null else int(_districts.floor_cap(p))
 
 
 func _create(zid: int, lot: PackedInt32Array, front_cell: int, w: int, d: int, style: String, floors: int, manual: bool) -> int:
@@ -243,7 +256,11 @@ func _on_month(_m: int) -> void:
 			b["no_utility_months"] = 0
 		if b["level"] < max_level and _rng.randf() < float(_growth["level_up_chance_per_month"]) and _deserves_level(b):
 			b["level"] += 1
-			b["floors"] = maxi(b["floors"], _floors_for(_zones.zone_config(b["zone"]), b["level"]))
+			var floors := maxi(b["floors"], _floors_for(_zones.zone_config(b["zone"]), b["level"]))
+			var cap := _floor_cap(b["centre"])
+			if cap > 0:
+				floors = mini(floors, maxi(cap, b["floors"]))
+			b["floors"] = floors
 			# A fixed-size Kenney model is replaced once the building outgrows it.
 			if not b["manual"] and KENNEY_MODELS.has(b["style"]) and b["floors"] > int(_vis["kenney_max_floors"]):
 				b["style"] = str(_vis["kenney_upgrade_style"])
@@ -275,17 +292,19 @@ func _abandon(id: int) -> void:
 ## only if all of its lot cells still exist.
 func _on_cells_rebuilt() -> void:
 	var grid: ZoneGrid = _zones.grid
+	# Plain Arrays: appending to a packed array taken out of a Dictionary
+	# would only change a copy.
 	var owned := {}
 	for i in grid.size():
 		var id := grid.building[i]
 		if id != ZoneGrid.FREE:
 			if not owned.has(id):
-				owned[id] = PackedInt32Array()
-			(owned[id] as PackedInt32Array).append(i)
+				owned[id] = []
+			(owned[id] as Array).append(i)
 	var changed := false
 	for id: int in buildings.keys():
 		var b: Dictionary = buildings[id]
-		var cells: PackedInt32Array = owned.get(id, PackedInt32Array())
+		var cells := PackedInt32Array(owned.get(id, []))
 		if cells.size() != (b["cells"] as PackedInt32Array).size():
 			for c in cells:
 				grid.building[c] = ZoneGrid.FREE

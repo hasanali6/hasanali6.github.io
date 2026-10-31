@@ -31,7 +31,7 @@ const OVERLAYS: Array = [
 	["police", "SVC_CAT_POLICE", UiStyle.BLUE], ["fire", "SVC_CAT_FIRE", UiStyle.ORANGE],
 	["garbage", "SVC_CAT_GARBAGE", UiStyle.GREEN], ["deathcare", "SVC_CAT_DEATHCARE", UiStyle.SLATE],
 	["pollution", "OVERLAY_POLLUTION", UiStyle.SLATE], ["happiness", "OVERLAY_HAPPINESS", UiStyle.GREEN],
-	["traffic", "OVERLAY_TRAFFIC", UiStyle.ORANGE],
+	["traffic", "OVERLAY_TRAFFIC", UiStyle.ORANGE], ["transit", "OVERLAY_TRANSIT", UiStyle.BLUE],
 ]
 ## Speed buttons: [icon, badge text].
 const SPEEDS: Array = [["pause", ""], ["play", ""], ["fast-forward", "2"], ["fast-forward", "3"]]
@@ -73,6 +73,8 @@ var _building_shown_frame: int = -1
 var _cost_pill: PanelContainer
 var _economy: EconomyPanel
 var _catalog: CatalogPanel
+var _transit_panel: TransitPanel
+var _district_panel: DistrictPanel
 var _rci: RciBars
 var _money_delta: Label
 var _cost_label: Label
@@ -117,6 +119,10 @@ func _ready() -> void:
 	# Beside the left buttons, so the city stays visible under the colours.
 	_place(_overlay_panel, Vector2(0, 0.5), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BOTH, Vector2(MIN_TOUCH + 26, 70))
 	_place(_catalog.panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
+	_transit_panel = TransitPanel.new(get_parent().get_node("TransitSystem"), FONT_SIZE, MIN_TOUCH, _close_transit_panel)
+	_place(_transit_panel.panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
+	_district_panel = DistrictPanel.new(get_parent().get_node("DistrictSystem"), FONT_SIZE, MIN_TOUCH, _close_district_panel)
+	_place(_district_panel.panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
 	_rci = _build_rci()
 	_place(_rci.get_parent(), Vector2(0, 0), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_END, Vector2(0, 96))
 	_cost_pill = _build_cost_pill()
@@ -385,6 +391,10 @@ func _build_tray() -> PanelContainer:
 			b.pressed.connect(_open_catalog.bind("utilities"))
 		elif key == "TOOL_ZONING":
 			b.pressed.connect(_open_zone_panel)
+		elif key == "TOOL_TRANSIT":
+			b.pressed.connect(_open_transit_panel)
+		elif key == "TOOL_DISTRICTS":
+			b.pressed.connect(_open_district_panel)
 		else:
 			b.pressed.connect(func() -> void: show_toast(tr("TOOL_LOCKED") % tr(key)))
 		col.add_child(b)
@@ -598,6 +608,8 @@ func _build_zone_panel() -> PanelContainer:
 
 func _open_zone_panel() -> void:
 	_close_overlay_panel()
+	_transit_panel.panel.visible = false
+	_district_panel.panel.visible = false
 	_road_panel.visible = false
 	_catalog.panel.visible = false
 	_cost_pill.visible = false
@@ -740,6 +752,8 @@ func _on_budget(ledger: Dictionary) -> void:
 
 
 func _open_catalog(group: String) -> void:
+	_transit_panel.panel.visible = false
+	_district_panel.panel.visible = false
 	_road_panel.visible = false
 	_zone_panel.visible = false
 	_overlay_panel.visible = false
@@ -843,9 +857,57 @@ func _refresh_overlay_legend() -> void:
 			var traffic := get_tree().current_scene.get_node("TrafficSystem")
 			var vehicles := get_tree().current_scene.get_node("VehicleSystem")
 			text = tr("OVERLAY_LEGEND_TRAFFIC") % [roundi(float(traffic.last_stats.get("avg_commute", 0.0))), int(vehicles.active)]
+		"transit":
+			var transit := get_parent().get_node("TransitSystem")
+			var mobility: Dictionary = get_parent().get_node("TrafficSystem").last_mobility
+			var rides: float = transit.total_riders()
+			var share := rides / maxf(float(mobility.get("person_trips", 0.0)), 1.0)
+			text = tr("OVERLAY_LEGEND_TRANSIT") % [transit.lines.size(), UiStyle.format_int(roundi(rides)), roundi(share * 100.0)]
 		_:
 			text = tr("OVERLAY_LEGEND")
 	_overlay_legend.text = text
+
+
+## Every bottom tool panel closed, the build button back (before opening another).
+func _hide_tool_panels() -> void:
+	_road_panel.visible = false
+	_zone_panel.visible = false
+	_catalog.panel.visible = false
+	_transit_panel.panel.visible = false
+	_district_panel.panel.visible = false
+	_cost_pill.visible = false
+	_set_tray_open(false)
+	_settings_panel.visible = false
+	_info_panel.visible = false
+
+
+func _open_transit_panel() -> void:
+	_close_overlay_panel()
+	_hide_tool_panels()
+	_build_button.get_parent().visible = false
+	_transit_panel.open()
+	_select_overlay("transit")
+
+
+func _close_transit_panel() -> void:
+	_transit_panel.panel.visible = false
+	_build_button.get_parent().visible = true
+	EventBus.build_tool_selected.emit("", {})
+	if not _overlay_panel.visible:
+		_select_overlay("")
+
+
+func _open_district_panel() -> void:
+	_close_overlay_panel()
+	_hide_tool_panels()
+	_build_button.get_parent().visible = false
+	_district_panel.open()
+
+
+func _close_district_panel() -> void:
+	_district_panel.panel.visible = false
+	_build_button.get_parent().visible = true
+	EventBus.build_tool_selected.emit("", {})
 
 
 func _close_catalog() -> void:
@@ -893,6 +955,8 @@ func _build_cost_pill() -> PanelContainer:
 
 func _open_road_panel() -> void:
 	_close_overlay_panel()
+	_transit_panel.panel.visible = false
+	_district_panel.panel.visible = false
 	_zone_panel.visible = false
 	_catalog.panel.visible = false
 	_set_tray_open(false)
@@ -1014,6 +1078,12 @@ func _show_location(world_pos: Vector3) -> void:
 
 
 func _on_back_requested() -> void:
+	if _transit_panel.panel.visible:
+		_close_transit_panel()
+		return
+	if _district_panel.panel.visible:
+		_close_district_panel()
+		return
 	if _road_panel.visible:
 		_close_road_panel()
 		return

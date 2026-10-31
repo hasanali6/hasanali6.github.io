@@ -218,3 +218,45 @@ ROAD_INFO_LOAD,Yoğunluk: %d%% · Ortalama hız: %d km/sa,Load: %d%% · Average 
 ROAD_INFO_LENGTH,Uzunluk: %d m,Length: %d m
 BUILDING_COMMUTE,İşe gidiş: %d dk,Commute: %d min
 NOTIFY_TRAFFIC_JAM,Trafik sıkışık! %d yolda yoğunluk çok yüksek,Traffic jam! %d roads are over capacity
+TRANSIT_BUS,Otobüs,Bus
+TRANSIT_TRAM,Tramvay,Tram
+TRANSIT_HINT,Durak eklemek için bir yola dokun (durağa tekrar dokunmak siler),Tap a road to add a stop (tap a stop again to remove it)
+TRANSIT_DRAFT,%d durak · %.1f km döngü · %s,%d stops · %.1f km loop · %s
+TRANSIT_OPEN,Hattı aç,Open line
+TRANSIT_CLEAR,Temizle,Clear
+TRANSIT_TICKET,Bilet,Ticket
+TRANSIT_VEHICLES,Araç,Vehicles
+TRANSIT_NO_LINES,"Henüz hat yok: durakları seç, sonra Hattı aç","No lines yet: pick stops, then Open line"
+TRANSIT_LINE_INFO,%s · %s yolcu/gün · %%%d dolu · %.1f km · %d durak · her %.1f dk,%s · %s riders/day · %d%% full · %.1f km · %d stops · every %.1f min
+TRANSIT_BROKEN,Hat çalışmıyor: %s,Line not running: %s
+TRANSIT_ERR_ROUTE,Duraklar arasında dönen bir güzergâh yok (araçlar yolda U dönüşü yapamaz),No looping route through the stops (vehicles cannot U-turn on the road)
+TRANSIT_ERR_STOPS,En az 2 durak gerekli,At least 2 stops are needed
+TRANSIT_ERR_ROAD,Durak bir yolun üstüne konmalı,A stop must be placed on a road
+TRANSIT_ERR_TRAM_ROAD,Tramvay sadece cadde ve bulvarlarda çalışır,Trams only run on avenues and boulevards
+TRANSIT_ERR_SPACING,Duraklar birbirine çok yakın,Stops are too close together
+TRANSIT_ERR_MAX_STOPS,Bir hatta en fazla 16 durak olabilir,A line can have at most 16 stops
+TRANSIT_ERR_MAX_LINES,Hat sınırına ulaşıldı,Line limit reached
+TRANSIT_ERR_STOP_LOST,Bir durağın yolu yıkıldı,The road of a stop was removed
+NOTIFY_LINE_OPENED,%s hizmete girdi,%s is now running
+DISTRICT_HINT,Köşe eklemek için haritaya dokun; ilk köşeye dokununca bölge kapanır,Tap the map to add corners; tap the first corner to close the district
+DISTRICT_DRAFT,%d köşe · son köşeye dokunmak geri alır,%d corners · tap the last corner to undo
+DISTRICT_FINISH,Bölgeyi oluştur,Create district
+DISTRICT_NAME,Bölge %d,District %d
+DISTRICT_NONE,Henüz bölge yok,No districts yet
+DISTRICT_STATS,%s kişi · %d bina · %.1f ha,%s people · %d buildings · %.1f ha
+DISTRICT_ERR_POINTS,En az 3 köşe gerekli,At least 3 corners are needed
+DISTRICT_ERR_CROSSING,Sınır kendini kesmemeli,The outline must not cross itself
+DISTRICT_ERR_SMALL,Bölge çok küçük,The district is too small
+DISTRICT_ERR_MAX,Bölge sınırına ulaşıldı,District limit reached
+DISTRICT_ERR_MAX_POINTS,Köşe sınırına ulaşıldı,Corner limit reached
+NOTIFY_DISTRICT_CREATED,%s oluşturuldu,%s created
+POLICY_HEAVY_BAN,Ağır araç yasağı,Heavy traffic ban
+POLICY_HIGH_RISE_BAN,Yüksek bina yasağı,High-rise ban
+POLICY_RECYCLING,Geri dönüşüm,Recycling
+POLICY_PAID_PARKING,Ücretli otopark,Paid parking
+ECON_IN_TICKETS,Bilet gelirleri,Ticket sales
+ECON_IN_PARKING,Otopark ücretleri,Parking fees
+ECON_OUT_TRANSIT,Toplu taşıma,Public transport
+ECON_OUT_RECYCLING,Geri dönüşüm,Recycling
+OVERLAY_TRANSIT,Toplu taşıma,Transit
+OVERLAY_LEGEND_TRANSIT,"%d hat · %s yolcu/gün · yolculukların %%%d'i toplu taşımayla. Yeşil: durağa yakın, kırmızı: uzak, gri: durak yok.","%d lines · %s riders/day · %d%% of trips by transit. Green: near a stop, red: far, grey: no stop."

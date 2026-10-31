@@ -33,6 +33,7 @@ const COVERAGE_BUDGET_US := 1500
 @export var road_network_path: NodePath
 @export var zone_system_path: NodePath
 @export var building_system_path: NodePath
+@export var district_system_path: NodePath
 
 var types: Dictionary = {}               # service id -> type entry
 var categories: Dictionary
@@ -80,9 +81,12 @@ var _fees: Dictionary = {"power": 0.0, "water": 0.0}
 var _icons: Dictionary = {}              # "power" / "water" -> MultiMeshInstance3D
 var _population: int = 0
 var _deaths: int = 0
+var _districts: Node
 
 
 func _ready() -> void:
+	if not district_system_path.is_empty():
+		_districts = get_node(district_system_path)
 	_net = get_node(road_network_path)
 	_zones = get_node(zone_system_path)
 	_buildings = get_node(building_system_path)
@@ -516,7 +520,9 @@ func _on_month(_m: int) -> void:
 			if by < 0:
 				continue
 			var people := residents
-			if key == "education2":
+			if key == "garbage" and _districts != null:
+				people = roundi(residents * float(_districts.garbage_factor(b)))
+			elif key == "education2":
 				people = roundi(residents * uni_share)
 			elif key.begins_with("education"):
 				people = int(b.get("children", 0))

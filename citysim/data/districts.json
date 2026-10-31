@@ -1,0 +1,13 @@
+{
+  "colors": ["#4f8fe8", "#e86f4f", "#55b86a", "#d9b23a", "#a25fd6", "#e05c9a", "#3cb7b7", "#8f7a55"],
+  "max_districts": 16,
+  "max_points": 24,
+  "min_area_m2": 4000.0,
+  "order": ["heavy_ban", "high_rise_ban", "recycling", "paid_parking"],
+  "policies": {
+    "heavy_ban": {"name_key": "POLICY_HEAVY_BAN", "flag": 1, "happiness": 2.0, "route_penalty": 6.0, "noise_factor": 0.6},
+    "high_rise_ban": {"name_key": "POLICY_HIGH_RISE_BAN", "flag": 2, "happiness": 1.0, "max_floors": 4},
+    "recycling": {"name_key": "POLICY_RECYCLING", "flag": 4, "happiness": 1.0, "garbage_factor": 0.65, "cost_per_resident": 0.6},
+    "paid_parking": {"name_key": "POLICY_PAID_PARKING", "flag": 8, "happiness": -1.0, "fee": 1.5}
+  }
+}

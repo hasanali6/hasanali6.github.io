@@ -17,6 +17,10 @@ extends Node3D
 ## of a lane piece, a light changes or a queue moves, and then rewrites that
 ## one instance (start position, start time, speed, stop position). Lights:
 ## junctions flagged lit by the TrafficGraph cycle two signal groups.
+##
+## Buses and trams (TransitSystem) are the same kind of vehicle on a looping
+## route: they keep to the curb lane, stop at each of their stops for a while
+## and never despawn on their own.
 
 const SHADER := preload("res://assets/materials/vehicle.gdshader")
 const LIGHT_SHADER := preload("res://assets/materials/traffic_light.gdshader")
@@ -27,6 +31,7 @@ const MAP_AABB := AABB(Vector3(-2600, -20, -2600), Vector3(5200, 80, 5200))
 @export var traffic_system_path: NodePath
 
 var active: int = 0
+var line_active: int = 0     # of which buses and trams
 var trips_done: int = 0      # vehicles that reached their destination
 var trips_lost: int = 0      # vehicles removed because their route broke
 
@@ -77,6 +82,11 @@ var _stop := PackedFloat32Array()
 var _accel := PackedFloat32Array()
 var _end_s := PackedFloat32Array()
 var _wait := PackedByteArray()
+var _line := PackedInt32Array()    # transit line id, -1 for ordinary traffic
+var _stops: Array = []             # line vehicles: PackedVector2Array of (route index, lane distance)
+var _next_stop := PackedInt32Array()
+var _dwell := PackedFloat32Array()
+var _dwell_s := PackedFloat32Array()  # lane distance of the stop ahead on this road, -1 if none
 var _half := PackedFloat32Array()  # half the vehicle length
 var _ver := PackedInt32Array()
 var _color := PackedColorArray()
@@ -192,7 +202,8 @@ func _apply_preset(_preset: String) -> void:
 	_slot_high = PackedInt32Array()
 	var shares: Dictionary = _cfg["models"]["capacity_share"]
 	for name in _models:
-		var capacity := maxi(ceili(_cap * float(shares.get(name, 0.1))), 4)
+		var minimum: Dictionary = _cfg["models"].get("capacity_min", {})
+		var capacity := maxi(maxi(ceili(_cap * float(shares.get(name, 0.1))), int(minimum.get(name, 4))), 4)
 		var mesh := VehicleModels.build(name)
 		mesh.surface_set_material(0, _material)
 		var mm := MultiMesh.new()
@@ -260,7 +271,8 @@ func _on_lanes_rebuilt() -> void:
 			(by_lane[pid] as Array).append(v)
 		_plan_next(v)
 		if _on_conn[v] == 1:
-			_npiece[v] = _lane_piece(_route[v][_leg[v] + 1], _nlane[v]) if _leg[v] + 1 < (_route[v] as PackedInt32Array).size() else -1
+			var nk := _next_index(v)
+			_npiece[v] = _lane_piece(_route[v][nk], _nlane[v]) if nk >= 0 else -1
 	for pid: int in by_lane:
 		var list: Array = by_lane[pid]
 		list.sort_custom(func(a: int, b: int) -> bool: return _pos(a) > _pos(b))
@@ -276,15 +288,38 @@ func _on_lanes_rebuilt() -> void:
 
 func _route_valid(v: int) -> bool:
 	var route: PackedInt32Array = _route[v]
-	for k in range(_leg[v], route.size()):
+	var looping := _line[v] >= 0
+	for k in range(0 if looping else _leg[v], route.size()):
 		var seg := route[k] >> 1
 		if not _seg_lanes.has(seg):
 			return false
-		if k + 1 < route.size():
-			var nxt := route[k + 1]
+		var nk := (k + 1) % route.size() if looping else k + 1
+		if nk < route.size():
+			var nxt := route[nk]
 			if not _seg_lanes.has(nxt >> 1) or _end_node(route[k]) != _start_node(nxt):
 				return false
 	return true
+
+
+## Index of the road after the current one (wrapping for transit loops), or -1.
+func _next_index(v: int) -> int:
+	var size := (_route[v] as PackedInt32Array).size()
+	if _line[v] >= 0:
+		return (_leg[v] + 1) % size
+	return _leg[v] + 1 if _leg[v] + 1 < size else -1
+
+
+func _is_last(v: int) -> bool:
+	return _line[v] < 0 and _leg[v] == (_route[v] as PackedInt32Array).size() - 1
+
+
+## Lane distance of a transit vehicle's next stop if it is on the current road.
+func _stop_on_leg(v: int) -> float:
+	var stops: PackedVector2Array = _stops[v]
+	if stops.is_empty():
+		return -1.0
+	var next := stops[_next_stop[v]]
+	return next.y if int(next.x) == _leg[v] else -1.0
 
 
 func _build_junctions() -> void:
@@ -441,14 +476,15 @@ func _resolve(pid: int) -> void:
 	var prev_half := 0.0
 	var released := 0
 	for v: int in fifo:
-		var route: PackedInt32Array = _route[v]
-		var last := _leg[v] == route.size() - 1
+		var last := _is_last(v)
 		var half := _half[v]
 		var want := FREE
 		if last:
 			want = _end_s[v]
 		elif _wait[v] == 1:
 			want = line - half
+		elif _line[v] >= 0 and _dwell_s[v] >= 0.0:
+			want = _dwell_s[v]
 		var s_now := _pos(v)
 		var limit := FREE
 		var at_line := false
@@ -505,8 +541,8 @@ func _retry_blocked() -> void:
 		if _alive[v] == 0 or _on_conn[v] == 1:
 			_blocked.erase(v)
 			continue
-		var route: PackedInt32Array = _route[v]
-		var ahead := _lane_piece(route[_leg[v] + 1], _nlane[v]) if _leg[v] + 1 < route.size() else -1
+		var nk := _next_index(v)
+		var ahead := _lane_piece(_route[v][nk], _nlane[v]) if nk >= 0 else -1
 		if ahead < 0 or not _lane_full(ahead):
 			_blocked.erase(v)
 			_wait[v] = 0
@@ -540,8 +576,8 @@ func _turn(e1: int, e2: int) -> int:
 
 ## Lane on road k of a route, ready for the turn at its end (curb lane on
 ## the destination road).
-func _choose_lane(route: PackedInt32Array, k: int, current: int, lanes: int) -> int:
-	if k == route.size() - 1:
+func _choose_lane(route: PackedInt32Array, k: int, current: int, lanes: int, transit: bool = false) -> int:
+	if transit or k == route.size() - 1:
 		return lanes - 1
 	var turn := _turn(route[k], route[k + 1])
 	if turn == 0:
@@ -552,16 +588,16 @@ func _choose_lane(route: PackedInt32Array, k: int, current: int, lanes: int) -> 
 ## Picks the next road's lane and the junction connector leading there.
 func _plan_next(v: int) -> void:
 	var route: PackedInt32Array = _route[v]
-	var k := _leg[v]
 	_npiece[v] = -1
-	if _on_conn[v] == 1 or k >= route.size() - 1:
+	var nk := _next_index(v)
+	if _on_conn[v] == 1 or nk < 0:
 		return
-	var cur := route[k]
-	var nxt := route[k + 1]
+	var cur := route[_leg[v]]
+	var nxt := route[nk]
 	var n_next: int = _seg_lanes.get(nxt >> 1, 0)
 	if n_next <= 0:
 		return
-	var lane := _choose_lane(route, k + 1, _lane[v], n_next)
+	var lane := _choose_lane(route, nk, _lane[v], n_next, _line[v] >= 0)
 	var key := Vector3i(_end_node(cur), LaneGeometry.lane_key(cur >> 1, cur & 1, _lane[v]), LaneGeometry.lane_key(nxt >> 1, nxt & 1, lane))
 	_npiece[v] = (_traffic.lanes as LaneGeometry).conn_pieces.get(key, -1)
 	_nlane[v] = lane
@@ -579,13 +615,15 @@ func _connector_speed(cpid: int, lane_speed: float) -> float:
 func _schedule(v: int) -> void:
 	_ver[v] += 1
 	var lg: LaneGeometry = _traffic.lanes
-	var route: PackedInt32Array = _route[v]
-	var last := _on_conn[v] == 0 and _leg[v] == route.size() - 1
+	var last := _on_conn[v] == 0 and _is_last(v)
 	var t: float
 	if _stop[v] < FREE:
-		if not last:
+		if _at_transit_stop(v):
+			t = TrafficRules.time_to_reach(_stop[v] - 0.3, _s0[v], _t0[v], _v[v], _accel[v], _accel_time) + _dwell[v]
+		elif not last:
 			return
-		t = TrafficRules.time_to_reach(_stop[v] - 0.3, _s0[v], _t0[v], _v[v], _accel[v], _accel_time) + float(_veh["park_seconds"])
+		else:
+			t = TrafficRules.time_to_reach(_stop[v] - 0.3, _s0[v], _t0[v], _v[v], _accel[v], _accel_time) + float(_veh["park_seconds"])
 	else:
 		t = TrafficRules.time_to_reach(lg.piece_length[_piece[v]], _s0[v], _t0[v], _v[v], _accel[v], _accel_time)
 	_push_event(t, v, _ver[v])
@@ -599,12 +637,24 @@ func _process_events() -> void:
 		var v: int = top[1]
 		if _alive[v] == 0 or _ver[v] != int(top[2]):
 			continue
-		var route: PackedInt32Array = _route[v]
-		if _on_conn[v] == 0 and _leg[v] == route.size() - 1 and _stop[v] < FREE:
+		if _at_transit_stop(v):
+			# Doors closed: on to the next stop.
+			var stops: PackedVector2Array = _stops[v]
+			_next_stop[v] = (_next_stop[v] + 1) % stops.size()
+			_dwell_s[v] = _stop_on_leg(v)
+			_resolve(_piece[v])
+			if _stop[v] >= FREE:
+				_schedule(v)
+			continue
+		if _on_conn[v] == 0 and _is_last(v) and _stop[v] < FREE:
 			trips_done += 1
 			_despawn(v)
 			continue
 		_advance(v)
+
+
+func _at_transit_stop(v: int) -> bool:
+	return _line[v] >= 0 and _on_conn[v] == 0 and _dwell_s[v] >= 0.0 and absf(_stop[v] - _dwell_s[v]) < 0.05
 
 
 ## The vehicle reached the end of its piece: into the junction, or out of it.
@@ -613,12 +663,13 @@ func _advance(v: int) -> void:
 	var pid := _piece[v]
 	var length := lg.piece_length[pid]
 	var route: PackedInt32Array = _route[v]
+	var nk := _next_index(v)
 	if _on_conn[v] == 0:
 		var c := _npiece[v]
-		if c < 0 or _leg[v] + 1 >= route.size():
+		if c < 0 or nk < 0:
 			_despawn(v)
 			return
-		var ahead := _lane_piece(route[_leg[v] + 1], _nlane[v])
+		var ahead := _lane_piece(route[nk], _nlane[v])
 		if ahead < 0:
 			_despawn(v)
 			return
@@ -628,7 +679,7 @@ func _advance(v: int) -> void:
 			_resolve(pid)
 			return
 		var overflow := maxf(_pos(v) - length, 0.0)
-		var next_entry := route[_leg[v] + 1]
+		var next_entry := route[nk]
 		_rebase(v, overflow, _connector_speed(c, _traffic.lane_speed(next_entry >> 1, next_entry & 1)), 0.0)
 		_fifo_remove(v, pid)
 		_piece[v] = c
@@ -645,7 +696,7 @@ func _advance(v: int) -> void:
 		if ahead < 0:
 			_despawn(v)
 			return
-		_leg[v] += 1
+		_leg[v] = nk
 		_lane[v] = _nlane[v]
 		_enter_lane(v, ahead, overflow)
 
@@ -664,7 +715,9 @@ func _enter_lane(v: int, pid: int, s_start: float) -> void:
 	_on_conn[v] = 0
 	_stop[v] = FREE
 	_wait[v] = 0
-	if _leg[v] == route.size() - 1:
+	if _line[v] >= 0:
+		_dwell_s[v] = _stop_on_leg(v)
+	elif _leg[v] == route.size() - 1:
 		var length := lg.piece_length[pid]
 		_end_s[v] = clampf(length * _rng.randf_range(0.25, 0.8), minf(s_start + 4.0, length), length)
 	fifo.append(v)
@@ -699,7 +752,7 @@ func _spawn_some() -> void:
 	var target := int(fleet * TrafficRules.hourly(_cfg["fleet_by_hour"], hour))
 	var lod: Dictionary = _cfg["lod"]
 	var tries := 0
-	while active < target and tries < int(lod["spawns_per_frame"]):
+	while active - line_active < target and tries < int(lod["spawns_per_frame"]):
 		tries += 1
 		var trip: int = _traffic.pick_trip(hour, _focus, _near, float(lod["far_accept"]))
 		if trip < 0:
@@ -775,6 +828,9 @@ func _spawn(trip: int, route: PackedInt32Array) -> void:
 	_on_conn[v] = 0
 	_lane[v] = lane
 	_wait[v] = 0
+	_line[v] = -1
+	_stops[v] = PackedVector2Array()
+	_dwell_s[v] = -1.0
 	_half[v] = _half_by_model[model]
 	_color[v] = look[1]
 	_second[v] = look[2]
@@ -818,6 +874,90 @@ func _free_spot(pid: int, s: float, half: float) -> float:
 	return -1.0
 
 
+## A bus or tram of line `line_id` waiting at stop `start_stop` of its loop.
+## stops: (route index, lane distance on the curb lane) per stop.
+func spawn_line_vehicle(line_id: int, route: PackedInt32Array, stops: PackedVector2Array, start_stop: int,
+		model_name: String, paint: Color, second: Color, dwell: float) -> int:
+	if route.is_empty() or stops.is_empty():
+		return -1
+	var k := int(stops[start_stop].x)
+	var entry := route[k]
+	var lanes: int = _seg_lanes.get(entry >> 1, 0)
+	if lanes <= 0:
+		return -1
+	var pid := _lane_piece(entry, lanes - 1)
+	if pid < 0:
+		return -1
+	var model: int = _model_index[model_name]
+	var lg: LaneGeometry = _traffic.lanes
+	var half := _half_by_model[model]
+	# Behind any vehicle already waiting there.
+	var s := _free_spot(pid, clampf(stops[start_stop].y, half + 0.5, lg.piece_length[pid]), half)
+	if s < 0.0:
+		return -1
+	var slot := _take_slot(model)
+	if slot < 0:
+		return -1
+	var v := _new_id()
+	_alive[v] = 1
+	_model[v] = model
+	_slot[v] = slot
+	_route[v] = route
+	_leg[v] = k
+	_piece[v] = pid
+	_pkey[v] = lg.piece_key[pid]
+	_on_conn[v] = 0
+	_lane[v] = lanes - 1
+	_wait[v] = 0
+	_line[v] = line_id
+	_stops[v] = stops
+	_next_stop[v] = start_stop
+	_dwell[v] = dwell
+	_half[v] = _half_by_model[model]
+	_color[v] = paint
+	_second[v] = second
+	_beacon[v] = 0
+	_seed[v] = _rng.randf()
+	_dwell_s[v] = s
+	_s0[v] = s
+	_t0[v] = _time
+	_v[v] = maxf(_traffic.lane_speed(entry >> 1, entry & 1), 0.5)
+	_accel[v] = 1.0
+	_stop[v] = FREE
+	_end_s[v] = 0.0
+	active += 1
+	line_active += 1
+	var fifo: Array = _fifo.get(pid, [])
+	var at := fifo.size()
+	for i in fifo.size():
+		if _pos(fifo[i]) < s:
+			at = i
+			break
+	fifo.insert(at, v)
+	_fifo[pid] = fifo
+	_plan_next(v)
+	_resolve(pid)
+	_schedule(v)
+	_write(v)
+	return v
+
+
+## Removes every vehicle of a transit line.
+func despawn_line(line_id: int) -> void:
+	for v in _alive.size():
+		if _alive[v] == 1 and _line[v] == line_id:
+			_despawn(v)
+
+
+## Vehicles currently serving a line.
+func line_vehicles(line_id: int) -> int:
+	var n := 0
+	for v in _alive.size():
+		if _alive[v] == 1 and _line[v] == line_id:
+			n += 1
+	return n
+
+
 func _despawn(v: int, resolve: bool = true) -> void:
 	if _alive[v] == 0:
 		return
@@ -831,6 +971,9 @@ func _despawn(v: int, resolve: bool = true) -> void:
 	_release_slot(_model[v], _slot[v])
 	_free_ids.append(v)
 	active -= 1
+	if _line[v] >= 0:
+		line_active -= 1
+		_line[v] = -1
 	if resolve and on_lane:
 		_resolve(pid)
 
@@ -857,6 +1000,11 @@ func _new_id() -> int:
 	_accel.append(0.0)
 	_end_s.append(0.0)
 	_wait.append(0)
+	_line.append(-1)
+	_stops.append(PackedVector2Array())
+	_next_stop.append(0)
+	_dwell.append(0.0)
+	_dwell_s.append(-1.0)
 	_half.append(2.3)
 	_ver.append(0)
 	_color.append(Color.WHITE)

@@ -105,6 +105,24 @@ func points(pid: int) -> PackedVector2Array:
 	return out
 
 
+## Distance along a piece to the point on it closest to p.
+func project(pid: int, p: Vector2) -> float:
+	var o := piece_offset[pid] * 2
+	var best := 0.0
+	var best_d := INF
+	var acc := 0.0
+	for k in piece_count[pid] - 1:
+		var a := Vector2(buffer[o + k * 2], buffer[o + k * 2 + 1])
+		var b := Vector2(buffer[o + k * 2 + 2], buffer[o + k * 2 + 3])
+		var q := Geometry2D.get_closest_point_to_segment(p, a, b)
+		var d := q.distance_squared_to(p)
+		if d < best_d:
+			best_d = d
+			best = acc + a.distance_to(q)
+		acc += a.distance_to(b)
+	return best * piece_length[pid] / maxf(acc, 0.001)
+
+
 ## The packed buffer as an RGF image for the vehicle shader.
 func image() -> Image:
 	return Image.create_from_data(TEX_WIDTH, rows, false, Image.FORMAT_RGF, buffer.to_byte_array())

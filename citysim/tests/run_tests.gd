@@ -35,6 +35,7 @@ func _initialize() -> void:
 	_test_traffic_rules()
 	_test_traffic_assignment()
 	_test_lane_geometry()
+	_test_transit_rules()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -55,7 +56,7 @@ func _input_config() -> Dictionary:
 
 
 func _test_data_files() -> void:
-	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy", "zones", "services", "vegetation", "catalog", "traffic"]:
+	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy", "zones", "services", "vegetation", "catalog", "traffic", "transit", "districts"]:
 		_check(not DataLoader.load_json("res://data/%s.json" % f).is_empty(), "data file %s loads" % f)
 	var db := DataLoader.load_files(PackedStringArray(["graphics"]))
 	for preset: String in DataLoader.lookup(db, "graphics/preset_order"):
@@ -571,7 +572,7 @@ func _test_traffic_assignment() -> void:
 	_check(job.done and is_equal_approx(job.volumes[east], 100.0) and is_equal_approx(job.volumes[west], 40.0),
 		"trips load the roads they use (%.0f / %.0f)" % [job.volumes[east], job.volumes[west]])
 	_check(absf(job.trip_time[0] - 800.0 / (40.0 / 3.6)) < 1.0, "trip time from the tree (%.1f s)" % job.trip_time[0])
-	var via: PackedInt32Array = job.rev_trees[s_last]
+	var via: PackedInt32Array = job.rev_trees[s_last * 2]
 	_check(TrafficRules.path_from(tg, via, job.trip_node[0]).size() == 1, "vehicle routes come from the kept trees")
 	var jam := TrafficAssignment.new()
 	jam.graph = tg
@@ -626,3 +627,73 @@ func _test_lane_geometry() -> void:
 	var before := lg.piece_total()
 	lg.rebuild(g, roads["types"], roads["mesh"])
 	_check(lg.piece_total() == before, "rebuilding reuses unchanged pieces")
+
+
+func _test_transit_rules() -> void:
+	var cfg := _traffic_cfg()
+	var g := _graph()
+	for r: Array in [[Vector2(0, 5000), Vector2(400, 5000)], [Vector2(400, 5000), Vector2(400, 5400)], [Vector2(0, 5000), Vector2(0, 5400)], [Vector2(0, 5400), Vector2(400, 5400)]]:
+		g.commit_road(g.plan_road(r[0], r[1], null), "street")
+	var tg := TrafficGraph.build(g, _roads()["types"], cfg)
+	var costs := TrafficRules.edge_costs(tg, TrafficRules.factors_for(tg, PackedFloat32Array(), cfg), cfg)
+	var bottom: int = tg.seg_index[g.find_segment_near(Vector2(200, 5000), 1.0)["segment"]]
+	var top: int = tg.seg_index[g.find_segment_near(Vector2(200, 5400), 1.0)["segment"]]
+	var stops := [[bottom, 0.5], [top, 0.5]]
+	var loop := TransitRules.loop_route(tg, stops, costs)
+	var closed: bool = loop["ok"]
+	if closed:
+		var route: PackedInt32Array = loop["route"]
+		for k in route.size():
+			if tg.edge_to(route[k]) != tg.edge_from(route[(k + 1) % route.size()]):
+				closed = false
+	_check(closed and absf(float(loop.get("length", 0.0)) - 1600.0) < 1.0, "a line loops through its stops and back (%.0f m)" % float(loop.get("length", 0.0)))
+	# A dead-end street cannot carry a line: vehicles never turn round on the road.
+	var g2 := _graph()
+	g2.commit_road(g2.plan_road(Vector2(1000, 5000), Vector2(1400, 5000), null), "street")
+	var tg2 := TrafficGraph.build(g2, _roads()["types"], cfg)
+	var costs2 := TrafficRules.edge_costs(tg2, TrafficRules.factors_for(tg2, PackedFloat32Array(), cfg), cfg)
+	var dead_end := TransitRules.loop_route(tg2, [[0, 0.25], [0, 0.75]], costs2)
+	var dead_ok: bool = dead_end["ok"]
+	_check(not dead_ok, "no line along a dead-end street (no U-turns)")
+	var dist := TransitRules.stop_distances(tg, loop["route"], loop["stop_edge"], stops)
+	var ride := TransitRules.along(dist[0], dist[1], float(loop["length"]))
+	_check(absf(ride - 800.0) < 1.0, "riding half way round the loop (%.0f m)" % ride)
+	var mc: Dictionary = DataLoader.load_json("res://data/transit.json")["mode_choice"]
+	var fast := TransitRules.transit_share(20.0, 10.0, mc)
+	var slow := TransitRules.transit_share(20.0, 40.0, mc)
+	_check(fast > slow and slow > 0.0 and TransitRules.transit_share(20.0, -1.0, mc) == 0.0 and fast <= float(mc["max_share"]),
+		"faster transit wins more riders (%.2f vs %.2f)" % [fast, slow])
+	var square := PackedVector2Array([Vector2(0, 0), Vector2(10, 0), Vector2(10, 10), Vector2(0, 10)])
+	var bow := PackedVector2Array([Vector2(0, 0), Vector2(10, 10), Vector2(10, 0), Vector2(0, 10)])
+	_check(TransitRules.polygon_simple(square) and not TransitRules.polygon_simple(bow) and is_equal_approx(TransitRules.polygon_area(square), 100.0),
+		"district outlines must not cross themselves")
+	# Trucks avoid a road with a heavy-traffic ban when there is another way.
+	var job := TrafficAssignment.new()
+	job.graph = tg
+	job.cfg = cfg
+	var left: int = tg.seg_index[g.find_segment_near(Vector2(0, 5200), 1.0)["segment"]]
+	var right: int = tg.seg_index[g.find_segment_near(Vector2(400, 5200), 1.0)["segment"]]
+	job.trip_origin = PackedInt32Array([bottom, bottom])
+	job.trip_dest = PackedInt32Array([top, top])
+	job.trip_count = PackedFloat32Array([10.0, 10.0])
+	job.trip_forward = PackedByteArray([0, 0])
+	job.trip_heavy = PackedByteArray([0, 1])
+	var penalty := PackedFloat32Array()
+	penalty.resize(tg.edge_count())
+	penalty.fill(1.0)
+	var light_route := TrafficRules.path_from(tg, TrafficRules.dijkstra(tg, PackedInt32Array([tg.seg_a[top], tg.seg_b[top]]), PackedFloat32Array([0.0, 0.0]), costs, false)["via"], tg.seg_b[bottom])
+	var used_right := false
+	for e in light_route:
+		if e >> 1 == right:
+			used_right = true
+	var banned := right if used_right else left
+	penalty[banned * 2] = 6.0
+	penalty[banned * 2 + 1] = 6.0
+	job.heavy_penalty = penalty
+	job.run()
+	var heavy_path := TrafficRules.path_from(tg, job.rev_trees[top * 2 + 1], job.trip_node[1])
+	var truck_on_banned := false
+	for e in heavy_path:
+		if e >> 1 == banned:
+			truck_on_banned = true
+	_check(not truck_on_banned and job.rev_trees.has(top * 2) and job.rev_trees.has(top * 2 + 1), "trucks route around a heavy-traffic ban")

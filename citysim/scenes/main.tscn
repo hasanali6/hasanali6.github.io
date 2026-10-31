@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=3 uid="uid://b8c1tymain001"]
+[gd_scene load_steps=24 format=3 uid="uid://b8c1tymain001"]
 
 [ext_resource type="Script" path="res://scripts/world/day_night_cycle.gd" id="1_daynight"]
 [ext_resource type="Script" path="res://scripts/systems/terrain_system.gd" id="2_terrain"]
@@ -20,6 +20,8 @@
 [ext_resource type="Script" path="res://scripts/world/info_overlay.gd" id="18_overlay"]
 [ext_resource type="Script" path="res://scripts/systems/traffic_system.gd" id="19_traffic"]
 [ext_resource type="Script" path="res://scripts/world/vehicle_system.gd" id="20_vehicles"]
+[ext_resource type="Script" path="res://scripts/systems/transit_system.gd" id="21_transit"]
+[ext_resource type="Script" path="res://scripts/systems/district_system.gd" id="22_districts"]
 
 [node name="Main" type="Node3D"]
 
@@ -47,6 +49,7 @@ road_network_path = NodePath("../RoadNetwork")
 [node name="BuildingSystem" type="Node3D" parent="."]
 script = ExtResource("9_buildings")
 zone_system_path = NodePath("../ZoneSystem")
+district_system_path = NodePath("../DistrictSystem")
 
 [node name="ZoneTool" type="Node3D" parent="."]
 script = ExtResource("10_zonetool")
@@ -62,6 +65,7 @@ script = ExtResource("12_citizens")
 building_system_path = NodePath("../BuildingSystem")
 company_system_path = NodePath("../CompanySystem")
 traffic_system_path = NodePath("../TrafficSystem")
+district_system_path = NodePath("../DistrictSystem")
 
 [node name="DemandSystem" type="Node" parent="."]
 script = ExtResource("13_demand")
@@ -73,6 +77,7 @@ script = ExtResource("17_services")
 road_network_path = NodePath("../RoadNetwork")
 zone_system_path = NodePath("../ZoneSystem")
 building_system_path = NodePath("../BuildingSystem")
+district_system_path = NodePath("../DistrictSystem")
 
 [node name="TrafficSystem" type="Node" parent="."]
 script = ExtResource("19_traffic")
@@ -82,10 +87,23 @@ building_system_path = NodePath("../BuildingSystem")
 citizen_system_path = NodePath("../CitizenSystem")
 company_system_path = NodePath("../CompanySystem")
 service_system_path = NodePath("../ServiceSystem")
+transit_system_path = NodePath("../TransitSystem")
+district_system_path = NodePath("../DistrictSystem")
 
 [node name="VehicleSystem" type="Node3D" parent="."]
 script = ExtResource("20_vehicles")
 traffic_system_path = NodePath("../TrafficSystem")
+
+[node name="TransitSystem" type="Node3D" parent="."]
+script = ExtResource("21_transit")
+traffic_system_path = NodePath("../TrafficSystem")
+vehicle_system_path = NodePath("../VehicleSystem")
+road_network_path = NodePath("../RoadNetwork")
+
+[node name="DistrictSystem" type="Node3D" parent="."]
+script = ExtResource("22_districts")
+building_system_path = NodePath("../BuildingSystem")
+road_network_path = NodePath("../RoadNetwork")
 
 [node name="InfoOverlay" type="Node3D" parent="."]
 script = ExtResource("18_overlay")
@@ -93,6 +111,7 @@ zone_system_path = NodePath("../ZoneSystem")
 building_system_path = NodePath("../BuildingSystem")
 service_system_path = NodePath("../ServiceSystem")
 traffic_system_path = NodePath("../TrafficSystem")
+transit_system_path = NodePath("../TransitSystem")
 
 [node name="BuildTool" type="Node3D" parent="."]
 script = ExtResource("14_buildtool")
@@ -108,6 +127,8 @@ company_system_path = NodePath("../CompanySystem")
 citizen_system_path = NodePath("../CitizenSystem")
 demand_system_path = NodePath("../DemandSystem")
 service_system_path = NodePath("../ServiceSystem")
+transit_system_path = NodePath("../TransitSystem")
+district_system_path = NodePath("../DistrictSystem")
 
 [node name="Vegetation" type="Node3D" parent="."]
 script = ExtResource("16_vegetation")

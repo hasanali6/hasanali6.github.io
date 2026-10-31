@@ -69,6 +69,20 @@ signal lanes_rebuilt()
 signal traffic_updated()
 ## A road was long-pressed: {type_key, lanes, daily, ratio, speed_kmh}.
 signal road_inspected(info: Dictionary)
+## Mode choice of the latest demand round: {parking, riders, raw} (per day).
+signal mobility_reported(report: Dictionary)
+
+# --- Transit and districts ---
+signal transit_changed()
+## Line being drawn: {type, stops, cost, error}.
+signal transit_draft_changed(info: Dictionary)
+## Monthly transit books: {tickets, upkeep}.
+signal transit_reported(report: Dictionary)
+signal districts_changed()
+## District being drawn: {points, error}.
+signal district_draft_changed(info: Dictionary)
+## Monthly district books: {recycling}.
+signal district_reported(report: Dictionary)
 
 # --- World queries resolved by the camera ---
 signal ground_long_pressed(world_pos: Vector3)

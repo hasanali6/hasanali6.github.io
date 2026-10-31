@@ -21,6 +21,8 @@ var trip_origin := PackedInt32Array()   # segment index where the trip starts
 var trip_dest := PackedInt32Array()     # segment index where it ends
 var trip_count := PackedFloat32Array()  # trips per day
 var trip_forward := PackedByteArray()   # 1: routed by a forward tree from the origin, 0: reverse tree into the destination
+var trip_heavy := PackedByteArray()     # 1 = truck: avoids roads with a heavy-traffic ban
+var heavy_penalty := PackedFloat32Array()  # cost multiplier per directed edge for trucks (empty = none)
 var previous := PackedFloat32Array()    # smoothed daily volumes per directed edge from the last round
 # Optional bookkeeping done on the worker thread too (see summarize()).
 var trip_seg_o := PackedInt32Array()    # segment ids, for the commute table
@@ -34,10 +36,11 @@ var factors := PackedFloat32Array()     # speed factor per directed edge
 var trip_time := PackedFloat32Array()   # seconds, TrafficRules.FAR when unreachable
 var trip_node := PackedInt32Array()     # junction where the route leaves the non-anchor segment's tree side
 var trip_exit := PackedInt32Array()     # directed edge used on the non-anchor segment
-var fwd_trees: Dictionary = {}          # anchor segment index -> via
-var rev_trees: Dictionary = {}          # anchor segment index -> via
+var fwd_trees: Dictionary = {}          # anchor segment index * 2 + heavy -> via
+var rev_trees: Dictionary = {}          # anchor segment index * 2 + heavy -> via
 var groups: Dictionary = {}             # spawn group -> [trip ids, cumulative counts, total]
 var commute: Dictionary = {}            # Vector2i(home seg id, work seg id) -> minutes
+var od_minutes: Dictionary = {}         # Vector2i(seg id, seg id) -> minutes by car, person trips (groups 0..2)
 var avg_commute: float = 0.0
 var total_trips: float = 0.0
 var jammed: int = 0
@@ -50,6 +53,11 @@ func run() -> void:
 	var n_trips := trip_origin.size()
 	var ne := graph.edge_count()
 	var costs := TrafficRules.edge_costs(graph, TrafficRules.factors_for(graph, previous, cfg), cfg)
+	var heavy_costs := costs
+	if heavy_penalty.size() == ne:
+		heavy_costs = costs.duplicate()
+		for e in ne:
+			heavy_costs[e] *= heavy_penalty[e]
 	var fresh := PackedFloat32Array()
 	fresh.resize(ne)
 	trip_time.resize(n_trips)
@@ -59,28 +67,32 @@ func run() -> void:
 	trip_exit.resize(n_trips)
 	trip_exit.fill(-1)
 	var groups := {}
+	var has_heavy := trip_heavy.size() == n_trips
 	for i in n_trips:
 		var anchor := trip_origin[i] if trip_forward[i] == 1 else trip_dest[i]
-		var key := anchor * 2 + trip_forward[i]
+		var heavy := trip_heavy[i] if has_heavy else 0
+		var key := anchor * 4 + trip_forward[i] * 2 + heavy
 		if not groups.has(key):
 			groups[key] = []
 		(groups[key] as Array).append(i)
 	var node_load := PackedFloat32Array()
 	node_load.resize(graph.node_count())
 	for key: int in groups:
-		var anchor := key >> 1
-		var forward := (key & 1) == 1
-		var seeds := anchor_seeds(anchor, forward, costs)
+		var anchor := key >> 2
+		var forward := (key & 2) == 2
+		var heavy := key & 1
+		var c := heavy_costs if heavy == 1 else costs
+		var seeds := anchor_seeds(anchor, forward, c)
 		if (seeds[0] as PackedInt32Array).is_empty():
 			continue
-		var res := TrafficRules.dijkstra(graph, seeds[0], seeds[1], costs, forward)
+		var res := TrafficRules.dijkstra(graph, seeds[0], seeds[1], c, forward)
 		var dist: PackedFloat32Array = res["dist"]
 		node_load.fill(0.0)
 		for i in groups[key]:
 			var other := trip_dest[i] if forward else trip_origin[i]
 			if other == anchor:
 				continue
-			var pick := best_end(other, dist, forward, costs)
+			var pick := best_end(other, dist, forward, c)
 			if pick[0] < 0:
 				continue
 			trip_time[i] = pick[1]
@@ -90,9 +102,9 @@ func run() -> void:
 			fresh[pick[2]] += trip_count[i]
 		TrafficRules.accumulate(graph, res["via"], res["order"], node_load, fresh, forward)
 		if forward:
-			fwd_trees[anchor] = res["via"]
+			fwd_trees[anchor * 2 + heavy] = res["via"]
 		else:
-			rev_trees[anchor] = res["via"]
+			rev_trees[anchor * 2 + heavy] = res["via"]
 	var smoothing := float(cfg["assignment"]["smoothing"]) if previous.size() == ne else 1.0
 	volumes.resize(ne)
 	for e in ne:
@@ -122,6 +134,8 @@ func summarize() -> void:
 			commute_n += trip_count[i]
 		if trip_group.size() == trip_count.size():
 			var g := trip_group[i]
+			if g <= 2:
+				od_minutes[Vector2i(trip_seg_o[i], trip_seg_d[i])] = trip_time[i] / 60.0
 			if not lists.has(g):
 				lists[g] = [[], [], 0.0]
 			var entry: Array = lists[g]

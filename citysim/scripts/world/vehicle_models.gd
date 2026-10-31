@@ -17,7 +17,7 @@ const SECOND := 6
 const SHADOW := 7
 const BEACON := 8
 
-const NAMES: Array[String] = ["sedan", "hatch", "van", "truck", "police", "ambulance", "fire"]
+const NAMES: Array[String] = ["sedan", "hatch", "van", "truck", "police", "ambulance", "fire", "bus", "tram"]
 
 
 static func build(name: String) -> ArrayMesh:
@@ -41,6 +41,10 @@ static func build(name: String) -> ArrayMesh:
 				_box(st, Vector3(0, 2.07, 1.35), Vector3(1.3, 0.14, 0.3), BEACON)
 		"truck", "fire":
 			_truck(st, name == "fire")
+		"bus":
+			_bus(st)
+		"tram":
+			_tram(st)
 	st.generate_normals()
 	return st.commit()
 
@@ -54,6 +58,41 @@ static func traffic_light() -> ArrayMesh:
 	_box(st, Vector3(0, 4.5, 0.05), Vector3(0.42, 1.15, 0.32), 1)
 	for k in 3:
 		_box(st, Vector3(0, 4.85 - k * 0.35, 0.23), Vector3(0.26, 0.26, 0.05), 2 + k)
+	st.generate_normals()
+	return st.commit()
+
+
+## Bus shelter facing +z (the road): roof, glass back wall, bench and a
+## sign post whose disc takes the line colour. Ids: 0 metal, 1 glass,
+## 2 line colour, 3 bench, 4 concrete.
+static func bus_stop() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(-1)
+	_box(st, Vector3(0, 0.06, 0), Vector3(4.2, 0.12, 2.0), 4)
+	_box(st, Vector3(0, 2.5, -0.2), Vector3(3.6, 0.1, 1.6), 0)
+	_box(st, Vector3(0, 1.3, -0.95), Vector3(3.4, 2.2, 0.05), 1)
+	for sx in [-1.7, 1.7]:
+		_box(st, Vector3(sx, 1.3, -0.9), Vector3(0.08, 2.4, 0.08), 0)
+	_box(st, Vector3(0, 0.5, -0.6), Vector3(2.4, 0.08, 0.45), 3)
+	_box(st, Vector3(2.4, 1.4, 0.6), Vector3(0.08, 2.8, 0.08), 0)
+	_box(st, Vector3(2.4, 2.75, 0.6), Vector3(0.05, 0.6, 0.6), 2)
+	st.generate_normals()
+	return st.commit()
+
+
+## Tram platform along the curb with a small shelter.
+static func tram_stop() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(-1)
+	_box(st, Vector3(0, 0.15, 0), Vector3(18.0, 0.3, 2.6), 4)
+	_box(st, Vector3(0, 0.31, 1.15), Vector3(18.0, 0.02, 0.25), 2)
+	_box(st, Vector3(0, 2.7, -0.4), Vector3(6.0, 0.1, 1.6), 0)
+	_box(st, Vector3(0, 1.5, -1.15), Vector3(5.8, 2.2, 0.05), 1)
+	for sx in [-2.9, 2.9]:
+		_box(st, Vector3(sx, 1.5, -1.1), Vector3(0.1, 2.4, 0.1), 0)
+	_box(st, Vector3(0, 0.75, -0.8), Vector3(3.6, 0.08, 0.45), 3)
 	st.generate_normals()
 	return st.commit()
 
@@ -108,6 +147,40 @@ static func _truck(st: SurfaceTool, fire: bool) -> void:
 		_box(st, Vector3(0, 3.18, -1.2), Vector3(0.7, 0.16, 5.6), TRIM)
 		_box(st, Vector3(0, 2.62, 2.9), Vector3(1.6, 0.14, 0.32), BEACON)
 	_shadow(st, 2.8, 8.4)
+
+
+## City bus: white body with the line colour along the bottom, a band of
+## windows, roof units.
+static func _bus(st: SurfaceTool) -> void:
+	_box(st, Vector3(0, 0.75, 0), Vector3(2.5, 0.8, 12.0), SECOND)
+	_box(st, Vector3(0, 2.0, 0), Vector3(2.5, 1.7, 12.0), PAINT)
+	for sx in [-1.0, 1.0]:
+		_box(st, Vector3(sx * 1.255, 2.0, -0.4), Vector3(0.02, 0.85, 10.4), GLASS)
+		for sz in [3.9, -3.6]:
+			_box(st, Vector3(sx * 1.08, 0.5, sz), Vector3(0.36, 1.0, 1.0), TYRE)
+		_box(st, Vector3(sx * 0.9, 0.85, 6.005), Vector3(0.36, 0.14, 0.02), HEADLIGHT)
+		_box(st, Vector3(sx * 1.0, 1.0, -6.005), Vector3(0.24, 0.4, 0.02), TAILLIGHT)
+	_box(st, Vector3(0, 2.05, 6.01), Vector3(2.3, 1.1, 0.03), GLASS)
+	_box(st, Vector3(0, 3.0, -2.5), Vector3(1.6, 0.35, 3.0), TRIM)
+	_shadow(st, 2.9, 12.6)
+
+
+## Tram: line-coloured body over a light skirt, long window band, bogies
+## and a pantograph on the roof.
+static func _tram(st: SurfaceTool) -> void:
+	_box(st, Vector3(0, 0.75, 0), Vector3(2.5, 0.7, 18.0), SECOND)
+	_box(st, Vector3(0, 2.05, 0), Vector3(2.5, 1.9, 18.0), PAINT)
+	for sx in [-1.0, 1.0]:
+		_box(st, Vector3(sx * 1.255, 2.15, 0.0), Vector3(0.02, 0.95, 16.4), GLASS)
+		_box(st, Vector3(sx * 0.85, 1.0, 9.005), Vector3(0.32, 0.14, 0.02), HEADLIGHT)
+		_box(st, Vector3(sx * 0.95, 1.1, -9.005), Vector3(0.22, 0.3, 0.02), TAILLIGHT)
+	for sz in [-6.5, 0.0, 6.5]:
+		_box(st, Vector3(0, 0.38, sz), Vector3(2.2, 0.62, 2.4), TYRE)
+	_box(st, Vector3(0, 2.2, 9.01), Vector3(2.3, 1.2, 0.03), GLASS)
+	_box(st, Vector3(0, 2.2, -9.01), Vector3(2.3, 1.2, 0.03), GLASS)
+	_box(st, Vector3(0, 3.1, 1.0), Vector3(1.8, 0.2, 3.0), TRIM)
+	_box(st, Vector3(0, 3.55, 1.0), Vector3(0.1, 0.7, 1.6), TRIM)
+	_shadow(st, 2.9, 18.6)
 
 
 static func _shadow(st: SurfaceTool, width: float, length: float) -> void:

@@ -8,7 +8,7 @@ extends RefCounted
 ##   Kredi     : the single loan: amount, limit, interest, instalment, borrow/repay.
 
 const ROW_HEIGHT := 40.0
-const INCOME_KEYS := ["residential", "commercial", "office", "industrial", "subsidy", "power_fees", "water_fees"]
+const INCOME_KEYS := ["residential", "commercial", "office", "industrial", "subsidy", "power_fees", "water_fees", "tickets", "parking"]
 
 var card: PanelContainer
 
@@ -137,7 +137,7 @@ func _build_budget() -> VBoxContainer:
 func _expense_keys() -> Array:
 	var keys := ["roads"]
 	keys.append_array(_categories.keys())
-	keys.append("loan")
+	keys.append_array(["transit", "recycling", "loan"])
 	return keys
 
 

@@ -10,6 +10,8 @@ extends Node
 ##  * Services: a budget slider per service category (50..150 %) scales its
 ##    upkeep and its efficiency; electricity and water fees (50..150 %) bring
 ##    income but lower consumption and happiness when high.
+##  * Transport and districts: bus and tram tickets and paid parking come in;
+##    transit vehicle upkeep and recycling programmes go out.
 ## Settlement runs deferred on month change, after the citizen and company
 ## systems have filed their monthly reports.
 
@@ -34,6 +36,9 @@ var _refunds: float = 0.0
 var _citizens: Dictionary = {}
 var _companies: Dictionary = {}
 var _services: Dictionary = {}
+var _transit: Dictionary = {}
+var _districts: Dictionary = {}
+var _parking_per_day: float = 0.0
 var _svc_budget_cfg: Dictionary
 var _fee_cfg: Dictionary
 
@@ -49,6 +54,9 @@ func _ready() -> void:
 	EventBus.citizens_reported.connect(func(r: Dictionary) -> void: _citizens = r)
 	EventBus.companies_reported.connect(func(r: Dictionary) -> void: _companies = r)
 	EventBus.services_reported.connect(func(r: Dictionary) -> void: _services = r)
+	EventBus.transit_reported.connect(func(r: Dictionary) -> void: _transit = r)
+	EventBus.district_reported.connect(func(r: Dictionary) -> void: _districts = r)
+	EventBus.mobility_reported.connect(func(r: Dictionary) -> void: _parking_per_day = float(r.get("parking", 0.0)))
 	EventBus.road_upkeep_changed.connect(func(v: float) -> void: _road_upkeep = v)
 	EventBus.city_stats_changed.connect(func(s: Dictionary) -> void: _population = int(s.get("population", 0)))
 
@@ -163,6 +171,9 @@ func _settle() -> void:
 		"subsidy": EconomyRules.subsidy(_population, _budget_cfg),
 		"power_fees": float((_services.get("fees", {}) as Dictionary).get("power", 0.0)),
 		"water_fees": float((_services.get("fees", {}) as Dictionary).get("water", 0.0)),
+		"tickets": float(_transit.get("tickets", 0.0)),
+		# One game day is one month: the day's parking fees are the month's.
+		"parking": _parking_per_day,
 	}
 	var instalment := 0.0
 	if loan > 0.0 and loan_months_left > 0:
@@ -178,6 +189,8 @@ func _settle() -> void:
 	var upkeep: Dictionary = _services.get("upkeep", {})
 	for cat: String in GameData.section("services/categories"):
 		expenses[cat] = float(upkeep.get(cat, 0.0))
+	expenses["transit"] = float(_transit.get("upkeep", 0.0))
+	expenses["recycling"] = float(_districts.get("recycling", 0.0))
 	expenses["loan"] = instalment
 	var total_in := 0.0
 	for v: float in income.values():
@@ -194,6 +207,8 @@ func _settle() -> void:
 	_construction = 0.0
 	_refunds = 0.0
 	_services = {}
+	_transit = {}
+	_districts = {}
 	EventBus.money_changed.emit(balance)
 	EventBus.budget_settled.emit(last_ledger)
 
@@ -217,6 +232,9 @@ func reset_state() -> void:
 	_citizens = {}
 	_companies = {}
 	_services = {}
+	_transit = {}
+	_districts = {}
+	_parking_per_day = 0.0
 	service_budgets = {}
 	utility_fees = {}
 

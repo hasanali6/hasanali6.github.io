@@ -21,6 +21,7 @@ extends Node
 @export var building_system_path: NodePath
 @export var company_system_path: NodePath
 @export var traffic_system_path: NodePath
+@export var district_system_path: NodePath
 
 var data := HouseholdData.new()
 var last_report: Dictionary = {}
@@ -46,6 +47,7 @@ var _no_utility_score: float
 var _traffic: Node
 var _commute_cfg: Dictionary
 var _noise_happiness: float
+var _districts: Node
 
 # Live counters (kept exact on every change).
 var population: int = 0
@@ -73,6 +75,8 @@ func _ready() -> void:
 	_noise_happiness = GameData.num("traffic/noise/happiness")
 	if not traffic_system_path.is_empty():
 		_traffic = get_node(traffic_system_path)
+	if not district_system_path.is_empty():
+		_districts = get_node(district_system_path)
 	_reset_month()
 	EventBus.sim_tick.connect(_on_tick)
 	EventBus.month_changed.connect(_on_month)
@@ -395,6 +399,8 @@ func _update(i: int) -> void:
 		_near_park(home["pos"]), _happy, _default_tax)
 	var record: Dictionary = _buildings.buildings.get(bid, {})
 	h += float(record.get("service_happiness", 0.0))
+	if _districts != null and not record.is_empty():
+		h += float(_districts.happiness_of(record))
 	if _traffic != null:
 		var commute := _commute_of(i, record)
 		if commute >= 0.0:
@@ -555,6 +561,10 @@ func save_state() -> Dictionary:
 
 
 func load_state(state: Dictionary) -> void:
+	# Homes start empty: residents lists of the city before refer to the old
+	# household table.
+	_homes = {}
+	_vacant = {}
 	_sync_homes()
 	data = HouseholdData.new()
 	population = 0

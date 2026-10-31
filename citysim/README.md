@@ -1,4 +1,4 @@
-# Şehir Simülasyonu — Faz 1–6 (Temel, Yollar, İmar ve Binalar, Ekonomi, Hizmetler, Trafik)
+# Şehir Simülasyonu — Faz 1–7 (Temel, Yollar, İmar ve Binalar, Ekonomi, Hizmetler, Trafik, Toplu Taşıma ve Bölgeler)
 
 Godot 4.7.2 (Mobile renderer, Vulkan) ile Android için şehir kurma simülasyonu.
 Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
@@ -18,6 +18,43 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 | Arayüz | `scripts/ui/hud.gd`, `scripts/ui/ui_style.gd` | Mobil şehir oyunu düzeni: sol üstte nüfus/mutluluk, ortada saat ve hız, sağ üstte para ve ayarlar, sağ altta büyük **İnşa Et** düğmesi ve kategori menüsü. İkonlar Lucide (ISC), font Nunito (OFL); lisanslar `assets/ui/` içinde. |
 | Referans sahne (kapalı) | `scripts/world/reference_scene.gd` + `assets/materials/*.gdshader` | Işık testi için bina blokları ve ağaçlar. Varsayılan **kapalı** — harita boş başlar. `data/reference_scene.json` → `"enabled": true` ile açılır. |
 | Testler | `tests/run_tests.gd` | Görselsiz (headless) birim testleri: saat, hız, ay geçişi, jestler, ızgara. |
+
+## Faz 7: Toplu taşıma, bölgeler ve politikalar
+
+| Parça | Dosya | Ne yapar |
+|---|---|---|
+| Hat hesapları | `scripts/data/transit_rules.gd` | Durakların sırasıyla dolaşan kapalı güzergâh (yol ortasında U dönüşü yok, hat döngü kurmalı), duraklar arası mesafe, araba–toplu taşıma seçimi, bölge çokgeni kontrolleri. Görselsiz test edilir. |
+| Toplu taşıma | `scripts/systems/transit_system.gd`, `data/transit.json` | Otobüs ve tramvay hatları: yola dokununca durak, "Hattı aç" ile hat açılır. Tramvay sadece cadde ve bulvarda. Her hattın rengi, araç sayısı (−/+), yolcu ve doluluk bilgisi var; bilet fiyatı bütün hatlarda ortak. Durak kulübesi (otobüs), peron (tramvay), tramvay rayları; çizerken ve Katmanlar → Toplu taşıma'da renkli hat şeritleri. |
+| Hat araçları | `scripts/world/vehicle_system.gd`, `vehicle_models.gd` | Otobüs (12 m) ve tramvay (18 m) hat boyunca sağ şeritte döner, her durakta 6–8 sn bekler, kaybolmaz. Kaybolan araç (yol düzenleme, kalite değişimi) kendiliğinden geri gelir. |
+| Araç mı otobüs mü | `scripts/systems/traffic_system.gd` | İki ucu da bir durağa yürüme mesafesinde (450 m) olan yolculuklar arabayı (sürüş + park yeri arama + otopark ücreti) toplu taşımayla (yürüme + bekleme + yolculuk + bilet) karşılaştırır; bir kısmı arabayı bırakır. Hat doluysa fazlası tekrar arabaya döner. İşe gidiş süresi otobüse binenlerin süresiyle karışık hesaplanır. |
+| Bölgeler | `scripts/systems/district_system.gd`, `data/districts.json` | Haritaya köşe köşe dokunarak bölge çiz, ilk köşeye dokununca kapanır (son köşeye dokunmak geri alır). Kendini kesen sınır kabul edilmez. Bölge adı haritada yazar, panelden değiştirilir. |
+| Politikalar | `district_system.gd` + trafik, bina, hizmet, vatandaş sistemleri | **Ağır araç yasağı:** kamyonlar bölgenin içinden geçmemeye çalışır, gürültü %40 azalır (+2 mutluluk). **Yüksek bina yasağı:** yeni ve büyüyen binalar en fazla 4 kat (+1). **Geri dönüşüm:** çöp %35 azalır, kişi başı aylık 0,6 maliyet (+1). **Ücretli otopark:** bölgeye arabayla gelen 1,5 öder, şehre gelir; daha çok kişi otobüse biner (−1). |
+| Paneller | `scripts/ui/transit_panel.gd`, `scripts/ui/district_panel.gd` | İnşa Et → **Ulaşım** ve **Bölgeler** artık açık. |
+| Bütçe | `scripts/systems/economy_system.gd` | Gelir: bilet, otopark. Gider: toplu taşıma araç bakımı, geri dönüşüm. Ekonomi → Bütçe'de satır satır. |
+
+**Hızlı sayılar (`data/transit.json`):** otobüs hattı 2.000 + durak başına 500, araç başı aylık 180, günde araç başı 450 yolcu taşır. Tramvay hattı 8.000 + durak başına 1.500, araç başı aylık 420, günde araç başı 1.100 yolcu. Varsayılan bilet 2 (0–6 arası, 0,5 adım).
+
+**Bu fazda düzeltilen eski hatalar:**
+- **Yol yapınca bütün binalar siliniyordu.** Binalar varken yeni yol çizilince (Faz 3'ten beri) şehirdeki her bina kayboluyordu: hücreleri toplayan kod listeyi geçici bir kopyaya ekliyordu. Düzeltildi; artık sadece yolun gerçekten kestiği binalar yıkılır.
+- Oyun açıkken kayıt yeniden yüklenince eski hane numaraları evlerde kalıyordu (hata mesajı ve "0 kişi"); yükleme artık evleri boş başlatıyor.
+
+**Ölçümler (geliştirme bilgisayarı):** bir yolculuk için toplu taşıma süresi sorgusu ~4 µs (önbellekli). Test şehrinde (4 hat, 2 bölge) 900 kare gerçek oyun döngüsü: 14 trafik turu, bütün hat araçları yolda, kayıp araç 0.
+
+**Faz 7 kabul kriterleri:**
+
+| # | Kriter | Nasıl test edilir |
+|---|---|---|
+| 1 | Otobüs hattı | İnşa Et → Ulaşım → Otobüs. Bir yapı adasının çevresindeki yollara 3–4 durak koy, "Hattı aç". Hat rengiyle şerit çıkar, duraklarda kulübe belirir, otobüsler durakta durup devam eder. |
+| 2 | Geçersiz hat | Çıkmaz bir yolun iki ucuna durak koy → "dönen bir güzergâh yok" uyarısı, hat açılmaz. Duraklar çok yakınsa / yol dışındaysa uyarı. |
+| 3 | Tramvay | Cadde veya bulvarlardan bir döngü kur, tramvay seç, durak koy. Sokağa durak koyunca "Tramvay sadece cadde ve bulvarlarda çalışır". Rayda tramvay, durakta peron. |
+| 4 | Yolcu ve kalabalık | Panelde hat seç: yolcu/gün, doluluk %, uzunluk, sefer aralığı. Araç ekle/çıkar → kapasite ve sefer aralığı değişir. Bilet fiyatını artır → yolcu azalır. |
+| 5 | Mod seçimi | Katmanlar → Toplu taşıma: durağa yakın sokaklar yeşil; açıklamada "yolculukların %N'i toplu taşımayla". Hat açınca birkaç saniyede yollardaki araba trafiği hafifler. |
+| 6 | Bölge çizme | İnşa Et → Bölgeler. Haritaya köşe köşe dokun, ilk köşeye dokun → bölge oluşur, adı haritada çıkar. Panelden adını değiştir. Kendini kesen sınır → uyarı. |
+| 7 | Politikalar | Ağır araç yasağı → kamyonlar bölgeden geçmez (başka yol varsa). Yüksek bina yasağı → yeni binalar en fazla 4 kat. Geri dönüşüm → Bütçe'de geri dönüşüm gideri. Ücretli otopark (işyeri olan bölgede) → Bütçe'de otopark geliri. |
+| 8 | Bütçe | Ekonomi → Bütçe: bilet gelirleri, otopark ücretleri, toplu taşıma ve geri dönüşüm giderleri. |
+| 9 | Kayıt | Uygulamayı kapat-aç: hatlar, araç sayıları, bilet fiyatı, bölgeler, adlar ve politikalar geri gelir. |
+| 10 | Yol düzenleme | Hattın geçtiği yolu yık → hat "çalışmıyor" olur, araçları kalkar; binalar sadece yıkılan yolun kenarında gider. |
+| 11 | Testler | `godot --headless --path citysim -s res://tests/run_tests.gd` → `151 checks, 0 failed`. |
 
 ## Faz 6: Trafik
 
@@ -218,7 +255,8 @@ Aynı sayfada `SehirSim-GL.apk` da var: aynı oyunun OpenGL (Compatibility) sür
 - Mobile renderer'da FSR yok (yalnızca Forward+), bu yüzden düşük ayarlarda bilinear ölçekleme kullanılıyor.
 
 ## Bilinen eksikler / sonraki fazlara kalanlar
-- **Trafik (Faz 6):** kaza ve yağmurda rota değişimi yok (hava Faz 8). Kavşakta çarpışma kontrolü yok: aynı fazda karşıdan sola dönenle düz giden üst üste geçebilir; ışıksız sokak kavşaklarında öncelik kuralı yok, araçlar durmadan geçer. Şerit değiştirme kavşakta yapılır, yol ortasında değil. Yayalar, bisikletler ve park etmiş araçlar yok; araçlar varınca bina önünde durup kaybolur. Otoyol / dış bağlantı yok, ithalat-ihracat kamyonları şehir dışından gelmez. İş seçimi hâlâ kuş uçuşu mesafeye bakar. Yol düzenlenince değişen yollardaki araçlar kaybolur ve yeni atama bitene kadar (büyük şehirde telefonda 5–10 sn) yeni araç çıkmaz. Toplu taşıma Faz 7'de.
+- **Toplu taşıma ve bölgeler (Faz 7):** metro, tren, liman ve şehir dışı bağlantıları yok (dış bağlantılar ve otoyol sonraki fazlarda). Aktarma yok: bir yolculuk tek hatla yapılır. Yolcular sayısal; durakta bekleyen ya da araca binen yaya görünmüyor. Otobüs ve tramvay diğer trafikle aynı sağ şeritte gider (ayrı otobüs/tramvay şeridi yok) ve U dönüşü yapamaz, bu yüzden her hat bir döngü olmalı. Var olan hattın durakları düzenlenemez; sil ve yeniden çiz. Tramvay için ayrı ray yolu yok, cadde/bulvarda asfalta gömülü ray çizilir. Hat ve politika ücretleri ilk ayar; denge oynanarak ayarlanacak (küçük kasabada hatlar zarar eder, bu bilinçli). Bölgeler sadece politika içindir, bölge başına vergi yok. Yüksek bina yasağı var olan yüksek binaları yıkmaz, sadece büyümeyi durdurur.
+- **Trafik (Faz 6):** kaza ve yağmurda rota değişimi yok (hava Faz 8). Kavşakta çarpışma kontrolü yok: aynı fazda karşıdan sola dönenle düz giden üst üste geçebilir; ışıksız sokak kavşaklarında öncelik kuralı yok, araçlar durmadan geçer. Şerit değiştirme kavşakta yapılır, yol ortasında değil. Yayalar, bisikletler ve park etmiş araçlar yok; araçlar varınca bina önünde durup kaybolur. Otoyol / dış bağlantı yok, ithalat-ihracat kamyonları şehir dışından gelmez. İş seçimi hâlâ kuş uçuşu mesafeye bakar. Yol düzenlenince değişen yollardaki araçlar kaybolur ve yeni atama bitene kadar (büyük şehirde telefonda 5–10 sn) yeni araç çıkmaz.
 - **Hizmetler (Faz 5):** ambulans, çöp kamyonu, itfaiye aracı gibi hizmet araçları yolda gezmiyor (araçlar ve trafik Faz 6); kapsama şimdilik yol mesafesiyle hesaplanıyor. Elektrik direkleri ve su boruları görünmüyor, yolları izledikleri varsayılıyor. Çöp alanı ve mezarlık boşaltılamıyor; dolunca yenisi gerekir. Yangın binayı anında harabeye çevirir (söndürme yok). Su kirliliği mesafeye bakar, nehrin akış yönü yok. Rüzgâr türbinleri yola bakar, rüzgâr yönü yok; güneş santrali gece de üretir (hava durumu ve gün-gece üretimi Faz 8).
 - **Yollar:** yol yükseltme (sokak → cadde) yok, şimdilik yık + yeniden çiz. Serbest el çizimi, köprü/tünel ve çıkmaz sokak dönüş cebi yok; trafik ışıkları sadece cadde/bulvar kavşaklarında. Kavşak köşeleri çok dar açılarda sadeleşir.
 - **Binalar:** Kenney kitinde sadece 5 bina modeli var; çeşitlilik kod ile üretilen binalarla sağlanıyor. Kenney'nin büyük ücretsiz şehir paketleri (kenney.nl) repoya eklenirse kolayca bağlanır. Binalar imarla kendiliğinden gelir; istersen katalogdan elle de yerleştirilir.

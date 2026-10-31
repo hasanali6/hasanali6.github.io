@@ -58,7 +58,9 @@
       "truck": 4.0,
       "police": 2.3,
       "ambulance": 2.55,
-      "fire": 4.0
+      "fire": 4.0,
+      "bus": 6.1,
+      "tram": 9.1
     }
   },
   "lod": {
@@ -98,7 +100,9 @@
       "truck": 0.3,
       "police": 0.06,
       "ambulance": 0.05,
-      "fire": 0.04
+      "fire": 0.04,
+      "bus": 0.0,
+      "tram": 0.0
     },
     "service_models": {
       "garbage": "truck",
@@ -106,6 +110,10 @@
       "health": "ambulance",
       "fire": "fire",
       "deathcare": "van"
+    },
+    "capacity_min": {
+      "bus": 120,
+      "tram": 80
     }
   },
   "paint": [
