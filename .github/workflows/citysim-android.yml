@@ -14,6 +14,13 @@ env:
   GODOT_VERSION: "4.7.2"
   GODOT_RELEASE: "stable"
   PROJECT_DIR: citysim
+  # Fixed debug signing key, committed on purpose: Android only installs an
+  # update over an existing app when the signature is identical, so a key
+  # generated per run made every new APK "conflict" with the installed one.
+  # It is a debug key for test builds only; a release key must never be
+  # committed (store it as a repository secret when publishing).
+  DEBUG_KEYSTORE: .github/citysim-debug.keystore
+  DEBUG_KEY_SHA256: "FE:A2:DE:98:1A:66:95:DD:DB:81:2D:AE:A0:A3:AE:F4:A8:47:15:F9:A2:CC:82:21:91:07:98:2B:35:AF:15:C8"
 
 jobs:
   build-apk:
@@ -62,11 +69,14 @@ jobs:
         run: |
           set -euo pipefail
           SETTINGS=$(ls ~/.config/godot/editor_settings-*.tres | head -n1)
-          python3 - "$SETTINGS" "$ANDROID_HOME" "$JAVA_HOME" <<'PY'
+          python3 - "$SETTINGS" "$ANDROID_HOME" "$JAVA_HOME" "$GITHUB_WORKSPACE/$DEBUG_KEYSTORE" <<'PY'
           import re, sys
-          path, sdk, jdk = sys.argv[1:4]
+          path, sdk, jdk, keystore = sys.argv[1:5]
           text = open(path).read()
-          for key, value in (("export/android/android_sdk_path", sdk), ("export/android/java_sdk_path", jdk)):
+          for key, value in (("export/android/android_sdk_path", sdk), ("export/android/java_sdk_path", jdk),
+                             ("export/android/debug_keystore", keystore),
+                             ("export/android/debug_keystore_user", "androiddebugkey"),
+                             ("export/android/debug_keystore_pass", "android")):
               line = f'{key} = "{value}"'
               if re.search(rf"^{re.escape(key)} = .*$", text, flags=re.M):
                   text = re.sub(rf"^{re.escape(key)} = .*$", line, text, flags=re.M)
@@ -74,13 +84,13 @@ jobs:
                   text = text.rstrip("\n") + "\n" + line + "\n"
           open(path, "w").write(text)
           PY
-          keytool -genkeypair -v -keystore "$RUNNER_TEMP/debug.keystore" -storepass android \
-            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
+          # Every build gets a higher version code so phones see it as an update.
+          sed -i "s|^version/code=.*|version/code=${GITHUB_RUN_NUMBER}|; s|^version/name=.*|version/name=\"0.2.${GITHUB_RUN_NUMBER}\"|" "$PROJECT_DIR/export_presets.cfg"
+          grep -E "^version/(code|name)=" "$PROJECT_DIR/export_presets.cfg"
 
       - name: Export debug APK (arm64-v8a)
         env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/.github/citysim-debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
           GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
@@ -92,7 +102,7 @@ jobs:
 
       - name: Export OpenGL (Compatibility renderer) test APK
         env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/.github/citysim-debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
           GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
@@ -107,6 +117,16 @@ jobs:
           ~/godot/godot --headless --path "$GL_DIR" --export-debug "Android" "$GITHUB_WORKSPACE/$PROJECT_DIR/export/SehirSim-GL.apk"
           test -s "$PROJECT_DIR/export/SehirSim-GL.apk"
           ls -lh "$PROJECT_DIR/export/SehirSim-GL.apk"
+
+      - name: Verify both APKs carry the fixed signing key
+        run: |
+          set -euo pipefail
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n1)apksigner
+          for apk in "$PROJECT_DIR/export/SehirSim.apk" "$PROJECT_DIR/export/SehirSim-GL.apk"; do
+            CERT=$("$APKSIGNER" verify --print-certs "$apk" | grep -m1 "SHA-256 digest" | awk '{print toupper($NF)}' | sed 's/../&:/g; s/:$//')
+            echo "$apk -> $CERT"
+            test "$CERT" = "$DEBUG_KEY_SHA256"
+          done
 
       - uses: actions/upload-artifact@v4
         with:

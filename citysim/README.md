@@ -72,6 +72,8 @@ Bu repoda `.github/workflows/citysim-android.yml` var. `citysim/` içinde bir de
 
 Telefondan: repo sayfası → Releases → `citysim-latest` → `SehirSim.apk` indir → "Bilinmeyen kaynaklardan yükleme" iznini ver → kur.
 
+APK'lar her derlemede aynı sabit test anahtarıyla imzalanır (`.github/citysim-debug.keystore`) ve sürüm numarası artar, yani yeni sürüm eskisinin üstüne güncelleme olarak kurulur. 31 Ekim 2026'dan önceki APK'lar her seferinde farklı anahtarla imzalanıyordu; onlardan geçerken eski uygulamayı **bir kez** kaldırman gerekir. Bu anahtar sadece test içindir; Play Store'a çıkarken ayrı bir yayın anahtarı GitHub secret olarak saklanmalı, asla repoya konmamalı.
+
 Aynı sayfada `SehirSim-GL.apk` da var: aynı oyunun OpenGL (Compatibility) sürümü, ayrı paket adıyla (`Şehir Sim (GL)`) kurulur. Bazı telefonlarda Vulkan'dan hızlıdır; ikisini karşılaştırmak için.
 
 ### Yol B — Kendi bilgisayarında (Godot editörü)
