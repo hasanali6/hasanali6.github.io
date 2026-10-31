@@ -140,7 +140,7 @@ SETTINGS_NEW_CITY,Yeni şehir,New city
 NOTIFY_SAVED,Şehir kaydedildi,City saved
 NOTIFY_LOADED,Şehir yüklendi,City loaded
 NOTIFY_NEW_CITY_CONFIRM,Şehri silip baştan başlamak için tekrar bas,Tap again to wipe the city and start over
-ROAD_ERR_WATER,Su üstünden geçemez (köprü yok),Cannot cross water (no bridges yet)
+ROAD_ERR_WATER,"Köprünün iki ucu ve kavşaklar karada olmalı","Bridge ends and junctions must be on land"
 SVC_CAT_POWER,Elektrik,Electricity
 SVC_CAT_WATER,Su,Water
 SVC_CAT_HEALTH,Sağlık,Health
@@ -308,3 +308,11 @@ MODE_BUILDING,İnşa,Build
 MODE_CAMERA,Kamera,Camera
 NOTIFY_CAMERA_MODE,"Kamera modu: tek parmakla haritayı kaydır, araç açık kalır","Camera mode: drag with one finger to move, the tool stays open"
 NOTIFY_BUILD_MODE,İnşa modu: tek parmakla inşa et,Build mode: draw with one finger
+ROAD_HIGHWAY,Otoyol,Highway
+ROAD_ERR_OUTSIDE_LINK,Şehrin dış bağlantısı yıkılamaz,The city's outside connection cannot be demolished
+NOTIFY_NO_CONNECTION,"Şehrin otoyola bağlı değil: ihracat zor, ithalat pahalı, göç yavaş. Yollarını harita kenarından gelen otoyola bağla.","Your town is not linked to the highway: exports are hard, imports dear, growth slow. Connect your roads to the highway at the map edge."
+MODE_UPGRADE,Yükselt,Upgrade
+ROAD_HINT_UPGRADE,yolu seçili tipe çevir,change the road to the selected type
+ROAD_UPGRADED,Yol %s yapıldı (%s),Road changed to %s (%s)
+ROAD_ERR_UPGRADE_SAME,Yol zaten bu tipte,The road is already this type
+ROAD_ERR_UPGRADE_NONE,Yükseltmek için bir yola dokun,Touch a road to upgrade it

@@ -317,12 +317,50 @@ func _step_demand(budget: int) -> void:
 					shops.append(bid)
 				elif kind == "industrial":
 					factories.append(bid)
+			var per_shop := float(_cfg["trips"]["freight_per_shop"])
 			if not factories.is_empty():
-				var per_shop := float(_cfg["trips"]["freight_per_shop"])
 				for k in shops.size():
 					var from: int = _seg_of.get(factories[k % factories.size()], -1)
 					_add_trip(from, _seg_of.get(shops[k], -1), KIND_FREIGHT, NO_CATEGORY, per_shop)
+			_add_trade_trips(factories, shops, per_shop)
 			_demand_stage = 4
+
+
+## Trucks to and from the map edge: exports from factories, imports to shops,
+## and some through traffic between the two outside connections.
+func _add_trade_trips(factories: Array, shops: Array, per_shop: float) -> void:
+	var outs: PackedInt32Array = _net.outside_segments()
+	if outs.is_empty():
+		return
+	var rep: Dictionary = _companies.last_report
+	var produced := float(rep.get("goods_produced", 0.0))
+	var sold := float(rep.get("goods_sold", 0.0))
+	var export_share := 0.0 if produced <= 0.0 else clampf(float(rep.get("exports", 0.0)) / produced, 0.0, 1.0)
+	var import_share := 1.0 if factories.is_empty() else (0.0 if sold <= 0.0 else clampf(float(rep.get("imports", 0.0)) / sold, 0.0, 1.0))
+	for f in factories:
+		var seg: int = _seg_of.get(f, -1)
+		if seg >= 0 and _net.is_reachable(seg):
+			_add_trip(seg, _nearest_outside(seg, outs), KIND_FREIGHT, NO_CATEGORY, per_shop * 2.0 * export_share)
+	for s in shops:
+		var seg: int = _seg_of.get(s, -1)
+		if seg >= 0 and _net.is_reachable(seg):
+			_add_trip(_nearest_outside(seg, outs), seg, KIND_FREIGHT, NO_CATEGORY, per_shop * import_share)
+	if outs.size() >= 2 and _net.city_connected():
+		var through := float(_cfg["trips"].get("through_per_day", 0.0)) * 0.5
+		_add_trip(outs[0], outs[outs.size() - 1], KIND_FREIGHT, NO_CATEGORY, through)
+		_add_trip(outs[outs.size() - 1], outs[0], KIND_FREIGHT, NO_CATEGORY, through)
+
+
+func _nearest_outside(seg: int, outs: PackedInt32Array) -> int:
+	var p := _segment_mid(seg)
+	var best := outs[0]
+	var best_d := INF
+	for o in outs:
+		var d := _segment_mid(o).distance_to(p)
+		if d < best_d:
+			best_d = d
+			best = o
+	return best
 
 
 # --- Assignment rounds ------------------------------------------------------------

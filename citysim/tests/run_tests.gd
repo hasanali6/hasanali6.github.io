@@ -38,6 +38,7 @@ func _initialize() -> void:
 	_test_transit_rules()
 	_test_progression()
 	_test_weather_traffic()
+	_test_highway_bridge()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -764,3 +765,23 @@ func _test_weather_traffic() -> void:
 	_check(months.size() == 12 and months.all(func(s): return weights.has(s)) and (w["autumn_by_month"] as Array).size() == 12
 		and not (weights["summer"] as Dictionary).has("snow") and (weights["winter"] as Dictionary).has("snow"),
 		"every month has a season; snow only in winter")
+
+
+func _test_highway_bridge() -> void:
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(0, 0), Vector2(160, 0), null), "highway")
+	_check(_zone_grid(g).size() == 0, "nothing is zoned along a highway")
+	# A road across the river near the map centre runs partly over water.
+	var wet := MapWater.shared().curve_water_length(Vector2(100, -880), Vector2(100, -1080), Vector2(100, -1280))
+	var dry := MapWater.shared().curve_water_length(Vector2(100, 0), Vector2(100, 100), Vector2(100, 200))
+	_check(wet > 60.0 and wet < 160.0 and dry == 0.0, "the bridge part of a river crossing is measured (%.0f m)" % wet)
+	var roads: Dictionary = DataLoader.load_json("res://data/roads.json")
+	var mesh: Dictionary = roads["mesh"]
+	var bg := _graph()
+	bg.commit_road(bg.plan_road(Vector2(100, -880), Vector2(100, -1280), null), "street")
+	var parts := RoadMeshBuilder.build_segment(bg, bg.segments.keys()[0], roads["types"], mesh)
+	var top := -INF
+	var verts: PackedVector3Array = parts._get_arrays(RoadMeshBuilder.ASPHALT)["v"]
+	for v in verts:
+		top = maxf(top, v.y)
+	_check(top > float(mesh["asphalt_height_m"]) + 0.1, "the deck rises above the water on a bridge")

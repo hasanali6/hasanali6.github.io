@@ -638,7 +638,7 @@ func _build_road_panel() -> PanelContainer:
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 12)
 	var mode_group := ButtonGroup.new()
-	for entry: Array in [["straight", "slash", "MODE_STRAIGHT"], ["curve", "spline", "MODE_CURVE"], ["bulldoze", "trash-2", "MODE_BULLDOZE"]]:
+	for entry: Array in [["straight", "slash", "MODE_STRAIGHT"], ["curve", "spline", "MODE_CURVE"], ["upgrade", "refresh-cw", "MODE_UPGRADE"], ["bulldoze", "trash-2", "MODE_BULLDOZE"]]:
 		var mode: String = entry[0]
 		var b := UiStyle.round_button(entry[1], UiStyle.SLATE, MIN_TOUCH, true,
 			UiStyle.RED if mode == "bulldoze" else UiStyle.GREEN)

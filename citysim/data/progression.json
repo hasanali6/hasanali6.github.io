@@ -24,7 +24,7 @@
     },
     {
       "name_key": "MILESTONE_3", "population": 2500, "reward": 25000, "loan_limit": 120000,
-      "unlocks": ["road:boulevard", "zone:com_high", "item:mall", "svc:crematorium", "transit:tram"]
+      "unlocks": ["road:boulevard", "road:highway", "zone:com_high", "item:mall", "svc:crematorium", "transit:tram"]
     },
     {
       "name_key": "MILESTONE_4", "population": 5000, "reward": 40000, "loan_limit": 200000, "area_half_m": 2000,

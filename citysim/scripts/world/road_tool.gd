@@ -115,6 +115,8 @@ func _on_down(screen_pos: Vector2) -> void:
 	match _mode:
 		"bulldoze":
 			_pick_target(screen_pos)
+		"upgrade":
+			_highlight = _segment_at(screen_pos)
 		"curve":
 			if _curve_stage == 0:
 				_start = _snap(screen_pos, null)
@@ -133,6 +135,8 @@ func _on_move(screen_pos: Vector2) -> void:
 	match _mode:
 		"bulldoze":
 			_pick_target(screen_pos)
+		"upgrade":
+			_highlight = _segment_at(screen_pos)
 		"curve":
 			if _curve_stage == 0:
 				_control = _snap(screen_pos, _start)
@@ -146,6 +150,17 @@ func _on_move(screen_pos: Vector2) -> void:
 
 func _on_up(screen_pos: Vector2) -> void:
 	match _mode:
+		"upgrade":
+			_highlight = _segment_at(screen_pos)
+			if _highlight >= 0:
+				var res: Dictionary = _net.upgrade(_highlight, _type)
+				if res["ok"]:
+					EventBus.sfx_requested.emit("build_road")
+					EventBus.notification_posted.emit("roads", tr("ROAD_UPGRADED") % [tr(_net.type_config(_type)["name_key"]), UiStyle.format_int(int(res["cost"]))])
+				else:
+					EventBus.sfx_requested.emit("error")
+					EventBus.notification_posted.emit("roads", tr(res["error"]))
+			_reset()
 		"bulldoze":
 			_pick_target(screen_pos)
 			if _target_building >= 0:
@@ -155,6 +170,9 @@ func _on_up(screen_pos: Vector2) -> void:
 					EconomySystem.refund(back)
 				EventBus.sfx_requested.emit("bulldoze")
 				EventBus.notification_posted.emit("roads", tr("BUILDING_DEMOLISHED") % UiStyle.format_int(back))
+			elif _highlight >= 0 and _net.is_outside_segment(_highlight):
+				EventBus.sfx_requested.emit("error")
+				EventBus.notification_posted.emit("roads", tr("ROAD_ERR_OUTSIDE_LINK"))
 			elif _highlight >= 0:
 				var refund: int = _net.demolish(_highlight)
 				EventBus.sfx_requested.emit("bulldoze")
@@ -219,11 +237,11 @@ func _evaluate(a: Vector2, b: Vector2, control: Variant) -> Dictionary:
 	var plan: Dictionary = (_net.graph as RoadGraph).plan_road(a, b, control)
 	if not plan["ok"]:
 		return {"valid": false, "error": plan["error"], "cost": 0, "length": 0.0}
-	# No bridges yet: the road and its sidewalks must stay on land.
-	var half := RoadTypes.half_width(_net.type_config(_type))
-	if MapWater.shared().curve_hits_water(plan["a"], plan["control"], plan["b"], half, 4.0):
-		return {"valid": false, "error": "ROAD_ERR_WATER", "cost": 0, "length": plan["length"]}
-	var cost: int = _net.cost_of(plan["length"], _type)
+	# Over water the road becomes a bridge; its ends must stand on land.
+	var wet: String = _net.water_error(plan, _type)
+	if wet != "":
+		return {"valid": false, "error": wet, "cost": 0, "length": plan["length"]}
+	var cost: int = _net.plan_cost(plan, _type)
 	if not EconomySystem.can_afford(cost):
 		return {"valid": false, "error": "ROAD_ERR_MONEY", "cost": cost, "length": plan["length"]}
 	return {"valid": true, "error": "", "cost": cost, "length": plan["length"]}
@@ -232,6 +250,9 @@ func _evaluate(a: Vector2, b: Vector2, control: Variant) -> Dictionary:
 func _refresh() -> void:
 	if _mode == "bulldoze":
 		_show_bulldoze()
+		return
+	if _mode == "upgrade":
+		_show_upgrade()
 		return
 	var a: Variant = _start
 	var b: Variant = _end
@@ -262,6 +283,32 @@ func _refresh() -> void:
 	if _mode == "curve" and _curve_stage == 0:
 		check["hint"] = "ROAD_HINT_CURVE"
 	EventBus.road_preview_changed.emit(check)
+
+
+func _show_upgrade() -> void:
+	var graph: RoadGraph = _net.graph
+	if _highlight < 0 or not graph.segments.has(_highlight):
+		_preview.visible = false
+		EventBus.road_preview_changed.emit({"active": false})
+		return
+	var seg: RoadGraph.RoadSegment = graph.segments[_highlight]
+	var c := graph.curve_of(seg)
+	var same := seg.type == _type
+	var cost: int = 0 if same else _net.upgrade_cost(_highlight, _type)
+	var ok: bool = not same and not _net.is_outside_segment(_highlight) and EconomySystem.can_afford(cost)
+	_preview.transform = Transform3D.IDENTITY
+	_preview.mesh = _ribbon(c[0], c[1], c[2], RoadTypes.total_width(_net.type_config(_type)) + 0.6)
+	_preview.material_override = _valid_mat if ok else _invalid_mat
+	_preview.visible = true
+	var error := ""
+	if same:
+		error = "ROAD_ERR_UPGRADE_SAME"
+	elif _net.is_outside_segment(_highlight):
+		error = "ROAD_ERR_OUTSIDE_LINK"
+	elif not ok:
+		error = "ROAD_ERR_MONEY"
+	EventBus.road_preview_changed.emit({"active": true, "valid": ok, "error": error, "cost": cost,
+		"length": seg.length, "screen_pos": _last_screen, "hint": "ROAD_HINT_UPGRADE"})
 
 
 func _show_bulldoze() -> void:

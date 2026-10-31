@@ -4,7 +4,8 @@
     "street_oneway",
     "avenue",
     "avenue_oneway",
-    "boulevard"
+    "boulevard",
+    "highway"
   ],
   "types": {
     "street": {
@@ -71,6 +72,20 @@
       "lamp_spacing_m": 26,
       "lamps_both_sides": true,
       "street_trees": true
+    },
+    "highway": {
+      "name_key": "ROAD_HIGHWAY",
+      "lanes_per_dir": 3,
+      "oneway": false,
+      "lane_width_m": 3.5,
+      "median_width_m": 3.0,
+      "sidewalk_width_m": 0.6,
+      "speed_kmh": 100,
+      "cost_per_m": 60,
+      "lamp_spacing_m": 40,
+      "lamps_both_sides": true,
+      "street_trees": false,
+      "zoning": false
     }
   },
   "graph": {
@@ -103,7 +118,10 @@
     "crosswalk_length_m": 3.2,
     "crosswalk_stripe_m": 0.6,
     "joint_max_deviation_deg": 20.0,
-    "sidewalk_tile_m": 1.6
+    "sidewalk_tile_m": 1.6,
+    "bridge_lift_m": 0.14,
+    "bridge_ramp_m": 5.0,
+    "bridge_railing_m": 0.9
   },
   "colors": {
     "asphalt": "#3b3e46",
@@ -126,5 +144,34 @@
     "light_energy": 3.0,
     "pool_radius_m": 7.0,
     "pool_strength": 0.55
+  },
+  "outside": {
+    "type": "highway",
+    "links": [
+      {
+        "from": [
+          1998.0,
+          288.0
+        ],
+        "to": [
+          1200.0,
+          288.0
+        ]
+      },
+      {
+        "from": [
+          -1998.0,
+          288.0
+        ],
+        "to": [
+          -1200.0,
+          288.0
+        ]
+      }
+    ]
+  },
+  "bridge": {
+    "cost_factor": 4.0,
+    "land_clearance_m": 4.0
   }
 }

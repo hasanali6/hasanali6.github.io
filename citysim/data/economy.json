@@ -105,7 +105,9 @@
     "hire_step": 0.25,
     "shop_radius_m": 420.0,
     "job_radius_m": 1600.0,
-    "min_target": 0.1
+    "min_target": 0.1,
+    "isolated_export_factor": 0.35,
+    "isolated_import_factor": 1.4
   },
   "lifecycle": {
     "birth_chance": 0.035,
@@ -120,7 +122,8 @@
     "immigrants_per_month_per_demand": 120,
     "unhappy_leave_threshold": 25.0,
     "unhappy_leave_chance": 0.25,
-    "candidates_sampled": 6
+    "candidates_sampled": 6,
+    "isolated_factor": 0.5
   },
   "happiness": {
     "base": 50.0,

@@ -78,6 +78,16 @@ func is_water(p: Vector2, margin: float = 0.0) -> bool:
 	return distance(p) < margin
 
 
+## Metres of the quadratic curve (a, c, b) that run over water.
+func curve_water_length(a: Vector2, c: Vector2, b: Vector2) -> float:
+	var n := RoadGraph.sample_count(a, c, b, 4.0)
+	var wet := 0
+	for i in n + 1:
+		if distance(RoadGraph.bezier(a, c, b, float(i) / n)) < 0.0:
+			wet += 1
+	return RoadGraph.curve_length(a, c, b, 4.0) * float(wet) / float(n + 1)
+
+
 ## True if the quadratic curve (a, c, b) passes within `margin` of water.
 func curve_hits_water(a: Vector2, c: Vector2, b: Vector2, margin: float, step: float) -> bool:
 	var n := RoadGraph.sample_count(a, c, b, step)

@@ -61,6 +61,7 @@ building_system_path = NodePath("../BuildingSystem")
 [node name="CompanySystem" type="Node" parent="."]
 script = ExtResource("11_companies")
 building_system_path = NodePath("../BuildingSystem")
+road_network_path = NodePath("../RoadNetwork")
 
 [node name="CitizenSystem" type="Node" parent="."]
 script = ExtResource("12_citizens")
@@ -68,6 +69,7 @@ building_system_path = NodePath("../BuildingSystem")
 company_system_path = NodePath("../CompanySystem")
 traffic_system_path = NodePath("../TrafficSystem")
 district_system_path = NodePath("../DistrictSystem")
+road_network_path = NodePath("../RoadNetwork")
 
 [node name="DemandSystem" type="Node" parent="."]
 script = ExtResource("13_demand")

@@ -98,6 +98,9 @@ func _clear() -> void:
 func _add_rows(graph: RoadGraph, sid: int, types: Dictionary, mesh_cfg: Dictionary,
 		playable_half: float, seg_index: Dictionary) -> void:
 	var seg: RoadGraph.RoadSegment = graph.segments[sid]
+	# Highways have no frontage: nothing is zoned along them.
+	if not bool((types[seg.type] as Dictionary).get("zoning", true)):
+		return
 	var hw := RoadTypes.half_width(types[seg.type])
 	var trim_a := RoadMeshBuilder.junction_radius(graph, seg.a, types, mesh_cfg)
 	var trim_b := RoadMeshBuilder.junction_radius(graph, seg.b, types, mesh_cfg)

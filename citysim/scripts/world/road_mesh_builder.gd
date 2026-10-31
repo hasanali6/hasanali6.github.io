@@ -211,43 +211,90 @@ static func build_segment(graph: RoadGraph, seg_id: int, types: Dictionary, cfg:
 	var hm := float(t["median_width_m"]) * 0.5
 	var curb_h := float(cfg["curb_height_m"])
 	var road_h := float(cfg["asphalt_height_m"])
+	# Over water the deck rises just above the surface on short ramps, and
+	# gets parapets and a concrete edge (a bridge).
+	var lifts := PackedFloat32Array()
+	var over := PackedFloat32Array()
+	var any_bridge := false
+	var lift_h := float(cfg.get("bridge_lift_m", 0.14))
+	var ramp := float(cfg.get("bridge_ramp_m", 5.0))
+	for p in points:
+		var wd := MapWater.shared().distance(p) - hw
+		var k := 1.0 - smoothstep(0.0, ramp, wd)
+		lifts.append(lift_h * k)
+		over.append(1.0 if wd < 1.0 else 0.0)
+		if k > 0.0:
+			any_bridge = true
+	if not any_bridge:
+		lifts = PackedFloat32Array()
 
 	# Asphalt (split around a median if there is one). The last argument is
 	# the facing: 0 = top face, +1 / -1 = vertical face towards +left / -left.
 	if hm > 0.0:
-		_strip(parts, ASPHALT, points, lefts, dist, to_junction, -cw, -hm, road_h, road_h, custom, 0)
-		_strip(parts, ASPHALT, points, lefts, dist, to_junction, hm, cw, road_h, road_h, custom, 0)
-		_strip(parts, MEDIAN, points, lefts, dist, to_junction, -hm, hm, curb_h, curb_h, custom, 0)
-		_strip(parts, CURB, points, lefts, dist, to_junction, -hm, -hm, road_h, curb_h, custom, -1)
-		_strip(parts, CURB, points, lefts, dist, to_junction, hm, hm, road_h, curb_h, custom, 1)
+		_strip(parts, ASPHALT, points, lefts, dist, to_junction, -cw, -hm, road_h, road_h, custom, 0, lifts)
+		_strip(parts, ASPHALT, points, lefts, dist, to_junction, hm, cw, road_h, road_h, custom, 0, lifts)
+		_strip(parts, MEDIAN, points, lefts, dist, to_junction, -hm, hm, curb_h, curb_h, custom, 0, lifts)
+		_strip(parts, CURB, points, lefts, dist, to_junction, -hm, -hm, road_h, curb_h, custom, -1, lifts)
+		_strip(parts, CURB, points, lefts, dist, to_junction, hm, hm, road_h, curb_h, custom, 1, lifts)
 	else:
-		_strip(parts, ASPHALT, points, lefts, dist, to_junction, -cw, cw, road_h, road_h, custom, 0)
+		_strip(parts, ASPHALT, points, lefts, dist, to_junction, -cw, cw, road_h, road_h, custom, 0, lifts)
 	# Sidewalks: top, inner curb face, outer face down to the ground.
-	_strip(parts, SIDEWALK, points, lefts, dist, to_junction, -hw, -cw, curb_h, curb_h, custom, 0)
-	_strip(parts, SIDEWALK, points, lefts, dist, to_junction, cw, hw, curb_h, curb_h, custom, 0)
-	_strip(parts, CURB, points, lefts, dist, to_junction, -cw, -cw, road_h, curb_h, custom, 1)
-	_strip(parts, CURB, points, lefts, dist, to_junction, cw, cw, road_h, curb_h, custom, -1)
-	_strip(parts, CURB, points, lefts, dist, to_junction, -hw, -hw, 0.0, curb_h, custom, -1)
-	_strip(parts, CURB, points, lefts, dist, to_junction, hw, hw, 0.0, curb_h, custom, 1)
+	_strip(parts, SIDEWALK, points, lefts, dist, to_junction, -hw, -cw, curb_h, curb_h, custom, 0, lifts)
+	_strip(parts, SIDEWALK, points, lefts, dist, to_junction, cw, hw, curb_h, curb_h, custom, 0, lifts)
+	_strip(parts, CURB, points, lefts, dist, to_junction, -cw, -cw, road_h, curb_h, custom, 1, lifts)
+	_strip(parts, CURB, points, lefts, dist, to_junction, cw, cw, road_h, curb_h, custom, -1, lifts)
+	_strip(parts, CURB, points, lefts, dist, to_junction, -hw, -hw, 0.0, curb_h, custom, -1, lifts)
+	_strip(parts, CURB, points, lefts, dist, to_junction, hw, hw, 0.0, curb_h, custom, 1, lifts)
+	if any_bridge:
+		_bridge_parts(parts, points, lefts, dist, to_junction, hw, curb_h, lifts, over, float(cfg.get("bridge_railing_m", 0.9)), custom)
 	return parts
+
+
+## Parapets along both edges and the deck's side down into the water, only
+## where the road is over water.
+static func _bridge_parts(parts: Parts, points: PackedVector2Array, lefts: PackedVector2Array, dist: PackedFloat32Array,
+		to_junction: PackedFloat32Array, hw: float, curb_h: float, lifts: PackedFloat32Array, over: PackedFloat32Array,
+		railing: float, custom: Color) -> void:
+	var start := -1
+	for i in points.size() + 1:
+		var wet := i < points.size() and over[i] > 0.5
+		if wet and start < 0:
+			start = maxi(i - 1, 0)
+		elif not wet and start >= 0:
+			var end := mini(i, points.size() - 1)
+			var pts := points.slice(start, end + 1)
+			var ls := lefts.slice(start, end + 1)
+			var ds := dist.slice(start, end + 1)
+			var tj := to_junction.slice(start, end + 1)
+			var lf := lifts.slice(start, end + 1)
+			for side: float in [-1.0, 1.0]:
+				var inner := (hw - 0.25) * side
+				var outer := hw * side
+				var top := curb_h + railing
+				# Parapet: inner face, top, outer face.
+				_strip(parts, CURB, pts, ls, ds, tj, inner, inner, curb_h, top, custom, -int(side), lf)
+				_strip(parts, CURB, pts, ls, ds, tj, inner, outer, top, top, custom, 0, lf)
+				_strip(parts, CURB, pts, ls, ds, tj, outer, outer, -2.0, top, custom, int(side), lf)
+			start = -1
 
 
 ## A strip between two cross-section lines (offset along the left normal,
 ## height). facing 0 = top face, +1/-1 = vertical face towards +left/-left.
 static func _strip(parts: Parts, key: String, points: PackedVector2Array, lefts: PackedVector2Array,
 		dist: PackedFloat32Array, to_junction: PackedFloat32Array, off0: float, off1: float,
-		h0: float, h1: float, custom: Color, facing: int) -> void:
+		h0: float, h1: float, custom: Color, facing: int, lifts: PackedFloat32Array = PackedFloat32Array()) -> void:
 	var base := -1
 	for i in points.size():
 		var l := lefts[i]
 		var p0 := points[i] + l * off0
 		var p1 := points[i] + l * off1
+		var lift := lifts[i] if i < lifts.size() else 0.0
 		var n := Vector3.UP
 		if facing != 0:
 			n = Vector3(l.x, 0.0, l.y).normalized() * float(facing)
 		var uv2 := Vector2(to_junction[i], 0.0)
-		var a := parts.add_vertex(key, Vector3(p0.x, h0, p0.y), n, Vector2(off0, dist[i]), uv2, custom)
-		var b := parts.add_vertex(key, Vector3(p1.x, h1, p1.y), n, Vector2(off1, dist[i]), uv2, custom)
+		var a := parts.add_vertex(key, Vector3(p0.x, h0 + lift, p0.y), n, Vector2(off0, dist[i]), uv2, custom)
+		var b := parts.add_vertex(key, Vector3(p1.x, h1 + lift, p1.y), n, Vector2(off1, dist[i]), uv2, custom)
 		if base >= 0:
 			parts.add_face(key, base, a, base + 1, n)
 			parts.add_face(key, base + 1, a, b, n)

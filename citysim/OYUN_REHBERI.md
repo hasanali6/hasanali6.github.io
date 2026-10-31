@@ -89,9 +89,21 @@ yıkılır.
 | Cadde | 4 | 22 |
 | Tek yön cadde | 4 (tek yön) | 24 |
 | Bulvar | 6 + refüj | 38 |
+| Otoyol | 6 + refüj, 100 km/s, kenarında imar yok | 60 |
 
-Cadde ve bulvar kavşaklarında trafik ışığı vardır. Yollar su üstünden geçemez
-(köprü yok).
+Cadde ve bulvar kavşaklarında trafik ışığı vardır.
+
+- **Köprü:** yolu suyun üstünden çizebilirsin. Su üstündeki kısım korkuluklu
+  köprü olur, metre başına 4 kat pahalıdır. Köprünün iki ucu ve kavşaklar
+  karada olmalı.
+- **Yükselt:** yol panelinde Yükselt modunu seç, üstten yeni yol tipini seç,
+  yola dokun. Yol yerinde değişir (ör. sokak → cadde). Bedel = yeni yolun fiyatı
+  − eski yolun iadesi.
+- **Dış bağlantılar:** haritanın doğu ve batı kenarından iki otoyol gelir;
+  başta hazırdır, yıkılamaz. Şehrini bunlara bağla:
+  - Bağlıysan fabrikalar ihracat yapar, dükkânlar normal fiyattan ithal eder,
+    göçmenler gelir, otoyolda kamyon ve transit trafik akar.
+  - Bağlı değilsen ihracat çok az olur, ithalat pahalıdır, nüfus yavaş artar.
 
 ### İmar
 Fırça, blok doldurma ve silgi. İmar ücretsizdir. Binalar ancak yola bakan
@@ -243,20 +255,22 @@ sokaklar yeşildir ve hatlar renkli şerit olarak görünür.
 
 ## 12. İlk yarım saat için plan (ipuçları)
 
-1. **Su ve elektrik önce gelir.** Nehre yakın bir yere sokak çek. Kenarına su
+1. **Otoyola bağlan.** Haritanın doğu veya batı kenarından gelen otoyolun ucuna
+   bir sokak/cadde çek; ticaret ve göç buradan gelir.
+2. **Su ve elektrik önce gelir.** Nehre yakın bir yere sokak çek. Kenarına su
    pompası, uzağına (akıntı yönünün aşağısına) atık su çıkışı koy. Bir rüzgâr
    türbini veya kömür santrali yap.
-2. **Küçük başla.** 3–4 sokaklık bir ızgara yap. Düşük konut, biraz düşük
+3. **Küçük başla.** 3–4 sokaklık bir ızgara yap. Düşük konut, biraz düşük
    ticari, konuttan uzağa sanayi boya (kirlilik ve kamyon gürültüsü).
-3. **RCI çubuklarına bak.** Hangi çubuk yüksekse o imardan ekle.
-4. **Hizmetleri ihtiyaç oldukça ekle.** Sağlık ocağı, ilkokul, karakol, itfaiye
+4. **RCI çubuklarına bak.** Hangi çubuk yüksekse o imardan ekle.
+5. **Hizmetleri ihtiyaç oldukça ekle.** Sağlık ocağı, ilkokul, karakol, itfaiye
    ve çöp alanı ilk 300–1.000 nüfusta yeterli. Katmanlardan kapsamaya bak.
-5. **Bütçeyi izle.** Ekonomi → Bütçe'de net eksiye düşerse vergiyi 1–2 puan
+6. **Bütçeyi izle.** Ekonomi → Bütçe'de net eksiye düşerse vergiyi 1–2 puan
    artır, kullanılmayan hizmetin bütçesini kıs. Gerekirse kısa süreli kredi al.
-6. **Köy olunca** caddeleri ana aks yap, otobüs hattı aç. **Kasaba olunca**
+7. **Köy olunca** caddeleri ana aks yap, otobüs hattı aç. **Kasaba olunca**
    konut mahallesini bölge olarak çiz ve ağır araç yasağı koy: kamyonlar
    evlerin arasından geçmesin.
-7. **Trafik sıkışırsa** paralel yol, tek yön çiftleri veya toplu taşıma kullan.
+8. **Trafik sıkışırsa** paralel yol, tek yön çiftleri veya toplu taşıma kullan.
    Çok kavşaklı tek bir ana yola her şeyi bağlama.
 
 ---
@@ -281,7 +295,7 @@ sokaklar yeşildir ve hatlar renkli şerit olarak görünür.
 
 ## 14. Bilinen sınırlar (kısaca)
 
-- Otoyol, köprü/tünel, metro, tren, liman ve şehir dışı bağlantılar yok.
+- Tünel, otoyol rampaları, metro, tren ve liman yok.
 - Üretim zinciri (hammadde → işlenmiş ürün) basit tutuldu; sanayi doğrudan
   dükkânlara mal gönderir.
 - Yayalar, bisikletler ve park etmiş araçlar görünmüyor; sayılar arka planda

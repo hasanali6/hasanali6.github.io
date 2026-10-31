@@ -7,6 +7,11 @@ extends Node3D
 ## per material per chunk). An edit only rebuilds the pieces around it and the
 ## chunks they live in. Street lamps and their night light pools are two
 ## MultiMeshes for the whole city.
+##
+## Outside connections: highway stubs from the east and west map edges
+## (data/roads.json "outside") exist from the start, free. Roads joined to
+## them are "reachable": trade trucks and newcomers use them; an unlinked
+## town exports little, imports dearly and grows slower.
 
 const ASPHALT_SHADER := preload("res://assets/materials/road_asphalt.gdshader")
 const SIDEWALK_SHADER := preload("res://assets/materials/road_sidewalk.gdshader")
@@ -29,6 +34,10 @@ var _refund_ratio: float
 var _node_signature: Dictionary = {}  # node id -> sorted segment ids at last build
 var _lamps: MultiMeshInstance3D
 var _pools: MultiMeshInstance3D
+var _reach_dirty: bool = true
+var _reachable: Dictionary = {}    # segment id -> true when linked to an outside connection
+var _outside_nodes: Dictionary = {}  # node id -> true (map edge ends)
+var _connected: bool = false
 
 
 func _ready() -> void:
@@ -39,6 +48,9 @@ func _ready() -> void:
 	_refund_ratio = GameData.num("economy/road_refund_ratio")
 	_build_materials()
 	_build_lamp_nodes()
+	EventBus.roads_changed.connect(func() -> void: _reach_dirty = true)
+	EventBus.month_changed.connect(_on_month)
+	ensure_outside.call_deferred()
 
 
 func type_config(type: String) -> Dictionary:
@@ -54,18 +66,72 @@ func refund_of(seg_id: int) -> int:
 	return roundi(seg.length * float(types[seg.type]["cost_per_m"]) * _refund_ratio)
 
 
+## Price of a planned road: its length, plus the bridge premium over water.
+func plan_cost(plan: Dictionary, type: String) -> int:
+	var bridge := MapWater.shared().curve_water_length(plan["a"], plan["control"], plan["b"])
+	return cost_of(plan["length"], type) + ceili(bridge * float(types[type]["cost_per_m"]) * (GameData.num("roads/bridge/cost_factor") - 1.0))
+
+
+## Why a planned road cannot stand where it is ("" if fine): bridges need
+## both ends and every junction on firm land.
+func water_error(plan: Dictionary, type: String) -> String:
+	var clear := RoadTypes.half_width(types[type]) + GameData.num("roads/bridge/land_clearance_m")
+	var points: Array = [plan["a"], plan["b"]]
+	for hit: Dictionary in plan.get("hits", []):
+		points.append(hit["point"])
+	for p: Vector2 in points:
+		if MapWater.shared().distance(p) < clear:
+			return "ROAD_ERR_WATER"
+	return ""
+
+
 ## Plans and, if affordable, builds a road. Returns the plan with "cost" added.
 func build_road(start: Vector2, end: Vector2, control: Variant, type: String) -> Dictionary:
 	var plan := graph.plan_road(start, end, control)
 	if not plan["ok"]:
 		return plan
-	plan["cost"] = cost_of(plan["length"], type)
+	var wet := water_error(plan, type)
+	if wet != "":
+		return {"ok": false, "error": wet}
+	plan["cost"] = plan_cost(plan, type)
 	if not EconomySystem.try_spend(plan["cost"]):
 		return {"ok": false, "error": "ROAD_ERR_MONEY", "cost": plan["cost"]}
 	var before := _snapshot()
 	graph.commit_road(plan, type)
 	_refresh_after_edit(before)
 	return plan
+
+
+## Cost of changing a road to another type: the new road minus what the old
+## one gives back (never negative).
+func upgrade_cost(seg_id: int, type: String) -> int:
+	var seg: RoadGraph.RoadSegment = graph.segments[seg_id]
+	var c := graph.curve_of(seg)
+	var fresh := plan_cost({"a": c[0], "control": c[1], "b": c[2], "length": seg.length}, type)
+	return maxi(fresh - refund_of(seg_id), 0)
+
+
+## Rebuilds a road as another type in place (wider roads may take frontage
+## from the lots beside them). Returns {ok, cost, error}.
+func upgrade(seg_id: int, type: String) -> Dictionary:
+	if not graph.segments.has(seg_id):
+		return {"ok": false, "error": "ROAD_ERR_UPGRADE_NONE"}
+	var seg: RoadGraph.RoadSegment = graph.segments[seg_id]
+	if seg.type == type:
+		return {"ok": false, "error": "ROAD_ERR_UPGRADE_SAME"}
+	if is_outside_segment(seg_id):
+		return {"ok": false, "error": "ROAD_ERR_OUTSIDE_LINK"}
+	var c := graph.curve_of(seg)
+	var wet := water_error({"a": c[0], "b": c[2]}, type)
+	if wet != "":
+		return {"ok": false, "error": wet}
+	var cost := upgrade_cost(seg_id, type)
+	if not EconomySystem.try_spend(cost):
+		return {"ok": false, "error": "ROAD_ERR_MONEY", "cost": cost}
+	var before := _snapshot()
+	seg.type = type
+	_refresh_after_edit(before, [seg_id])
+	return {"ok": true, "cost": cost}
 
 
 func upkeep_per_month() -> float:
@@ -85,6 +151,91 @@ func load_state(state: Dictionary) -> void:
 	var before := _snapshot()
 	graph.load_state(state.get("graph", {}))
 	_refresh_after_edit(before)
+	ensure_outside()
+
+
+# --- Outside connections ---------------------------------------------------------
+
+## Builds the highway stubs at the map edges if they are missing (new city,
+## or a save from before outside connections).
+func ensure_outside() -> void:
+	var cfg: Dictionary = GameData.section("roads/outside")
+	var before := _snapshot()
+	var built := false
+	for link: Dictionary in cfg["links"]:
+		var from := Vector2(link["from"][0], link["from"][1])
+		var to := Vector2(link["to"][0], link["to"][1])
+		if graph.find_node_near(from, 3.0) >= 0:
+			continue
+		# Shorten towards the edge until it fits among roads already built.
+		for k in 4:
+			var end := from.lerp(to, 1.0 - k * 0.2)
+			var plan := graph.plan_road(from, end, null)
+			if plan["ok"]:
+				graph.commit_road(plan, str(cfg["type"]))
+				built = true
+				break
+	_outside_nodes = {}
+	for link: Dictionary in cfg["links"]:
+		var n := graph.find_node_near(Vector2(link["from"][0], link["from"][1]), 3.0)
+		if n >= 0:
+			_outside_nodes[n] = true
+	if built:
+		_refresh_after_edit(before)
+	_reach_dirty = true
+
+
+func is_outside_segment(seg_id: int) -> bool:
+	var seg: RoadGraph.RoadSegment = graph.segments.get(seg_id)
+	return seg != null and (_outside_nodes.has(seg.a) or _outside_nodes.has(seg.b))
+
+
+## Segments at the map edge (where trade and newcomers enter).
+func outside_segments() -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for nid: int in _outside_nodes:
+		if graph.nodes.has(nid):
+			out.append_array((graph.nodes[nid] as RoadGraph.RoadNode).segments)
+	return out
+
+
+func is_reachable(seg_id: int) -> bool:
+	_update_reach()
+	return _reachable.has(seg_id)
+
+
+## True once the player's roads join an outside connection.
+func city_connected() -> bool:
+	_update_reach()
+	return _connected
+
+
+func _update_reach() -> void:
+	if not _reach_dirty:
+		return
+	_reach_dirty = false
+	_reachable = {}
+	var seen := {}
+	var stack: Array = _outside_nodes.keys()
+	while not stack.is_empty():
+		var nid: int = stack.pop_back()
+		if seen.has(nid) or not graph.nodes.has(nid):
+			continue
+		seen[nid] = true
+		for sid in (graph.nodes[nid] as RoadGraph.RoadNode).segments:
+			_reachable[sid] = true
+			stack.append(graph.other_node(sid, nid))
+	var stub_type := str(GameData.value("roads/outside/type"))
+	_connected = false
+	for sid: int in _reachable:
+		if (graph.segments[sid] as RoadGraph.RoadSegment).type != stub_type:
+			_connected = true
+			break
+
+
+func _on_month(_m: int) -> void:
+	if graph.segments.size() > _outside_nodes.size() * 2 and not city_connected():
+		EventBus.notification_posted.emit("roads", tr("NOTIFY_NO_CONNECTION"))
 
 
 func demolish(seg_id: int) -> int:
@@ -158,7 +309,7 @@ func _snapshot() -> Dictionary:
 ## Rebuilds pieces affected by an edit: new segments, nodes whose set of
 ## roads changed, and every segment touching such a node (junction trims and
 ## mitres depend on all roads meeting there).
-func _refresh_after_edit(before: Dictionary) -> void:
+func _refresh_after_edit(before: Dictionary, forced: Array = []) -> void:
 	var dirty_chunks := {}
 	for sid: int in before["segments"]:
 		if not graph.segments.has(sid):
@@ -179,6 +330,12 @@ func _refresh_after_edit(before: Dictionary) -> void:
 	for sid: int in graph.segments:
 		if not (before["segments"] as Array).has(sid):
 			dirty_segments[sid] = true
+	# Roads changed in place (upgrades): their ends and neighbours redraw too.
+	for sid: int in forced:
+		var fs: RoadGraph.RoadSegment = graph.segments.get(sid)
+		if fs != null:
+			dirty_nodes[fs.a] = true
+			dirty_nodes[fs.b] = true
 	for nid: int in dirty_nodes:
 		for sid in (graph.nodes[nid] as RoadGraph.RoadNode).segments:
 			dirty_segments[sid] = true

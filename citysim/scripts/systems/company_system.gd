@@ -11,6 +11,7 @@ extends Node
 ## Without electricity or water a company works at a fraction of its output.
 
 @export var building_system_path: NodePath
+@export var road_network_path: NodePath
 
 var companies: Dictionary = {}   # building id -> record
 var last_report: Dictionary = {}
@@ -172,6 +173,14 @@ func nearest_shop(pos: Vector2) -> int:
 # --- Monthly books -----------------------------------------------------------
 
 ## 1 with electricity and water, a fraction without.
+## Whether a company's road reaches an outside connection (trade by highway).
+func _linked(bid: int) -> bool:
+	if road_network_path.is_empty():
+		return true
+	var b: Dictionary = _buildings.buildings.get(bid, {})
+	return get_node(road_network_path).is_reachable(int(b.get("segment", -1)))
+
+
 func _output_factor(bid: int) -> float:
 	var b: Dictionary = _buildings.buildings.get(bid, {})
 	return 1.0 if b.get("power", true) and b.get("water", true) else _no_utility_output
@@ -215,15 +224,17 @@ func _on_month(_m: int) -> void:
 		var output := _output_factor(bid)
 		match c["kind"]:
 			"commercial":
+				var import_price := float(_cfg["import_price"]) * (1.0 if _linked(bid) else float(_cfg["isolated_import_factor"]))
 				# A shop can only serve so much per worker; the rest shop elsewhere.
 				var capacity := float(employees[0] + employees[1] + employees[2]) * float(_cfg["shop_units_per_worker"]) * output
 				var units := minf(float(c["sales"]), capacity)
 				report["overflow"] += float(c["sales"]) - units
 				revenue = units * float(_money["retail_price"])
-				costs += units * (local_share_sales * float(_cfg["wholesale_price"]) + (1.0 - local_share_sales) * float(_cfg["import_price"]))
+				costs += units * (local_share_sales * float(_cfg["wholesale_price"]) + (1.0 - local_share_sales) * import_price)
 			"industrial":
 				var units: float = c.get("units", 0.0)
-				revenue = units * (local_share_prod * float(_cfg["wholesale_price"]) + (1.0 - local_share_prod) * float(_cfg["export_price"]))
+				var export_price := float(_cfg["export_price"]) * (1.0 if _linked(bid) else float(_cfg["isolated_export_factor"]))
+				revenue = units * (local_share_prod * float(_cfg["wholesale_price"]) + (1.0 - local_share_prod) * export_price)
 				costs += units * float(_cfg["industry_raw_cost_per_unit"])
 			"office":
 				for level in 3:
