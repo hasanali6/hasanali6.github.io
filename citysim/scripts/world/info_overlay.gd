@@ -45,6 +45,7 @@ var _roads: MultiMeshInstance3D
 var _road_seg := PackedInt32Array()
 var _road_buffer := PackedFloat32Array()
 var _roads_dirty: bool = true
+var _res_quad: MeshInstance3D
 
 
 func _ready() -> void:
@@ -121,6 +122,18 @@ func _refresh() -> void:
 	if current != "traffic":
 		_roads.multimesh.instance_count = 0
 		_roads_dirty = true
+	if _res_quad != null:
+		_res_quad.visible = current == "resources"
+	if current == "resources":
+		# Natural resources: a map-wide tint (fields exist before any road).
+		mm.instance_count = 0
+		_cells_dirty = true
+		_show_resource_map()
+		var res_tints := {}
+		for id: int in _buildings.buildings:
+			res_tints[id] = PROVIDER if (_buildings.buildings[id] as Dictionary).has("extractor") else NONE
+		_buildings.set_overlay_tint(res_tints)
+		return
 	if current == "":
 		mm.instance_count = 0
 		_cells_dirty = true
@@ -167,6 +180,46 @@ func _refresh() -> void:
 	for id: int in records:
 		tints[id] = _building_color(records[id])
 	_buildings.set_overlay_tint(tints)
+
+
+## Map-wide resource tint, built once: each pixel takes the colour of the
+## richest resource there, stronger where it is richer.
+func _show_resource_map() -> void:
+	if _res_quad != null:
+		_res_quad.visible = true
+		return
+	var size := 200
+	var half := GameData.num("map/playable_size_m") * 0.5
+	var types: Dictionary = GameData.section("resources/types")
+	var rm := ResourceMap.shared()
+	var water := MapWater.shared()
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	for y in size:
+		for x in size:
+			var p := Vector2((x + 0.5) / size * 2.0 - 1.0, (y + 0.5) / size * 2.0 - 1.0) * half
+			var best := 0.0
+			var col := Color(0, 0, 0, 0)
+			if water.distance(p) > 0.0:
+				for key: String in types:
+					var r := rm.richness(str(types[key]["field"]), p)
+					if r > best:
+						best = r
+						col = DataLoader.to_color(types[key]["color"])
+			img.set_pixel(x, y, Color(col.r, col.g, col.b, 0.0 if best <= 0.05 else 0.25 + best * 0.5))
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_texture = ImageTexture.create_from_image(img)
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(half * 2.0, half * 2.0)
+	plane.material = mat
+	_res_quad = MeshInstance3D.new()
+	_res_quad.name = "ResourceMap"
+	_res_quad.mesh = plane
+	_res_quad.position = Vector3(0, 0.35, 0)
+	_res_quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_res_quad)
 
 
 ## Road surfaces coloured by how full they are (peak volume / capacity).

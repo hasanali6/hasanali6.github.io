@@ -118,6 +118,27 @@ hücrelerde, talep varsa büyür.
 Ev, apartman, kule, dükkân, AVM, ofis, fabrika, atölye, park, koru ve çeşmeli
 meydanı katalogdan elle yerleştirebilirsin. Parklar mutluluğu artırır.
 
+### Üretim (hammadde)
+Haritada doğal kaynaklar var. Katmanlar → **Kaynaklar** ile görürsün: sarı
+verimli toprak, yeşil orman, kahverengi maden, mor petrol.
+
+| Tesis | Kaynak | Fiyat | Açılır |
+|---|---|---|---|
+| Çiftlik | Verimli toprak | 6.000 | Köy |
+| Kereste kampı | Orman | 7.000 | Köy |
+| Maden ocağı | Maden (tükenir) | 12.000 | Kasaba |
+| Petrol kuyusu | Petrol (tükenir) | 15.000 | Kasaba |
+
+- Tesis işçi çalıştırır ve kaynağın zenginliğine göre hammadde üretir.
+  Yerleştirirken zenginlik yüzdesi görünür; kaynak olmayan yere konmaz.
+- Fabrikalar önce şehrin hammaddesini kullanır: ithal hammaddeden ucuz olduğu
+  için kârları artar. Fazlası otoyoldan ucuza ihraç edilir.
+- Az fabrikası olan kasabaya çok tesis kurma: hammadde ucuza dışarı gider,
+  tesisler zarar edip küçülür.
+- Maden ve petrol rezervi tükenir (binaya uzun bas → kalan rezerv). Tarla ve
+  orman kirlilikten etkilenir; sanayiyi onlardan uzak tut.
+- Ekonomi → **Üretim** sekmesinde hammadde ve mamul ürün dengesi görünür.
+
 ### Hizmetler ve Altyapı
 Yerleştirirken kapsama haritası açılır.
 
@@ -296,8 +317,8 @@ sokaklar yeşildir ve hatlar renkli şerit olarak görünür.
 ## 14. Bilinen sınırlar (kısaca)
 
 - Tünel, otoyol rampaları, metro, tren ve liman yok.
-- Üretim zinciri (hammadde → işlenmiş ürün) basit tutuldu; sanayi doğrudan
-  dükkânlara mal gönderir.
+- Hammaddeler tek havuzda: fabrikalar hangi türün geldiğine bakmaz; ürün
+  çeşitleri (gıda, kereste, metal…) ayrı ayrı izlenmiyor.
 - Yayalar, bisikletler ve park etmiş araçlar görünmüyor; sayılar arka planda
   hesaplanıyor.
 - Doku ve sesler sentetik. Geliştirme ortamı ücretsiz asset sitelerine

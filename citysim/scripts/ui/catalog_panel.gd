@@ -66,6 +66,8 @@ func open(title_key: String, items: Array) -> void:
 		var color: Color
 		if item.has("category"):
 			color = DataLoader.to_color(categories[item["category"]]["color"])
+		elif item.has("extractor"):
+			color = DataLoader.to_color(GameData.value("resources/types/%s/color" % item["extractor"]))
 		elif str(item["zone"]) == "":
 			color = UiStyle.GREEN.darkened(0.2)
 		else:

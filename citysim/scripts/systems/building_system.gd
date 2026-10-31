@@ -206,6 +206,12 @@ func _create(zid: int, lot: PackedInt32Array, front_cell: int, w: int, d: int, s
 
 
 func _apply_capacity(b: Dictionary) -> void:
+	if b.has("extractor"):
+		# Farms, lumber camps, mines and oil wells: jobs from data/resources.json.
+		b["households_cap"] = 0
+		b["job_slots"] = PackedInt32Array(GameData.value("resources/types/%s/jobs" % b["extractor"]))
+		b["company_kind"] = "extractor"
+		return
 	var key: String = b["zone_key"]
 	var group := "" if key == "" else str(_zones.zone_types[key]["group"])
 	var cells := (b["cells"] as PackedInt32Array).size()
@@ -393,10 +399,25 @@ func place(item: Dictionary, cell: int) -> int:
 		floors = maxi(floors, _floors_for(_zones.zone_config(zid), 1))
 	var id := _create(zid, lot, cell, int(item["lot"][0]), int(item["lot"][1]), str(item["style"]), floors, true)
 	buildings[id]["service"] = str(item.get("service", ""))
+	if item.has("extractor"):
+		_init_extractor(buildings[id], str(item["extractor"]))
 	_render_all()
 	EventBus.zones_changed.emit()
 	EventBus.buildings_changed.emit()
 	return id
+
+
+## Resource richness under the lot and, for ore and oil, the deposit that
+## will run out.
+func _init_extractor(b: Dictionary, type: String) -> void:
+	var t: Dictionary = GameData.value("resources/types/" + type)
+	b["extractor"] = type
+	b["richness"] = ResourceMap.shared().lot_richness(str(t["field"]), b["centre"], float(b["width"]), float(b["depth"]))
+	if not bool(t["renewable"]):
+		var deposit := float(b["richness"]) * float(t["deposit_per_cell"]) * (b["cells"] as PackedInt32Array).size()
+		b["deposit"] = deposit
+		b["deposit_max"] = deposit
+	_apply_capacity(b)
 
 
 func _on_long_press(world_pos: Vector3) -> void:
@@ -410,6 +431,10 @@ func _on_long_press(world_pos: Vector3) -> void:
 		name_key = _zones.zone_config(b["zone"])["name_key"]
 	elif str(b.get("service", "")) != "":
 		name_key = str(_service_names.get(b["service"], name_key))
+	elif b.has("extractor"):
+		for item: Dictionary in GameData.value("catalog/production"):
+			if item["style"] == b["style"]:
+				name_key = str(item["name_key"])
 	EventBus.building_inspected.emit({
 		"id": id, "zone_key": name_key, "service": b.get("service", ""),
 		"level": b["level"], "floors": b["floors"], "width": b["width"], "depth": b["depth"],
@@ -420,7 +445,8 @@ func _on_long_press(world_pos: Vector3) -> void:
 		"polluted_water": b.get("polluted_water", false), "pollution": b.get("pollution", 0.0),
 		"coverage": b.get("coverage", {}), "happiness": b.get("happiness", 0.0),
 		"residents": b.get("residents", 0), "no_utility_months": b.get("no_utility_months", 0),
-		"commute": b.get("commute", -1.0),
+		"commute": b.get("commute", -1.0), "extractor": b.get("extractor", ""), "richness": b.get("richness", 0.0),
+		"deposit": b.get("deposit", -1.0), "deposit_max": b.get("deposit_max", -1.0),
 	})
 
 
@@ -439,6 +465,8 @@ func save_state() -> Dictionary:
 			"manual": b["manual"], "seed": b["seed"], "palette": b["palette"], "lot": [b["lot"].x, b["lot"].y],
 			"abandoned": b["abandoned"], "empty_months": b["empty_months"], "abandoned_months": b["abandoned_months"],
 			"service": b.get("service", ""), "no_utility_months": b.get("no_utility_months", 0), "burned": b.get("burned", false),
+			"extractor": b.get("extractor", ""), "richness": b.get("richness", 0.0), "deposit": b.get("deposit", -1.0),
+			"deposit_max": b.get("deposit_max", -1.0),
 			"cells": keys, "front": [grid.segment[front_cell], grid.side[front_cell], grid.along[front_cell], grid.depth[front_cell]],
 		})
 	return {"buildings": list, "next_id": _next_id}
@@ -474,6 +502,12 @@ func load_state(state: Dictionary) -> void:
 		for field: String in ["service", "no_utility_months", "burned"]:
 			if rec.has(field):
 				b[field] = rec[field]
+		if str(rec.get("extractor", "")) != "":
+			b["extractor"] = str(rec["extractor"])
+			b["richness"] = float(rec.get("richness", 0.5))
+			if float(rec.get("deposit", -1.0)) >= 0.0:
+				b["deposit"] = float(rec["deposit"])
+				b["deposit_max"] = float(rec.get("deposit_max", rec["deposit"]))
 		_apply_capacity(b)
 		_rising.erase(id)
 	_next_id = maxi(int(state.get("next_id", 1)), _next_id + 1)
@@ -677,6 +711,8 @@ func _parts_for(b: Dictionary, rise: float) -> Array[Dictionary]:
 				_parts_tower(b, ctx, parts)
 			"factory":
 				_parts_factory(b, ctx, parts)
+			"farm", "lumber", "mine", "oil_well":
+				_parts_extractor(b, ctx, parts)
 			_:
 				if style.begins_with("svc_"):
 					ServiceModels.parts(b, ctx, parts)
@@ -718,6 +754,10 @@ func _lot_kind(b: Dictionary) -> int:
 	match str(b["style"]):
 		"house":
 			return LOT_GARDEN
+		"farm", "lumber":
+			return 5
+		"mine", "oil_well":
+			return 7
 		"factory", "kenney_garage":
 			return LOT_PARKING
 	if str(b["zone_key"]) == "industry":
@@ -843,6 +883,60 @@ func _parts_factory(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) ->
 	var annex: Vector2 = pos + ctx["f"] * (d * 0.5 + 2.6) - ctx["side"] * (w * 0.3)
 	parts.append(_part("house", _basis(ctx, w * 0.3, 4.0 * e, 5.0), annex, 2.0 * e, wall.lightened(0.1), Color(b["seed"], 0.5, 2.4, 0.0)))
 	_contact(parts, ctx, pos, w, d)
+
+
+## Farms, lumber camps, mines and oil wells from boxes, cylinders and gables.
+func _parts_extractor(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> void:
+	var e: float = ctx["e"]
+	var c: Vector2 = ctx["centre"]
+	var f: Vector2 = ctx["f"]
+	var side: Vector2 = ctx["side"]
+	var w: float = ctx["lot_w"]
+	var d: float = ctx["lot_d"]
+	var rng: RandomNumberGenerator = ctx["rng"]
+	var up := Vector3.UP
+	match str(b["style"]):
+		"farm":
+			# Red barn with a grey roof, two silos.
+			var barn: Vector2 = c + f * (d * 0.32) - side * (w * 0.25)
+			parts.append(_part("roof_box", _basis(ctx, 7.0, 4.0 * e, 10.0), barn, 2.0 * e, Color(0.62, 0.2, 0.16), Color()))
+			parts.append(_part("house_roof", _basis(ctx, 7.6, 2.6 * e, 10.6), barn, 4.0 * e, Color(0.42, 0.42, 0.44), Color()))
+			for k in 2:
+				var silo: Vector2 = barn + side * (6.0 + k * 3.6)
+				parts.append(_part("chimney", _basis(ctx, 3.0, 9.0 * e, 3.0), silo, 4.5 * e, Color(0.78, 0.8, 0.82), Color()))
+		"lumber":
+			# Shed and stacks of logs lying along the lot.
+			var shed: Vector2 = c + f * (d * 0.3)
+			parts.append(_part("roof_box", _basis(ctx, 9.0, 3.6 * e, 6.0), shed, 1.8 * e, Color(0.48, 0.36, 0.24), Color()))
+			parts.append(_part("house_roof", _basis(ctx, 9.6, 1.6 * e, 6.6), shed, 3.6 * e, Color(0.3, 0.34, 0.3), Color()))
+			for row in 3:
+				for k in 4:
+					var p: Vector2 = c - f * (d * 0.12 + row * 2.4) + side * (k - 1.5) * 0.9
+					var lie := Basis(ctx["dx"] * 0.8, Vector3(ctx["fz"]) * 6.0 * e, -up * 0.8)
+					parts.append(_part("chimney", lie, p, 0.45 + row * 0.0, Color(0.5, 0.34, 0.2).lerp(Color(0.62, 0.45, 0.3), rng.randf()), Color()))
+		"mine":
+			# Headframe tower, winding house and a spoil heap.
+			var head: Vector2 = c + f * (d * 0.2) + side * (w * 0.2)
+			for k in 4:
+				var leg: Vector2 = head + side * (1.6 if k % 2 == 0 else -1.6) + f * (1.6 if k < 2 else -1.6)
+				parts.append(_part("roof_box", _basis(ctx, 0.4, 16.0 * e, 0.4), leg, 8.0 * e, Color(0.36, 0.3, 0.26), Color()))
+			parts.append(_part("roof_box", _basis(ctx, 4.0, 1.2 * e, 4.0), head, 16.0 * e, Color(0.36, 0.3, 0.26), Color()))
+			parts.append(_part("chimney", Basis(ctx["dx"] * 2.4, up * 0.5, ctx["fz"] * 2.4), head, 17.0 * e, Color(0.2, 0.2, 0.22), Color()))
+			var house: Vector2 = head - side * (w * 0.42)
+			parts.append(_part("roof_box", _basis(ctx, 6.0, 5.0 * e, 7.0), house, 2.5 * e, Color(0.55, 0.5, 0.45), Color()))
+			var heap: Vector2 = c - f * (d * 0.22) - side * (w * 0.05)
+			parts.append(_part("house_roof", _basis(ctx, w * 0.6, 7.0 * e, d * 0.4), heap, 0.0, Color(0.35, 0.32, 0.3), Color()))
+		"oil_well":
+			# Two pump jacks and storage tanks.
+			for k in 2:
+				var jack: Vector2 = c - f * (d * 0.15) + side * (k - 0.5) * (w * 0.45)
+				parts.append(_part("roof_box", _basis(ctx, 1.0, 4.0 * e, 1.0), jack, 2.0 * e, Color(0.24, 0.24, 0.26), Color()))
+				parts.append(_part("roof_box", Basis(ctx["dx"] * 0.6, up * 0.6 * e, ctx["fz"] * 7.0).rotated(ctx["dx"].normalized(), 0.25), jack, 4.2 * e, Color(0.86, 0.6, 0.12), Color()))
+				parts.append(_part("roof_box", _basis(ctx, 1.4, 1.4 * e, 1.4), jack - f * 3.2, 0.7 * e, Color(0.3, 0.3, 0.32), Color()))
+			for k in 2:
+				var tank: Vector2 = c + f * (d * 0.3) + side * (k - 0.5) * 7.0
+				parts.append(_part("chimney", _basis(ctx, 5.5, 5.0 * e, 5.5), tank, 2.5 * e, Color(0.82, 0.83, 0.84), Color()))
+	_contact(parts, ctx, c, w * 0.6, d * 0.6)
 
 
 ## Rooftop clutter: AC units, and a water tank on residential blocks.

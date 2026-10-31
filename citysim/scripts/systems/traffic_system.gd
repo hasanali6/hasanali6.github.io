@@ -311,12 +311,16 @@ func _step_demand(budget: int) -> void:
 		3:
 			var shops := []
 			var factories := []
+			var extractors := []
 			for bid: int in _companies.companies:
 				var kind: String = _companies.companies[bid]["kind"]
 				if kind == "commercial":
 					shops.append(bid)
 				elif kind == "industrial":
 					factories.append(bid)
+				elif kind == "extractor":
+					extractors.append(bid)
+			_add_raw_trips(extractors, factories)
 			var per_shop := float(_cfg["trips"]["freight_per_shop"])
 			if not factories.is_empty():
 				for k in shops.size():
@@ -324,6 +328,28 @@ func _step_demand(budget: int) -> void:
 					_add_trip(from, _seg_of.get(shops[k], -1), KIND_FREIGHT, NO_CATEGORY, per_shop)
 			_add_trade_trips(factories, shops, per_shop)
 			_demand_stage = 4
+
+
+## Raw material trucks: from farms, camps, mines and wells to the city's
+## factories, the surplus to the map edge.
+func _add_raw_trips(extractors: Array, factories: Array) -> void:
+	if extractors.is_empty():
+		return
+	var raw: Dictionary = (_companies.last_report as Dictionary).get("raw", {})
+	var produced := float(raw.get("produced", 0.0))
+	var local_share := 1.0 if produced <= 0.0 else clampf(float(raw.get("local", 0.0)) / produced, 0.0, 1.0)
+	if factories.is_empty():
+		local_share = 0.0
+	var per := float(_cfg["trips"].get("raw_per_extractor", 6.0))
+	var outs: PackedInt32Array = _net.outside_segments()
+	for k in extractors.size():
+		var seg: int = _seg_of.get(extractors[k], -1)
+		if seg < 0:
+			continue
+		if local_share > 0.0:
+			_add_trip(seg, _seg_of.get(factories[k % factories.size()], -1), KIND_FREIGHT, NO_CATEGORY, per * local_share)
+		if local_share < 1.0 and not outs.is_empty() and _net.is_reachable(seg):
+			_add_trip(seg, _nearest_outside(seg, outs), KIND_FREIGHT, NO_CATEGORY, per * (1.0 - local_share))
 
 
 ## Trucks to and from the map edge: exports from factories, imports to shops,

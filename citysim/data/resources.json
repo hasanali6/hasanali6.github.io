@@ -1,0 +1,104 @@
+{
+  "types": {
+    "farm": {
+      "name_key": "RES_FARM",
+      "field": "fertility",
+      "renewable": true,
+      "pollution_sensitive": true,
+      "units_per_worker": [
+        100,
+        115,
+        130
+      ],
+      "jobs": [
+        7,
+        2,
+        0
+      ],
+      "color": "#c8b03c"
+    },
+    "forest": {
+      "name_key": "RES_FOREST",
+      "field": "forest",
+      "renewable": true,
+      "pollution_sensitive": true,
+      "units_per_worker": [
+        95,
+        110,
+        125
+      ],
+      "jobs": [
+        6,
+        2,
+        1
+      ],
+      "color": "#3b7a3c"
+    },
+    "ore": {
+      "name_key": "RES_ORE",
+      "field": "ore",
+      "renewable": false,
+      "pollution_sensitive": false,
+      "units_per_worker": [
+        120,
+        140,
+        160
+      ],
+      "jobs": [
+        8,
+        3,
+        1
+      ],
+      "color": "#9a7656",
+      "deposit_per_cell": 6000
+    },
+    "oil": {
+      "name_key": "RES_OIL",
+      "field": "oil",
+      "renewable": false,
+      "pollution_sensitive": false,
+      "units_per_worker": [
+        130,
+        150,
+        170
+      ],
+      "jobs": [
+        5,
+        4,
+        2
+      ],
+      "color": "#4a4058",
+      "deposit_per_cell": 7000
+    }
+  },
+  "fields": {
+    "fertility": {
+      "seed": 11,
+      "frequency": 0.0014,
+      "low": 0.42,
+      "high": 0.72
+    },
+    "forest": {
+      "seed": 4242,
+      "frequency": 0.0012,
+      "low": 0.5,
+      "high": 0.72
+    },
+    "ore": {
+      "seed": 97,
+      "frequency": 0.0032,
+      "low": 0.66,
+      "high": 0.84
+    },
+    "oil": {
+      "seed": 131,
+      "frequency": 0.0026,
+      "low": 0.68,
+      "high": 0.86
+    }
+  },
+  "min_richness": 0.2,
+  "local_raw_price": 22,
+  "raw_export_price": 18,
+  "raw_per_good": 1.0
+}

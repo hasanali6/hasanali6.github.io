@@ -41,6 +41,15 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 - **Yol yükseltme:** yol panelinde **Yükselt** modu. Üstte yeni tipi seç, yola dokun: yol yerinde değişir (ör. sokak → cadde). Bedeli yeni yolun fiyatından eskisinin iadesi düşülerek alınır. Genişleyen yol kenardaki parsellerden yer alabilir.
 - **Köprüler:** yollar artık suyun üstünden geçebilir. Su üstündeki kısım korkuluklu köprü olur ve metre başına 4 kat pahalıdır. Köprünün iki ucu ve kavşaklar karada olmalı.
 
+- **Üretim zinciri:**
+  - Haritada doğal kaynaklar var: verimli toprak, orman, maden, petrol (Katmanlar → Kaynaklar).
+  - İnşa Et → **Üretim** ile çiftlik, kereste kampı, maden ocağı ve petrol kuyusu kurulur; kaynak olmayan yere konmaz.
+  - Tesisler işçi çalıştırır ve zenginliğe göre hammadde üretir. Maden ve petrol rezervi tükenir; tarla ve orman kirlilikten etkilenir.
+  - Fabrikalar önce şehrin hammaddesini kullanır (ithal hammaddeden ucuz); fazlası otoyoldan ucuza ihraç edilir.
+  - Kamyonlar tesisten fabrikaya ve harita kenarına gider.
+  - Ekonomi → **Üretim** sekmesi: üretilen, kullanılan, ithal ve ihraç edilen hammadde ve mamul ürün.
+  - Çiftlik ve kereste Köy'de, maden ve petrol Kasaba'da açılır.
+
 **Neden dokular ve sesler burada üretildi:** bu geliştirme ortamının ağ ayarları ambientcg.com, polyhaven.com, kenney.nl, freesound.org ve opengameart.org'a erişimi engelliyor. Dokular ve sesler bu yüzden repodaki Python betikleriyle sıfırdan üretildi (lisans derdi yok, istenirse yeniden üretilebilir). Ortamın ağ izni açılırsa (bulut ortamı ayarları → Network access → bu alan adlarını ekle) taranmış PBR dokular ve kayıt sesleri aynı dosya adlarıyla değiştirilebilir; kodda değişiklik gerekmez.
 
 **Faz 9 kabul kriterleri:**

@@ -31,7 +31,8 @@
       "fire": 0.002,
       "deathcare": 0.0015
     },
-    "through_per_day": 240.0
+    "through_per_day": 240.0,
+    "raw_per_extractor": 6.0
   },
   "lights": {
     "min_legs": 3,

@@ -15,12 +15,12 @@
       "unlocks": [
         "road:avenue", "road:avenue_oneway", "zone:res_mid", "zone:mixed",
         "item:apartment_s", "item:apartment", "item:factory", "item:park_forest",
-        "svc:gas_plant", "svc:solar_farm", "svc:high_school", "transit:bus"
+        "svc:gas_plant", "svc:solar_farm", "svc:high_school", "transit:bus", "item:farm", "item:lumber"
       ]
     },
     {
       "name_key": "MILESTONE_2", "population": 1000, "reward": 15000, "loan_limit": 80000, "area_half_m": 1600,
-      "unlocks": ["zone:office", "item:office", "item:plaza", "svc:hospital", "svc:treatment_plant", "svc:incinerator", "districts"]
+      "unlocks": ["zone:office", "item:office", "item:plaza", "svc:hospital", "svc:treatment_plant", "svc:incinerator", "districts", "item:mine", "item:oil_well"]
     },
     {
       "name_key": "MILESTONE_3", "population": 2500, "reward": 25000, "loan_limit": 120000,

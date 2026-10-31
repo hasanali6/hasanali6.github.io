@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_test_progression()
 	_test_weather_traffic()
 	_test_highway_bridge()
+	_test_resources()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -727,7 +728,8 @@ func _test_progression() -> void:
 	var roads: Dictionary = DataLoader.load_json("res://data/roads.json")["types"]
 	var zones: Dictionary = DataLoader.load_json("res://data/zones.json")["types"]
 	var items := {}
-	for it: Dictionary in DataLoader.load_json("res://data/catalog.json")["items"]:
+	var catalog: Dictionary = DataLoader.load_json("res://data/catalog.json")
+	for it: Dictionary in catalog["items"] + catalog.get("production", []):
 		items["item:" + str(it["id"])] = true
 	for it: Dictionary in DataLoader.load_json("res://data/services.json")["types"]:
 		items["svc:" + str(it["id"])] = true
@@ -785,3 +787,28 @@ func _test_highway_bridge() -> void:
 	for v in verts:
 		top = maxf(top, v.y)
 	_check(top > float(mesh["asphalt_height_m"]) + 0.1, "the deck rises above the water on a bridge")
+
+
+func _test_resources() -> void:
+	var data: Dictionary = DataLoader.load_json("res://data/resources.json")
+	var rm := ResourceMap.new(data["fields"])
+	var again := ResourceMap.new(data["fields"])
+	var found := {}
+	var in_range := true
+	for key: String in data["types"]:
+		var field := str(data["types"][key]["field"])
+		for i in 400:
+			var p := Vector2(-1900.0 + (i % 20) * 200.0, -1900.0 + (i / 20) * 200.0)
+			var r := rm.richness(field, p)
+			if r < 0.0 or r > 1.0 or r != again.richness(field, p):
+				in_range = false
+			if r > 0.3:
+				found[key] = true
+	_check(in_range, "resource richness is 0..1 and the same map every time")
+	_check(found.size() == (data["types"] as Dictionary).size(), "every resource can be found somewhere on the map %s" % [found.keys()])
+	var catalog: Dictionary = DataLoader.load_json("res://data/catalog.json")
+	var linked := true
+	for it: Dictionary in catalog["production"]:
+		if not (data["types"] as Dictionary).has(str(it["extractor"])):
+			linked = false
+	_check(linked, "every production site extracts a known resource")

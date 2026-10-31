@@ -23,6 +23,7 @@ const BUILD_TOOLS: Array = [
 	["TOOL_UTILITIES", "zap", UiStyle.GOLD],
 	["TOOL_TRANSIT", "bus", UiStyle.BLUE],
 	["TOOL_DISTRICTS", "map", UiStyle.PURPLE],
+	["TOOL_PRODUCTION", "factory", Color(0.8, 0.58, 0.12)],
 	["TOOL_BULLDOZE", "trash-2", UiStyle.RED],
 ]
 ## Info overlay layers: [key, label key, colour].
@@ -33,6 +34,7 @@ const OVERLAYS: Array = [
 	["garbage", "SVC_CAT_GARBAGE", UiStyle.GREEN], ["deathcare", "SVC_CAT_DEATHCARE", UiStyle.SLATE],
 	["pollution", "OVERLAY_POLLUTION", UiStyle.SLATE], ["happiness", "OVERLAY_HAPPINESS", UiStyle.GREEN],
 	["traffic", "OVERLAY_TRAFFIC", UiStyle.ORANGE], ["transit", "OVERLAY_TRANSIT", UiStyle.BLUE],
+	["resources", "OVERLAY_RESOURCES", UiStyle.GOLD],
 ]
 ## Speed buttons: [icon, badge text].
 const SPEEDS: Array = [["pause", ""], ["play", ""], ["fast-forward", "2"], ["fast-forward", "3"]]
@@ -167,6 +169,8 @@ func _ready() -> void:
 		var item: Dictionary = options.get("item", {})
 		if tool == "place" and item.has("category"):
 			_select_overlay(str(item["category"]))
+		elif tool == "place" and item.has("extractor"):
+			_select_overlay("resources")
 		elif tool == "place" and not _overlay_panel.visible:
 			_select_overlay(""))
 	EventBus.road_inspected.connect(_on_road_inspected)
@@ -467,6 +471,8 @@ func _build_tray() -> PanelContainer:
 			b.pressed.connect(_open_catalog.bind("utilities"))
 		elif key == "TOOL_ZONING":
 			b.pressed.connect(_open_zone_panel)
+		elif key == "TOOL_PRODUCTION":
+			b.pressed.connect(_open_catalog.bind("production"))
 		elif key == "TOOL_BULLDOZE":
 			# Demolish roads and buildings: the road panel in its bulldoze mode.
 			b.pressed.connect(func() -> void:
@@ -787,10 +793,15 @@ func _on_building_inspected(info: Dictionary) -> void:
 		lines.append(tr("BUILDING_BURNED"))
 	elif info.get("abandoned", false):
 		lines.append(tr("BUILDING_ABANDONED"))
-	if info["zone_key"] != "BUILD_PARK":
+	if info["zone_key"] != "BUILD_PARK" and str(info.get("extractor", "")) == "":
 		lines.append(tr("BUILDING_LEVEL") % [info["level"], info["floors"]])
 	if int(info.get("households_cap", 0)) > 0:
 		lines.append(tr("BUILDING_HOMES") % [info["households"], info["households_cap"]])
+	if str(info.get("extractor", "")) != "":
+		var res_key := str(GameData.value("resources/types/%s/name_key" % info["extractor"]))
+		lines.append(tr("BUILDING_RESOURCE") % [tr(res_key), roundi(float(info["richness"]) * 100.0)])
+		if float(info.get("deposit_max", -1.0)) > 0.0:
+			lines.append(tr("BUILDING_DEPOSIT") % roundi(float(info["deposit"]) / float(info["deposit_max"]) * 100.0))
 	if int(info.get("jobs", 0)) > 0:
 		lines.append(tr("BUILDING_JOBS") % [info["employees"], info["jobs"]])
 		lines.append(tr("BUILDING_PROFIT") % UiStyle.format_int(roundi(float(info["profit"]))))
@@ -901,6 +912,8 @@ func _open_catalog(group: String) -> void:
 	_build_button.get_parent().visible = false
 	if group == "buildings":
 		_catalog.open("BUILD_CATALOG", GameData.value("catalog/items"))
+	elif group == "production":
+		_catalog.open("BUILD_PRODUCTION", GameData.value("catalog/production"))
 	else:
 		_catalog.open("SVC_CATALOG_" + group.to_upper(), _service_system().catalog_items(group))
 
@@ -990,6 +1003,8 @@ func _refresh_overlay_legend() -> void:
 					UiStyle.format_int(roundi(float(sw[0]))), UiStyle.format_int(roundi(float(sw[1])))]
 		"pollution":
 			text = tr("OVERLAY_LEGEND_POLLUTION")
+		"resources":
+			text = tr("OVERLAY_LEGEND_RESOURCES")
 		"traffic":
 			var traffic := get_tree().current_scene.get_node("TrafficSystem")
 			var vehicles := get_tree().current_scene.get_node("VehicleSystem")

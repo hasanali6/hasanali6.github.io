@@ -4,6 +4,11 @@ extends Node
 ##                the rest is exported (cheaper). Raw input is bought in.
 ##   commercial : sells goods to households; buys from local industry or,
 ##                when that is not enough, imports at a higher price.
+##   extractor  : farms, lumber camps, mines and oil wells (placed by hand on
+##                a resource) produce raw material by richness and workers.
+##                Factories use the city's raw material first (cheaper than
+##                importing it); the rest is exported by highway. Ore and oil
+##                run out; farms and forests suffer from pollution.
 ##   office     : workers produce services sold at a value per worker.
 ## Each month a company books revenue, wages and goods costs, pays tax on
 ## profit, and adjusts how many of its job slots it wants filled. Companies
@@ -192,9 +197,34 @@ func _on_month(_m: int) -> void:
 	var office_value: Array = _cfg["office_value_per_worker"]
 	var sales_total := 0.0
 	var production_total := 0.0
+	var res_types: Dictionary = GameData.section("resources/types")
+	var raw_produced := 0.0
+	var raw_by_type := {}
+	var records0: Dictionary = _buildings.buildings
 	for bid: int in companies:
 		var c: Dictionary = companies[bid]
-		if c["kind"] == "commercial":
+		if c["kind"] == "extractor":
+			var b: Dictionary = records0.get(bid, {})
+			var t: Dictionary = res_types.get(str(b.get("extractor", "")), {})
+			if t.is_empty():
+				continue
+			var per: Array = t["units_per_worker"]
+			var raw := 0.0
+			for level in 3:
+				raw += (c["employees"] as PackedInt32Array)[level] * float(per[level])
+			raw *= float(b.get("richness", 0.0)) * _output_factor(bid)
+			if bool(t["pollution_sensitive"]):
+				raw *= 1.0 - clampf(float(b.get("pollution", 0.0)), 0.0, 1.0) * 0.7
+			if b.has("deposit"):
+				var left := float(b["deposit"])
+				raw = minf(raw, left)
+				b["deposit"] = left - raw
+				if left > 0.0 and left - raw <= 0.0:
+					EventBus.notification_posted.emit("economy", tr("NOTIFY_DEPOSIT_EMPTY") % tr(str(t["name_key"])))
+			c["units"] = raw
+			raw_produced += raw
+			raw_by_type[b["extractor"]] = float(raw_by_type.get(b["extractor"], 0.0)) + raw
+		elif c["kind"] == "commercial":
 			sales_total += c["sales"]
 		elif c["kind"] == "industrial":
 			var units := 0.0
@@ -206,11 +236,20 @@ func _on_month(_m: int) -> void:
 	var local := minf(sales_total, production_total)
 	var local_share_sales := 0.0 if sales_total <= 0.0 else local / sales_total
 	var local_share_prod := 0.0 if production_total <= 0.0 else local / production_total
+	# Raw material: the city's own first, the rest imported / exported.
+	var raw_needed := production_total * GameData.num("resources/raw_per_good")
+	var raw_local := minf(raw_produced, raw_needed)
+	var raw_share_need := 0.0 if raw_needed <= 0.0 else raw_local / raw_needed
+	var raw_share_prod := 0.0 if raw_produced <= 0.0 else raw_local / raw_produced
+	var local_raw_price := GameData.num("resources/local_raw_price")
+	var raw_export_price := GameData.num("resources/raw_export_price")
 
 	var report := {
 		"taxes": {"commercial": 0.0, "office": 0.0, "industrial": 0.0},
 		"goods_sold": sales_total, "goods_produced": production_total,
 		"imports": sales_total - local, "exports": production_total - local, "bankrupt": 0, "overflow": 0.0,
+		"raw": {"produced": raw_produced, "needed": raw_needed, "local": raw_local, "imported": raw_needed - raw_local,
+			"exported": raw_produced - raw_local, "by_type": raw_by_type},
 	}
 	var records: Dictionary = _buildings.buildings
 	for bid: int in companies.keys():
@@ -235,13 +274,19 @@ func _on_month(_m: int) -> void:
 				var units: float = c.get("units", 0.0)
 				var export_price := float(_cfg["export_price"]) * (1.0 if _linked(bid) else float(_cfg["isolated_export_factor"]))
 				revenue = units * (local_share_prod * float(_cfg["wholesale_price"]) + (1.0 - local_share_prod) * export_price)
-				costs += units * float(_cfg["industry_raw_cost_per_unit"])
+				var raw_import := float(_cfg["industry_raw_cost_per_unit"]) * (1.0 if _linked(bid) else float(_cfg["isolated_import_factor"]))
+				costs += units * GameData.num("resources/raw_per_good") * (raw_share_need * local_raw_price + (1.0 - raw_share_need) * raw_import)
+			"extractor":
+				var raw: float = c.get("units", 0.0)
+				var away := raw_export_price * (1.0 if _linked(bid) else float(_cfg["isolated_export_factor"]))
+				revenue = raw * (raw_share_prod * local_raw_price + (1.0 - raw_share_prod) * away)
 			"office":
 				for level in 3:
 					revenue += employees[level] * float(office_value[level]) * output
 		var profit := revenue - costs
-		var tax := maxf(profit, 0.0) * EconomySystem.tax_rate(c["kind"]) / 100.0 * EconomySystem.city_share()
-		report["taxes"][c["kind"]] += tax
+		var tax_group := "industrial" if c["kind"] == "extractor" else str(c["kind"])
+		var tax := maxf(profit, 0.0) * EconomySystem.tax_rate(tax_group) / 100.0 * EconomySystem.city_share()
+		report["taxes"][tax_group] += tax
 		c["money"] += profit - tax
 		c["profit"] = profit
 		c["sales"] = 0.0
@@ -282,7 +327,7 @@ func stats() -> Dictionary:
 	var vacant := 0
 	for c: Dictionary in companies.values():
 		var slots: PackedInt32Array = c["slots"]
-		jobs[c["kind"]] += slots[0] + slots[1] + slots[2]
+		jobs["industrial" if c["kind"] == "extractor" else c["kind"]] += slots[0] + slots[1] + slots[2]
 		for level in 3:
 			vacant += maxi(_open(c, level), 0)
 	var sold := float(last_report.get("goods_sold", 0.0))

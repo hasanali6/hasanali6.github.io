@@ -316,3 +316,28 @@ ROAD_HINT_UPGRADE,yolu seçili tipe çevir,change the road to the selected type
 ROAD_UPGRADED,Yol %s yapıldı (%s),Road changed to %s (%s)
 ROAD_ERR_UPGRADE_SAME,Yol zaten bu tipte,The road is already this type
 ROAD_ERR_UPGRADE_NONE,Yükseltmek için bir yola dokun,Touch a road to upgrade it
+TOOL_PRODUCTION,Üretim,Production
+BUILD_PRODUCTION,Üretim tesisleri,Production
+CAT_FARM,Çiftlik,Farm
+CAT_LUMBER,Kereste kampı,Lumber camp
+CAT_MINE,Maden ocağı,Mine
+CAT_OIL_WELL,Petrol kuyusu,Oil well
+RES_FARM,Verimli toprak,Fertile land
+RES_FOREST,Orman,Forest
+RES_ORE,Maden,Ore
+RES_OIL,Petrol,Oil
+BUILD_ERR_RESOURCE,Burada bu kaynak yok (Katmanlar → Kaynaklar),No such resource here (Layers → Resources)
+BUILD_RICHNESS,zenginlik %%%d,richness %d%%
+BUILDING_RESOURCE,Kaynak: %s · zenginlik %%%d,Resource: %s · richness %d%%
+BUILDING_DEPOSIT,Kalan rezerv: %%%d,Deposit left: %d%%
+NOTIFY_DEPOSIT_EMPTY,Bir %s rezervi tükendi; tesis artık üretmiyor,A %s deposit ran out; the site no longer produces
+OVERLAY_RESOURCES,Kaynaklar,Resources
+OVERLAY_LEGEND_RESOURCES,Sarı: verimli toprak (çiftlik) · yeşil: orman (kereste) · kahve: maden · mor: petrol. Renk koyulaştıkça zengin.,Yellow: fertile land (farms) · green: forest (lumber) · brown: ore · purple: oil. Stronger colour = richer.
+ECON_TAB_PRODUCTION,Üretim,Production
+PROD_EXTRACTORS,Üretim tesisi: %d,Production sites: %d
+PROD_RAW,Hammadde: %s/ay (%s),Raw material: %s/month (%s)
+PROD_RAW_USE,"Fabrikaların ihtiyacı %s — şehirden %s, ithal %s","Factories need %s — local %s, imported %s"
+PROD_RAW_EXPORT,İhraç edilen hammadde: %s,Raw material exported: %s
+PROD_GOODS,"Mamul ürün: üretilen %s, dükkânlarda satılan %s","Goods: produced %s, sold in shops %s"
+PROD_TRADE,"Mamul ürün ihracatı %s, ithalatı %s","Goods exported %s, imported %s"
+PROD_HINT,İpucu: yerel hammadde fabrikalara ithal hammaddeden ucuza gelir. Fazlası otoyoldan ucuza ihraç edilir.,Tip: local raw material is cheaper for factories than imports; the surplus is exported cheaply by highway.

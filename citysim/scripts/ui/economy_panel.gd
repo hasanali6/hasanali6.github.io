@@ -26,6 +26,7 @@ var _svc_sliders: Dictionary = {}
 var _svc_values: Dictionary = {}
 var _utility_label: Label
 var _loan_label: Label
+var _production_label: Label
 var _progress_label: Label
 var _progress_bar: ProgressBar
 var _milestone_list: Label
@@ -43,7 +44,7 @@ func _init(font_size: int, min_touch: float) -> void:
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 10)
 	var group := ButtonGroup.new()
-	for key: String in ["budget", "taxes", "services", "loan", "progress"]:
+	for key: String in ["budget", "taxes", "services", "loan", "production", "progress"]:
 		var b := Button.new()
 		b.text = "ECON_TAB_" + key.to_upper()
 		b.toggle_mode = true
@@ -60,6 +61,7 @@ func _init(font_size: int, min_touch: float) -> void:
 	_pages["taxes"] = _build_taxes()
 	_pages["services"] = _build_services()
 	_pages["loan"] = _build_loan()
+	_pages["production"] = _build_production()
 	_pages["progress"] = _build_progress()
 	for page: Control in _pages.values():
 		content.add_child(page)
@@ -73,6 +75,9 @@ func _init(font_size: int, min_touch: float) -> void:
 			_refresh_utilities())
 	EventBus.loan_changed.connect(_refresh_loan)
 	EventBus.progression_changed.connect(_refresh_progress)
+	EventBus.companies_reported.connect(func(_r: Dictionary) -> void:
+		if card.visible:
+			_refresh_production())
 	EventBus.city_stats_changed.connect(func(_s: Dictionary) -> void:
 		if card.visible and _pages["progress"].visible:
 			_refresh_progress())
@@ -85,6 +90,7 @@ func open() -> void:
 	_refresh_services()
 	_refresh_loan()
 	_refresh_progress()
+	_refresh_production()
 	card.visible = true
 
 
@@ -400,3 +406,42 @@ func _refresh_progress() -> void:
 		var m: Dictionary = ms[i]
 		lines.append("%s %s · %s" % ["✔" if i <= level else "○", tr(m["name_key"]), UiStyle.format_int(int(m["population"]))])
 	_milestone_list.text = "   ".join(lines)
+
+
+# --- Production -------------------------------------------------------------------
+
+func _build_production() -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 8)
+	_production_label = UiStyle.label("", _font - 4)
+	_production_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_production_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(_production_label)
+	return col
+
+
+func _refresh_production() -> void:
+	var companies := (Engine.get_main_loop() as SceneTree).current_scene.get_node_or_null("CompanySystem")
+	if companies == null:
+		return
+	var rep: Dictionary = companies.last_report
+	var raw: Dictionary = rep.get("raw", {})
+	var by_type: Dictionary = raw.get("by_type", {})
+	var types: Dictionary = GameData.section("resources/types")
+	var parts := PackedStringArray()
+	for key: String in types:
+		parts.append("%s %s" % [tr(types[key]["name_key"]), UiStyle.format_int(roundi(float(by_type.get(key, 0.0))))])
+	var count := 0
+	for c: Dictionary in companies.companies.values():
+		if c["kind"] == "extractor":
+			count += 1
+	var f := func(v: Variant) -> String: return UiStyle.format_int(roundi(float(v)))
+	_production_label.text = "\n".join(PackedStringArray([
+		tr("PROD_EXTRACTORS") % count,
+		tr("PROD_RAW") % [f.call(raw.get("produced", 0.0)), ", ".join(parts)],
+		tr("PROD_RAW_USE") % [f.call(raw.get("needed", 0.0)), f.call(raw.get("local", 0.0)), f.call(raw.get("imported", 0.0))],
+		tr("PROD_RAW_EXPORT") % f.call(raw.get("exported", 0.0)),
+		tr("PROD_GOODS") % [f.call(rep.get("goods_produced", 0.0)), f.call(rep.get("goods_sold", 0.0))],
+		tr("PROD_TRADE") % [f.call(rep.get("exports", 0.0)), f.call(rep.get("imports", 0.0))],
+		tr("PROD_HINT"),
+	]))
