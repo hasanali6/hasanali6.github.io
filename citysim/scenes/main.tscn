@@ -42,6 +42,7 @@ script = ExtResource("6_roads")
 [node name="RoadTool" type="Node3D" parent="."]
 script = ExtResource("7_roadtool")
 road_network_path = NodePath("../RoadNetwork")
+building_system_path = NodePath("../BuildingSystem")
 
 [node name="ZoneSystem" type="Node3D" parent="."]
 script = ExtResource("8_zones")

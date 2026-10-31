@@ -57,8 +57,22 @@ geçer.
 ## 4. İnşa Et menüsü
 
 ### Yollar
-Düz veya eğri çizim, yıkma. Kesişen yollar kendiliğinden kavşak olur. Çizerken
-maliyet görünür; yıkınca para iade edilir.
+Düz veya eğri çizim. Kesişen yollar kendiliğinden kavşak olur. Çizerken maliyet
+görünür.
+
+Düz çizimde yol 15°'lik adımlarla ve 8 m'lik boylarla ilerler. Açı, başladığın
+yola göre ölçülür; parmağın titrese de yol ya o yolun düz devamı olur ya da
+tam dik keser. Uç nokta yakındaki bir kavşağa veya yola ancak çizdiğin yön
+bozulmuyorsa yapışır. Serbest açı veya kavis için eğri modunu kullan.
+
+### Yık
+Menüdeki kırmızı **Yık** düğmesi (yol panelindeki yıkma modu da aynı işi
+yapar). Bir binaya ya da yola dokun: kırmızı işaretlenir, parmağını kaldırınca
+yıkılır.
+- Yollar fiyatının %75'ini geri verir.
+- Elle konan binalar ve hizmet binaları fiyatının yarısını geri verir.
+- İmarla kendiliğinden büyüyen binalar para vermez. İmar duruyorsa yerine
+  zamanla yenisi gelir; tamamen boşaltmak için imarı da silgiyle sil.
 
 | Yol | Şerit | m başı maliyet |
 |---|---|---|

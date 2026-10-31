@@ -302,3 +302,5 @@ SEASON_WINTER,Kış,Winter
 SETTINGS_MUSIC,Müzik,Music
 SETTINGS_SFX,Efekt,Effects
 SETTINGS_AMBIENT,Ortam,Ambience
+BUILDING_DEMOLISHED,Bina yıkıldı (+%s iade),Building demolished (+%s refund)
+TOOL_BULLDOZE,Yık,Demolish

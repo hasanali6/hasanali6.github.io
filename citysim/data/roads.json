@@ -83,7 +83,8 @@
   "snap": {
     "grid_m": 8.0,
     "angle_step_deg": 15.0,
-    "angle_snap_tolerance_deg": 4.0,
+    "angle_snap_tolerance_deg": 7.5,
+    "end_snap_max_turn_deg": 7.0,
     "node_radius_px": 36.0,
     "segment_radius_px": 28.0
   },

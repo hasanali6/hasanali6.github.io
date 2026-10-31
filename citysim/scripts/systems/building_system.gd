@@ -347,6 +347,25 @@ func demolish(id: int) -> void:
 	EventBus.buildings_changed.emit()
 
 
+## Money back for demolishing a building: part of its price if it was built
+## by hand (catalogue or service); grown buildings return nothing.
+func refund_of(id: int) -> int:
+	if not buildings.has(id):
+		return 0
+	var b: Dictionary = buildings[id]
+	var ratio := GameData.num("economy/building_refund_ratio")
+	var service := str(b.get("service", ""))
+	if service != "":
+		for t: Dictionary in GameData.value("services/types"):
+			if t["id"] == service:
+				return roundi(float(t["cost"]) * ratio)
+	if b["manual"]:
+		for item: Dictionary in GameData.value("catalog/items"):
+			if item["style"] == b["style"] and str(item["zone"]) == str(b["zone_key"]):
+				return roundi(float(item["cost"]) * ratio)
+	return 0
+
+
 func building_at(p: Vector2) -> int:
 	var grid: ZoneGrid = _zones.grid
 	var cell := grid.cell_at(p)

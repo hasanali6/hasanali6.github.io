@@ -31,6 +31,10 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 | Ses | `scripts/systems/audio_system.gd`, `assets/audio/*.ogg`, üretici `tools/gen_sounds.py` | Ortam: trafik uğultusu (yakındaki araç sayısıyla), gündüz kuşlar, yaz geceleri cırcır böcekleri, yağmur, yükseklerde rüzgâr; kamera yüksekliği, saat, mevsim ve havaya göre yumuşakça karışır. Efektler: buton, menü, yol yapma, yıkma, bina koyma, imar fırçası, hata, bildirim, kilometre taşı, para. Sakin bir müzik döngüsü (64 sn). Ayarlar'da Müzik / Efekt / Ortam ses seviyeleri (kaydedilir). Uygulama arka plana geçince ses kesilir. Toplam ses boyutu ~830 KB. |
 | Kalite | `data/graphics.json` | Düşük ayarda doku detayı kapalı (`surface_detail`), Orta ve Yüksek'te açık. |
 
+**Test sonrası düzeltmeler:**
+- **Bina yıkma:** İnşa Et menüsünde kırmızı **Yık** düğmesi. Dokunulan bina (yoksa yol) kırmızı işaretlenir, bırakınca yıkılır. Elle konan ve hizmet binaları fiyatının yarısını, yollar %75'ini geri verir.
+- **Düz yol çizimi:** açı adımları artık başlanan yola göre ölçülüyor ve her zaman 15°'ye kilitleniyor (eskiden ±4° tolerans vardı, parmak titreyince yol eğri/kırık çıkıyordu). Uç nokta yakındaki kavşağa veya yola ancak yön bozulmuyorsa yapışıyor.
+
 **Neden dokular ve sesler burada üretildi:** bu geliştirme ortamının ağ ayarları ambientcg.com, polyhaven.com, kenney.nl, freesound.org ve opengameart.org'a erişimi engelliyor. Dokular ve sesler bu yüzden repodaki Python betikleriyle sıfırdan üretildi (lisans derdi yok, istenirse yeniden üretilebilir). Ortamın ağ izni açılırsa (bulut ortamı ayarları → Network access → bu alan adlarını ekle) taranmış PBR dokular ve kayıt sesleri aynı dosya adlarıyla değiştirilebilir; kodda değişiklik gerekmez.
 
 **Faz 9 kabul kriterleri:**

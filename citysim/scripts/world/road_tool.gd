@@ -4,13 +4,21 @@ extends Node3D
 ## camera). Modes:
 ##   straight : press = start, drag = end, release = build
 ##   curve    : first stroke start -> bend point, second stroke drags the end
-##   bulldoze : touch a road to select it, release to demolish (partial refund)
-## Points snap to existing junctions, onto existing roads, to 15° angle steps
-## with 8 m length steps from the start, or to the 8 m grid.
+##   bulldoze : touch a building or a road to select it, release to demolish
+##              (hand-built buildings and roads give part of their price back)
+## Straight roads always follow 15° steps measured from the road they start
+## on (so continuing or crossing at right angles is exact) with 8 m length
+## steps; the end only jumps onto a nearby junction or road when that keeps
+## the drawn direction. Start points snap to junctions, roads or the 8 m grid.
 
 @export var road_network_path: NodePath
+@export var building_system_path: NodePath
 
 var _net: Node
+var _buildings: Node
+var _target_building: int = -1
+var _ref_angle: float = 0.0
+var _max_turn: float
 var _active: bool = false
 var _type: String = ""
 var _mode: String = "straight"
@@ -35,11 +43,14 @@ var _invalid_mat: StandardMaterial3D
 
 func _ready() -> void:
 	_net = get_node(road_network_path)
+	if not building_system_path.is_empty():
+		_buildings = get_node(building_system_path)
 	var snap := GameData.section("roads/snap")
 	_grid = float(snap["grid_m"])
 	_angle_step = deg_to_rad(float(snap["angle_step_deg"]))
 	_angle_tolerance = deg_to_rad(float(snap["angle_snap_tolerance_deg"]))
 	_node_radius_px = float(snap["node_radius_px"])
+	_max_turn = deg_to_rad(float(snap.get("end_snap_max_turn_deg", 7.0)))
 	_segment_radius_px = float(snap["segment_radius_px"])
 	_playable_half = GameData.num("map/playable_size_m") * 0.5
 	_type = str((GameData.value("roads/order") as Array)[0])
@@ -103,23 +114,25 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 func _on_down(screen_pos: Vector2) -> void:
 	match _mode:
 		"bulldoze":
-			_highlight = _segment_at(screen_pos)
+			_pick_target(screen_pos)
 		"curve":
 			if _curve_stage == 0:
 				_start = _snap(screen_pos, null)
 				_control = _start
+				_ref_angle = _reference_angle(_start)
 			else:
 				_end = _snap(screen_pos, null)
 		_:
 			_start = _snap(screen_pos, null)
 			_end = _start
+			_ref_angle = _reference_angle(_start)
 	_refresh()
 
 
 func _on_move(screen_pos: Vector2) -> void:
 	match _mode:
 		"bulldoze":
-			_highlight = _segment_at(screen_pos)
+			_pick_target(screen_pos)
 		"curve":
 			if _curve_stage == 0:
 				_control = _snap(screen_pos, _start)
@@ -134,8 +147,15 @@ func _on_move(screen_pos: Vector2) -> void:
 func _on_up(screen_pos: Vector2) -> void:
 	match _mode:
 		"bulldoze":
-			_highlight = _segment_at(screen_pos)
-			if _highlight >= 0:
+			_pick_target(screen_pos)
+			if _target_building >= 0:
+				var back: int = _buildings.refund_of(_target_building)
+				_buildings.demolish(_target_building)
+				if back > 0:
+					EconomySystem.refund(back)
+				EventBus.sfx_requested.emit("bulldoze")
+				EventBus.notification_posted.emit("roads", tr("BUILDING_DEMOLISHED") % UiStyle.format_int(back))
+			elif _highlight >= 0:
 				var refund: int = _net.demolish(_highlight)
 				EventBus.sfx_requested.emit("bulldoze")
 				EventBus.notification_posted.emit("roads", tr("ROAD_REFUND") % UiStyle.format_int(refund))
@@ -178,6 +198,7 @@ func _reset() -> void:
 	_end = null
 	_curve_stage = 0
 	_highlight = -1
+	_target_building = -1
 	_preview.visible = false
 	_marker.visible = false
 	EventBus.road_preview_changed.emit({"active": false})
@@ -231,6 +252,7 @@ func _refresh() -> void:
 	var check := _evaluate(a, b, control)
 	var ctrl: Vector2 = control if control != null else ((a as Vector2) + (b as Vector2)) * 0.5
 	var width := RoadTypes.total_width(_net.type_config(_type))
+	_preview.transform = Transform3D.IDENTITY
 	_preview.mesh = _ribbon(a, ctrl, b, width)
 	_preview.material_override = _valid_mat if check["valid"] else _invalid_mat
 	_marker.material_override = _preview.material_override
@@ -243,6 +265,23 @@ func _refresh() -> void:
 
 
 func _show_bulldoze() -> void:
+	if _target_building >= 0 and _buildings.buildings.has(_target_building):
+		var b: Dictionary = _buildings.buildings[_target_building]
+		var f: Vector2 = b["front"]
+		var fz := Vector3(f.x, 0, f.y)
+		var dx := Vector3.UP.cross(fz)
+		var h := maxf(int(b["floors"]) * 3.4 + 2.0, 5.0)
+		var box := BoxMesh.new()
+		box.size = Vector3(float(b["width"]) + 0.6, h, float(b["depth"]) + 0.6)
+		_preview.mesh = box
+		var c: Vector2 = b["centre"]
+		_preview.transform = Transform3D(Basis(dx, Vector3.UP, fz), Vector3(c.x, h * 0.5, c.y))
+		_preview.material_override = _invalid_mat
+		_preview.visible = true
+		EventBus.road_preview_changed.emit({"active": true, "valid": true, "refund": _buildings.refund_of(_target_building),
+			"length": 0.0, "screen_pos": _last_screen})
+		return
+	_preview.transform = Transform3D.IDENTITY
 	if _highlight < 0 or not (_net.graph as RoadGraph).segments.has(_highlight):
 		_preview.visible = false
 		EventBus.road_preview_changed.emit({"active": false})
@@ -298,35 +337,73 @@ func _snap(screen_pos: Vector2, anchor: Variant) -> Variant:
 	var p: Vector2 = g
 	var graph: RoadGraph = _net.graph
 	var cam := get_viewport().get_camera_3d()
-	# 1. Existing junctions / road ends.
-	var best := -1
+	# Where an existing junction or road would take the point (if anywhere).
+	var target: Variant = null
+	var target_px := INF
 	var best_px := _node_radius_px
 	for node: RoadGraph.RoadNode in graph.nodes.values():
 		var sp := cam.unproject_position(Vector3(node.pos.x, 0, node.pos.y))
 		var dpx := sp.distance_to(screen_pos)
 		if dpx < best_px:
 			best_px = dpx
-			best = node.id
-	if best >= 0:
-		return (graph.nodes[best] as RoadGraph.RoadNode).pos
-	# 2. Onto an existing road.
-	var hit := graph.find_segment_near(p, _segment_radius_px * _metres_per_pixel(p))
-	if not hit.is_empty():
-		return hit["point"]
-	# 3. Angle and length steps from the start point.
-	if anchor != null:
-		var a: Vector2 = anchor
-		var v := p - a
-		if v.length() > 0.01:
-			var ang := v.angle()
-			var snapped := roundf(ang / _angle_step) * _angle_step
-			if absf(angle_difference(ang, snapped)) <= _angle_tolerance:
-				ang = snapped
-			var length := maxf(roundf(v.length() / _grid) * _grid, _grid)
-			return a + Vector2.from_angle(ang) * length
+			target = node.pos
+			target_px = dpx
+	if target == null:
+		var hit := graph.find_segment_near(p, _segment_radius_px * _metres_per_pixel(p))
+		if not hit.is_empty():
+			target = hit["point"]
+			target_px = cam.unproject_position(Vector3(target.x, 0, target.y)).distance_to(screen_pos)
+	if anchor == null:
+		if target != null:
+			return target
+		return Vector2(roundf(p.x / _grid) * _grid, roundf(p.y / _grid) * _grid)
+	# Drawing from a start point: fixed angle steps from the reference
+	# direction and length steps, unless a junction or road lies (almost)
+	# straight ahead.
+	var a: Vector2 = anchor
+	var v := p - a
+	if v.length() < 0.01:
 		return a
-	# 4. Grid.
-	return Vector2(roundf(p.x / _grid) * _grid, roundf(p.y / _grid) * _grid)
+	var rel := angle_difference(_ref_angle, v.angle())
+	var ang := _ref_angle + roundf(rel / _angle_step) * _angle_step
+	if absf(angle_difference(ang, v.angle())) > _angle_tolerance:
+		ang = v.angle()
+	var length := maxf(roundf(v.length() / _grid) * _grid, _grid)
+	var stepped := a + Vector2.from_angle(ang) * length
+	if target != null:
+		var tv: Vector2 = (target as Vector2) - a
+		if tv.length() > 1.0 and (absf(angle_difference(tv.angle(), ang)) <= _max_turn or target_px < _node_radius_px * 0.35):
+			return target
+	return stepped
+
+
+## Direction to measure angle steps from: the road the start point sits on
+## (or the first road at a junction), else the map axes.
+func _reference_angle(start: Variant) -> float:
+	if start == null:
+		return 0.0
+	var graph: RoadGraph = _net.graph
+	var p: Vector2 = start
+	var node := graph.find_node_near(p, 0.5)
+	if node >= 0:
+		var segs: PackedInt32Array = (graph.nodes[node] as RoadGraph.RoadNode).segments
+		if not segs.is_empty():
+			return graph.leaving_direction(segs[0], node).angle()
+	var hit := graph.find_segment_near(p, 0.5)
+	if not hit.is_empty():
+		return graph.tangent_on(int(hit["segment"]), float(hit["t"])).angle()
+	return 0.0
+
+
+## Bulldoze target under the finger: a building first, else a road.
+func _pick_target(screen_pos: Vector2) -> void:
+	_target_building = -1
+	_highlight = -1
+	var g: Variant = _ground(screen_pos)
+	if g != null and _buildings != null:
+		_target_building = _buildings.building_at(g)
+	if _target_building < 0:
+		_highlight = _segment_at(screen_pos)
 
 
 func _segment_at(screen_pos: Vector2) -> int:

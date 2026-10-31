@@ -1,6 +1,7 @@
 {
   "start_money": 60000,
   "road_refund_ratio": 0.75,
+  "building_refund_ratio": 0.5,
   "education_levels": 3,
   "households": {
     "per_floor_per_cell": {

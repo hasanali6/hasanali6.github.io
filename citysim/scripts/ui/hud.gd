@@ -23,6 +23,7 @@ const BUILD_TOOLS: Array = [
 	["TOOL_UTILITIES", "zap", UiStyle.GOLD],
 	["TOOL_TRANSIT", "bus", UiStyle.BLUE],
 	["TOOL_DISTRICTS", "map", UiStyle.PURPLE],
+	["TOOL_BULLDOZE", "trash-2", UiStyle.RED],
 ]
 ## Info overlay layers: [key, label key, colour].
 const OVERLAYS: Array = [
@@ -410,6 +411,11 @@ func _build_tray() -> PanelContainer:
 			b.pressed.connect(_open_catalog.bind("utilities"))
 		elif key == "TOOL_ZONING":
 			b.pressed.connect(_open_zone_panel)
+		elif key == "TOOL_BULLDOZE":
+			# Demolish roads and buildings: the road panel in its bulldoze mode.
+			b.pressed.connect(func() -> void:
+				_open_road_panel()
+				_select_road(_road_type, "bulldoze"))
 		elif key == "TOOL_TRANSIT":
 			b.pressed.connect(func() -> void:
 				if not ProgressionSystem.warn_if_locked("transit:bus", "TOOL_TRANSIT"):
