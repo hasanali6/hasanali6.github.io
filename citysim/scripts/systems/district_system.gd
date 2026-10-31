@@ -264,6 +264,7 @@ func finish_draft() -> bool:
 	_draft = PackedVector2Array()
 	_update_draft()
 	_changed()
+	EventBus.sfx_requested.emit("build_place")
 	EventBus.notification_posted.emit("districts", tr("NOTIFY_DISTRICT_CREATED") % d["name"])
 	return true
 
@@ -332,6 +333,7 @@ func add_point(p: Vector2) -> void:
 		EventBus.district_draft_changed.emit({"points": _draft.size(), "error": "DISTRICT_ERR_MAX_POINTS"})
 		return
 	_draft.append(p)
+	EventBus.sfx_requested.emit("ui_click")
 	_update_draft()
 
 

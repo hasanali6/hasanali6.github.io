@@ -28,6 +28,7 @@ InputController="*res://scripts/systems/input_controller.gd"
 EconomySystem="*res://scripts/systems/economy_system.gd"
 ProgressionSystem="*res://scripts/systems/progression_system.gd"
 WeatherSystem="*res://scripts/systems/weather_system.gd"
+AudioSystem="*res://scripts/systems/audio_system.gd"
 
 [display]
 
@@ -85,4 +86,8 @@ snow_cover={
 autumn={
 "type": "float",
 "value": 0.0
+}
+surface_detail={
+"type": "float",
+"value": 1.0
 }

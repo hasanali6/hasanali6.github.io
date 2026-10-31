@@ -137,6 +137,7 @@ func _on_up(screen_pos: Vector2) -> void:
 			_highlight = _segment_at(screen_pos)
 			if _highlight >= 0:
 				var refund: int = _net.demolish(_highlight)
+				EventBus.sfx_requested.emit("bulldoze")
 				EventBus.notification_posted.emit("roads", tr("ROAD_REFUND") % UiStyle.format_int(refund))
 			_reset()
 		"curve":
@@ -161,8 +162,12 @@ func _try_build(a: Vector2, b: Vector2, control: Variant) -> void:
 	if check["valid"]:
 		var result: Dictionary = _net.build_road(a, b, control, _type)
 		if not result["ok"]:
+			EventBus.sfx_requested.emit("error")
 			EventBus.notification_posted.emit("roads", tr(result["error"]))
+		else:
+			EventBus.sfx_requested.emit("build_road")
 	elif a.distance_to(b) > 0.5:
+		EventBus.sfx_requested.emit("error")
 		EventBus.notification_posted.emit("roads", tr(check["error"]))
 	_reset()
 

@@ -428,6 +428,7 @@ func finish_draft() -> bool:
 	_rebuild_cover()
 	_rebuild_visuals()
 	EventBus.transit_changed.emit()
+	EventBus.sfx_requested.emit("build_place")
 	EventBus.notification_posted.emit("transit", tr("NOTIFY_LINE_OPENED") % line_name(line))
 	return true
 
@@ -515,9 +516,11 @@ func toggle_stop(p: Vector2) -> void:
 	if error != "":
 		_update_draft()
 		_draft_info["error"] = error
+		EventBus.sfx_requested.emit("error")
 		EventBus.transit_draft_changed.emit(_draft_info)
 		return
 	_draft.append(hit["point"])
+	EventBus.sfx_requested.emit("ui_click")
 	_update_draft()
 
 

@@ -1,3 +1,17 @@
 {
-  "master_db": 0.0
+  "default_volume": {"Music": 0.45, "SFX": 0.8, "Ambient": 0.7},
+  "sfx_pool": 6,
+  "min_repeat_ms": {"ui_click": 40, "zone_paint": 120, "notify": 900, "coin": 300, "error": 250},
+  "ambient": {
+    "city":  {"stream": "amb_city.ogg",  "gain": 0.75},
+    "birds": {"stream": "amb_birds.ogg", "gain": 0.7},
+    "night": {"stream": "amb_night.ogg", "gain": 0.45},
+    "rain":  {"stream": "amb_rain.ogg",  "gain": 0.8},
+    "wind":  {"stream": "amb_wind.ogg",  "gain": 0.55}
+  },
+  "music": "music_calm.ogg",
+  "fade_per_second": 0.6,
+  "near_height_m": 260.0,
+  "far_height_m": 1400.0,
+  "busy_vehicles": 160
 }

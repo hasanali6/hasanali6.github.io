@@ -150,6 +150,7 @@ static func round_button(icon_name: String, color: Color, size: float, toggle: b
 	b.add_theme_stylebox_override("hover_pressed", down)
 	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	b.add_theme_stylebox_override("disabled", circle_box(SLATE, size, lip, false))
+	b.pressed.connect(func() -> void: EventBus.sfx_requested.emit("ui_click"))
 	return b
 
 
@@ -173,6 +174,7 @@ static func chip_button(text: String, color: Color, on_color: Color, min_size: V
 	b.add_theme_stylebox_override("pressed", down)
 	b.add_theme_stylebox_override("hover_pressed", down)
 	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	b.pressed.connect(func() -> void: EventBus.sfx_requested.emit("ui_click"))
 	return b
 
 

@@ -21,7 +21,8 @@
       "tree_shadows": false,
       "vehicle_cap": 300,
       "vehicle_draw_distance_m": 700.0,
-      "weather_particles": 0
+      "weather_particles": 0,
+      "surface_detail": false
     },
     "medium": {
       "render_scale": 0.75,
@@ -40,7 +41,8 @@
       "tree_shadows": true,
       "vehicle_cap": 800,
       "vehicle_draw_distance_m": 1100.0,
-      "weather_particles": 1500
+      "weather_particles": 1500,
+      "surface_detail": true
     },
     "high": {
       "render_scale": 0.9,
@@ -59,7 +61,8 @@
       "tree_shadows": true,
       "vehicle_cap": 1500,
       "vehicle_draw_distance_m": 1600.0,
-      "weather_particles": 3000
+      "weather_particles": 3000,
+      "surface_detail": true
     }
   },
   "dynamic_resolution": {

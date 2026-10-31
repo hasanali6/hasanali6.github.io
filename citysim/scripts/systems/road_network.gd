@@ -121,12 +121,16 @@ func _build_materials() -> void:
 	asphalt.set_shader_parameter("dash_gap", float(mesh_cfg["dash_gap_m"]))
 	asphalt.set_shader_parameter("crosswalk_length", float(mesh_cfg["crosswalk_length_m"]))
 	asphalt.set_shader_parameter("crosswalk_stripe", float(mesh_cfg["crosswalk_stripe_m"]))
+	asphalt.set_shader_parameter("detail_tex", load("res://assets/textures/asphalt_detail.png"))
+	asphalt.set_shader_parameter("detail_normal", load("res://assets/textures/asphalt_normal.png"))
 
 	var sidewalk := ShaderMaterial.new()
 	sidewalk.shader = SIDEWALK_SHADER
 	sidewalk.set_shader_parameter("noise_tex", noise)
 	sidewalk.set_shader_parameter("base_color", DataLoader.to_color(colors["sidewalk"]))
 	sidewalk.set_shader_parameter("tile", float(mesh_cfg["sidewalk_tile_m"]))
+	sidewalk.set_shader_parameter("detail_tex", load("res://assets/textures/concrete_detail.png"))
+	sidewalk.set_shader_parameter("detail_normal", load("res://assets/textures/concrete_normal.png"))
 
 	var curb := StandardMaterial3D.new()
 	curb.albedo_color = DataLoader.to_color(colors["curb"])

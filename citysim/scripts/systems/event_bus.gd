@@ -92,6 +92,8 @@ signal progression_changed()
 ## Weather or season changed: {state, season, rain, snow, clouds, autumn}.
 signal weather_changed(info: Dictionary)
 signal saves_changed()
+## A short sound effect by name (assets/audio/<name>.ogg), played by AudioSystem.
+signal sfx_requested(sfx_name: String)
 
 # --- World queries resolved by the camera ---
 signal ground_long_pressed(world_pos: Vector3)

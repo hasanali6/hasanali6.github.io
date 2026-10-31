@@ -1,4 +1,4 @@
-# Şehir Simülasyonu — Faz 1–8 (Temel, Yollar, İmar ve Binalar, Ekonomi, Hizmetler, Trafik, Toplu Taşıma ve Bölgeler, İlerleme ve Hava)
+# Şehir Simülasyonu — Faz 1–9 (tüm fazlar)
 
 Godot 4.7.2 (Mobile renderer, Vulkan) ile Android için şehir kurma simülasyonu.
 Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
@@ -18,6 +18,31 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 | Arayüz | `scripts/ui/hud.gd`, `scripts/ui/ui_style.gd` | Mobil şehir oyunu düzeni: sol üstte nüfus/mutluluk, ortada saat ve hız, sağ üstte para ve ayarlar, sağ altta büyük **İnşa Et** düğmesi ve kategori menüsü. İkonlar Lucide (ISC), font Nunito (OFL); lisanslar `assets/ui/` içinde. |
 | Referans sahne (kapalı) | `scripts/world/reference_scene.gd` + `assets/materials/*.gdshader` | Işık testi için bina blokları ve ağaçlar. Varsayılan **kapalı** — harita boş başlar. `data/reference_scene.json` → `"enabled": true` ile açılır. |
 | Testler | `tests/run_tests.gd` | Görselsiz (headless) birim testleri: saat, hız, ay geçişi, jestler, ızgara. |
+
+## Faz 9: Görsel cila ve ses
+
+| Parça | Dosya | Ne yapar |
+|---|---|---|
+| PBR dokular | `assets/textures/*.png`, üretici `tools/gen_textures.py` | Asfalt (agrega taşları, çatlaklar), beton kaldırım, sıva, tuğla, kiremit. Her biri renk detayı + pürüzlülük (alfa) + normal haritası; dikişsiz döşenir, telefonda ASTC/ETC2 ile sıkıştırılır, mipmap'li. Yakında tam, uzakta silinerek (titreme yok). |
+| Yol "decal"ları | `road_asphalt.gdshader` | Şeritlerde koyulaşmış teker izleri ve yağ çizgisi, yer yer yeni asfaltla yamanmış dikdörtgenler (dikiş çizgili), rögar kapakları. Hepsi shader'da, ek çizim maliyeti yok. |
+| Bina yüzeyleri | `building_placeholder.gdshader`, `roof.gdshader` | Alçak ve orta binaların bir kısmı tuğla, diğerleri sıva; sıvada yağmur izleri. Kırma çatılarda kiremit sıraları. Normal haritaları teğet gerektirmeden ışığa tepki verir. |
+| Gece ışıkları | `building_placeholder.gdshader`, `beacon.gdshader` | Zemin kat dükkân vitrinleri akşam çoğunlukla yanar ve daha parlaktır; 10+ katlı binaların çatı köşelerinde iki saniyede bir yanıp sönen kırmızı uçak ikaz lambaları. Sokak lambaları, ışık havuzları, araç farları, durak camları önceki fazlardan. |
+| Ses | `scripts/systems/audio_system.gd`, `assets/audio/*.ogg`, üretici `tools/gen_sounds.py` | Ortam: trafik uğultusu (yakındaki araç sayısıyla), gündüz kuşlar, yaz geceleri cırcır böcekleri, yağmur, yükseklerde rüzgâr; kamera yüksekliği, saat, mevsim ve havaya göre yumuşakça karışır. Efektler: buton, menü, yol yapma, yıkma, bina koyma, imar fırçası, hata, bildirim, kilometre taşı, para. Sakin bir müzik döngüsü (64 sn). Ayarlar'da Müzik / Efekt / Ortam ses seviyeleri (kaydedilir). Uygulama arka plana geçince ses kesilir. Toplam ses boyutu ~830 KB. |
+| Kalite | `data/graphics.json` | Düşük ayarda doku detayı kapalı (`surface_detail`), Orta ve Yüksek'te açık. |
+
+**Neden dokular ve sesler burada üretildi:** bu geliştirme ortamının ağ ayarları ambientcg.com, polyhaven.com, kenney.nl, freesound.org ve opengameart.org'a erişimi engelliyor. Dokular ve sesler bu yüzden repodaki Python betikleriyle sıfırdan üretildi (lisans derdi yok, istenirse yeniden üretilebilir). Ortamın ağ izni açılırsa (bulut ortamı ayarları → Network access → bu alan adlarını ekle) taranmış PBR dokular ve kayıt sesleri aynı dosya adlarıyla değiştirilebilir; kodda değişiklik gerekmez.
+
+**Faz 9 kabul kriterleri:**
+
+| # | Kriter | Nasıl test edilir |
+|---|---|---|
+| 1 | Asfalt dokusu | Sokak seviyesine in: asfaltta taş dokusu, ince çatlaklar, teker izleri, yer yer yama ve rögar kapağı. |
+| 2 | Bina yüzeyleri | Binalara yaklaş: bazılarında tuğla, bazılarında sıva; ışık yön değiştirince derz/pürüz gölgesi. Kırma çatılarda kiremit. |
+| 3 | Gece | Saati 21:00'e al: dükkân vitrinleri yanıyor, yüksek binaların köşelerinde kırmızı ikaz lambası yanıp sönüyor. |
+| 4 | Ses | Ses açıkken: alçakta kuşlar ve trafik, yükselince rüzgâr, gece cırcır böcekleri, yağmurda yağmur sesi. Yol yap/yık, bina koy → efekt. |
+| 5 | Ses ayarları | Ayarlar → Müzik/Efekt/Ortam kaydırıcıları; uygulamayı kapat-aç → seviyeler hatırlanır. |
+| 6 | Düşük kalite | Ayarlar → Düşük: doku detayı ve yağmur parçacıkları kapanır, FPS artar. |
+| 7 | Testler | `godot --headless --path citysim -s res://tests/run_tests.gd` → `164 checks, 0 failed`. |
 
 ## Faz 8: İlerleme, kayıt, hava ve mevsim, optimizasyon, kalite
 
@@ -290,6 +315,7 @@ Aynı sayfada `SehirSim-GL.apk` da var: aynı oyunun OpenGL (Compatibility) sür
 - Mobile renderer'da FSR yok (yalnızca Forward+), bu yüzden düşük ayarlarda bilinear ölçekleme kullanılıyor.
 
 ## Bilinen eksikler / sonraki fazlara kalanlar
+- **Görsel cila ve ses (Faz 9):** dokular ve sesler sentetik (taranmış fotoğraf/kayıt değil, nedeni yukarıda). Bina modelleri hâlâ prosedürel kutu + Kenney kiti; gerçek bina modelleri yok. Gece ışıkları emisyonla, binalara gerçek ışık düşmüyor (mobil bütçe). Ses 3B konumlu değil (araç sesi tek tek duyulmaz), tek müzik parçası var. Su yüzeyi ve araçlarda yeni doku yok.
 - **İlerleme, kayıt, hava (Faz 8):** harita karoları tek tek satın alınmıyor; açık alan kilometre taşlarıyla kare olarak büyüyor. Kilitlemeler sadece yeni inşaatı etkiler; eski kayıttaki caddeler/bulvarlar yerinde kalır. Bulut kaydı ve şehir adı yok. Kaza, sel, yıldırım yok; su yüzeyinde yağmur halkaları yok. Kar trafikte yolları kapatmaz, kar küreme aracı yok. Mevsimler ekonomiyi (ısınma, turizm) etkilemiyor.
 - **Toplu taşıma ve bölgeler (Faz 7):** metro, tren, liman ve şehir dışı bağlantıları yok (dış bağlantılar ve otoyol sonraki fazlarda). Aktarma yok: bir yolculuk tek hatla yapılır. Yolcular sayısal; durakta bekleyen ya da araca binen yaya görünmüyor. Otobüs ve tramvay diğer trafikle aynı sağ şeritte gider (ayrı otobüs/tramvay şeridi yok) ve U dönüşü yapamaz, bu yüzden her hat bir döngü olmalı. Var olan hattın durakları düzenlenemez; sil ve yeniden çiz. Tramvay için ayrı ray yolu yok, cadde/bulvarda asfalta gömülü ray çizilir. Hat ve politika ücretleri ilk ayar; denge oynanarak ayarlanacak (küçük kasabada hatlar zarar eder, bu bilinçli). Bölgeler sadece politika içindir, bölge başına vergi yok. Yüksek bina yasağı var olan yüksek binaları yıkmaz, sadece büyümeyi durdurur.
 - **Trafik (Faz 6):** kaza ve yağmurda rota değişimi yok (hava Faz 8). Kavşakta çarpışma kontrolü yok: aynı fazda karşıdan sola dönenle düz giden üst üste geçebilir; ışıksız sokak kavşaklarında öncelik kuralı yok, araçlar durmadan geçer. Şerit değiştirme kavşakta yapılır, yol ortasında değil. Yayalar, bisikletler ve park etmiş araçlar yok; araçlar varınca bina önünde durup kaybolur. Otoyol / dış bağlantı yok, ithalat-ihracat kamyonları şehir dışından gelmez. İş seçimi hâlâ kuş uçuşu mesafeye bakar. Yol düzenlenince değişen yollardaki araçlar kaybolur ve yeni atama bitene kadar (büyük şehirde telefonda 5–10 sn) yeni araç çıkmaz.

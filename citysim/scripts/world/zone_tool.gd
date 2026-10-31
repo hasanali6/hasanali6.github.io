@@ -80,9 +80,12 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 				doomed[grid.building[c]] = true
 		for id: int in doomed:
 			_buildings.demolish(id)
-		_zones.set_zone(cells, ZoneGrid.UNZONED)
-	else:
-		_zones.set_zone(cells, _zones.zone_id(_zone_key))
+		if not doomed.is_empty():
+			EventBus.sfx_requested.emit("bulldoze")
+		if _zones.set_zone(cells, ZoneGrid.UNZONED) > 0:
+			EventBus.sfx_requested.emit("zone_paint")
+	elif _zones.set_zone(cells, _zones.zone_id(_zone_key)) > 0:
+		EventBus.sfx_requested.emit("zone_paint")
 
 
 func _ground(screen_pos: Vector2) -> Variant:

@@ -115,11 +115,14 @@ func _preview_at(screen_pos: Vector2) -> void:
 
 func _build() -> void:
 	if _cell < 0 or not _valid:
+		if _cell >= 0:
+			EventBus.sfx_requested.emit("error")
 		EventBus.road_preview_changed.emit({"active": false})
 		return
 	var cost := int(_item["cost"])
 	if not _buildings.lot_for(_item, _cell).is_empty() and EconomySystem.try_spend(cost):
 		_buildings.place(_item, _cell)
+		EventBus.sfx_requested.emit("build_place")
 	EventBus.road_preview_changed.emit({"active": false})
 
 

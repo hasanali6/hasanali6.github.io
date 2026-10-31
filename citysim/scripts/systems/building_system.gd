@@ -34,6 +34,7 @@ const ABANDONED_TINT := Color(0.4, 0.38, 0.36)
 const LOT_SHADER := preload("res://assets/materials/lot_ground.gdshader")
 const CONTACT_SHADER := preload("res://assets/materials/contact_shadow.gdshader")
 const ROOF_SHADER := preload("res://assets/materials/roof.gdshader")
+const BEACON_SHADER := preload("res://assets/materials/beacon.gdshader")
 const LOT_GARDEN := 0
 const LOT_PLAZA := 1
 const LOT_PARKING := 2
@@ -522,6 +523,9 @@ func _build_meshes() -> void:
 
 	var roof_mat := ShaderMaterial.new()
 	roof_mat.shader = ROOF_SHADER
+	roof_mat.set_shader_parameter("tiles", true)
+	roof_mat.set_shader_parameter("tile_tex", load("res://assets/textures/rooftile_detail.png"))
+	roof_mat.set_shader_parameter("tile_normal", load("res://assets/textures/rooftile_normal.png"))
 	var roof := _gable_mesh()
 	roof.surface_set_material(0, roof_mat)
 	_add_multimesh("house_roof", roof, true, false)
@@ -540,6 +544,17 @@ func _build_meshes() -> void:
 	chimney.rings = 1
 	chimney.material = plain
 	_add_multimesh("chimney", chimney, true, false)
+
+	var beacon_mat := ShaderMaterial.new()
+	beacon_mat.shader = BEACON_SHADER
+	var beacon := SphereMesh.new()
+	beacon.radius = 0.35
+	beacon.height = 0.7
+	beacon.radial_segments = 8
+	beacon.rings = 4
+	beacon.material = beacon_mat
+	_add_multimesh("beacon", beacon, false, true)
+	(_meshes["beacon"] as MultiMeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	for key in ServiceModels.build_meshes(_add_multimesh):
 		(_meshes[key] as MultiMeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -568,6 +583,10 @@ func _facade_material(ground_floor: float, floor_height: float) -> ShaderMateria
 	mat.set_shader_parameter("lit_ratio", float(_vis["lit_window_ratio"]))
 	mat.set_shader_parameter("floor_height", floor_height)
 	mat.set_shader_parameter("ground_floor_height", ground_floor)
+	mat.set_shader_parameter("brick_tex", load("res://assets/textures/brick_detail.png"))
+	mat.set_shader_parameter("brick_normal", load("res://assets/textures/brick_normal.png"))
+	mat.set_shader_parameter("plaster_tex", load("res://assets/textures/plaster_detail.png"))
+	mat.set_shader_parameter("plaster_normal", load("res://assets/textures/plaster_normal.png"))
 	return mat
 
 
@@ -772,8 +791,16 @@ func _parts_tower(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> v
 		parts.append(_part("roof_box", _basis(ctx, tw * 0.55, 4.0 * e, td * 0.55), tpos, (h + 2.0) * e, crown, Color()))
 		if office:
 			parts.append(_part("chimney", _basis(ctx, 0.35, 10.0 * e, 0.35), tpos, (h + 4.0 + 5.0) * e, Color(0.82, 0.82, 0.84), Color()))
+			parts.append(_part("beacon", _basis(ctx, 1.0, e, 1.0), tpos, (h + 14.3) * e, Color.WHITE, Color(float(b["seed"]) * 0.137, 0, 0, 0)))
 	else:
 		_roof_kit(ctx, parts, tpos, tw, td, h, false)
+	if floors >= 10:
+		# Aircraft warning lights on two opposite corners of the roof.
+		var side: Vector2 = ctx["side"]
+		var fwd: Vector2 = ctx["f"]
+		for k in [-1.0, 1.0]:
+			var corner: Vector2 = tpos + side * (tw * 0.5 - 0.5) * k + fwd * (td * 0.5 - 0.5) * k
+			parts.append(_part("beacon", _basis(ctx, 1.0, e, 1.0), corner, (h + 0.5) * e, Color.WHITE, Color(float(b["seed"]) * 0.137, 0, 0, 0)))
 	if not office and str(b["zone_key"]) in ["com_high", "mixed"]:
 		_awning(ctx, parts, pos, w, d)
 	_contact(parts, ctx, pos, w, d)
@@ -838,7 +865,7 @@ func set_overlay_tint(tints: Dictionary) -> void:
 	_render_all()
 
 
-const UNTINTED := ["lot", "contact", "smoke", "solar", "basin"]
+const UNTINTED := ["lot", "contact", "smoke", "solar", "basin", "beacon"]
 
 
 ## Redraws every building once this frame (calls in between are merged).

@@ -87,6 +87,7 @@ func apply_preset(preset: String, persist: bool = true) -> void:
 	RenderingServer.directional_shadow_atlas_set_size(int(get_value("shadow_atlas_size")), true)
 	RenderingServer.directional_soft_shadow_filter_set_quality(
 		int(get_value("shadow_filter_quality")) as RenderingServer.ShadowQuality)
+	RenderingServer.global_shader_parameter_set("surface_detail", 1.0 if bool(get_value("surface_detail")) else 0.0)
 	if persist:
 		var cfg := ConfigFile.new()
 		cfg.load(SETTINGS_PATH)

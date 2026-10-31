@@ -501,6 +501,23 @@ func _build_settings_panel() -> PanelContainer:
 	perf.toggled.connect(func(on: bool) -> void: _perf_label.visible = on)
 	content.add_child(perf)
 
+	var sound_row := HBoxContainer.new()
+	sound_row.add_theme_constant_override("separation", 8)
+	for entry: Array in [["Music", "SETTINGS_MUSIC"], ["SFX", "SETTINGS_SFX"], ["Ambient", "SETTINGS_AMBIENT"]]:
+		var bus: String = entry[0]
+		sound_row.add_child(_label(entry[1], FONT_SIZE - 6))
+		var slider := HSlider.new()
+		slider.min_value = 0.0
+		slider.max_value = 1.0
+		slider.step = 0.05
+		slider.value = float(AudioSystem.volumes.get(bus, 0.7))
+		slider.custom_minimum_size = Vector2(96, MIN_TOUCH * 0.55)
+		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slider.focus_mode = Control.FOCUS_NONE
+		slider.value_changed.connect(func(v: float) -> void: AudioSystem.set_volume(bus, v))
+		sound_row.add_child(slider)
+	content.add_child(sound_row)
+
 	content.add_child(_label("SETTINGS_TIME", FONT_SIZE - 2))
 	_time_slider = HSlider.new()
 	_time_slider.min_value = 0.0
@@ -1078,6 +1095,7 @@ func _set_tray_open(open: bool) -> void:
 		_settings_panel.visible = false
 		_info_panel.visible = false
 		_tray.visible = true
+		EventBus.sfx_requested.emit("ui_open")
 	_tray_tween = create_tween()
 	_tray_tween.tween_property(_tray, "modulate:a", 1.0 if open else 0.0, TRAY_FADE)
 	if not open:
