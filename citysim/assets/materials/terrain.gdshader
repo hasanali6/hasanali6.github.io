@@ -1,4 +1,5 @@
 shader_type spatial;
+#include "res://assets/materials/water_common.gdshaderinc"
 // Flat ground for the 4 km playable map. All variation is world-space so the
 // terrain mesh stays a single cheap quad: two noise scales break up tiling,
 // a dirt/dry-grass mask adds imperfection, the locked area outside the map is
@@ -21,6 +22,13 @@ uniform float grid_fade_distance = 900.0;
 uniform float base_roughness = 0.93;
 uniform float normal_strength = 0.55;
 uniform bool detail_enabled = true;
+uniform sampler2D forest_mask : filter_linear, repeat_disable;
+uniform float forest_extent = 9000.0;
+uniform vec3 canopy_color : source_color = vec3(0.25, 0.48, 0.23);
+uniform float canopy_strength = 0.55;
+uniform vec3 sand_color : source_color = vec3(0.85, 0.78, 0.6);
+uniform vec3 wet_sand_color : source_color = vec3(0.66, 0.58, 0.4);
+uniform float bank_width = 14.0;
 
 varying vec3 world_pos;
 
@@ -57,6 +65,16 @@ void fragment() {
 	float dirt_mask = smoothstep(0.7, 0.84, mid * 0.55 + fine * 0.45) * near;
 	col = mix(col, dirt, dirt_mask * 0.6);
 	col *= 1.0 + (fine - 0.5) * 0.2 * near;
+
+	// Forest canopy seen from afar (trees themselves only render near the camera).
+	float forest = texture(forest_mask, p / forest_extent + 0.5).r;
+	float far = smoothstep(600.0, 1600.0, dist);
+	col = mix(col, canopy_color * (0.8 + mid * 0.4), forest * canopy_strength * far);
+
+	// Sandy banks along rivers and lakes.
+	float wd = water_distance(p);
+	float bank = 1.0 - smoothstep(bank_width * 0.4, bank_width, wd + (fine - 0.5) * 3.0);
+	col = mix(col, mix(wet_sand_color, sand_color, smoothstep(0.0, bank_width * 0.5, wd)), bank);
 
 	// Locked land outside the playable square.
 	float outside = max(abs(p.x), abs(p.y)) - playable_half;

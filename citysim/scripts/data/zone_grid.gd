@@ -30,6 +30,7 @@ var depth := PackedInt32Array()       # 0 = touching the road
 var zone := PackedInt32Array()
 var building := PackedInt32Array()
 
+var _water: MapWater
 var _lookup: Dictionary = {}   # Vector4i(segment, side, along, depth) -> cell index
 var _buckets: Dictionary = {}  # Vector2i -> PackedInt32Array of cell indices
 
@@ -53,7 +54,8 @@ func index_of(seg_id: int, row_side: int, along_index: int, depth_index: int) ->
 ## Regenerates all cells for the current road network. Zoning and building
 ## ownership are carried over to new cells at (almost) the same position, so
 ## splitting a road by drawing across it keeps the zoning around it.
-func rebuild(graph: RoadGraph, types: Dictionary, mesh_cfg: Dictionary, playable_half: float) -> void:
+func rebuild(graph: RoadGraph, types: Dictionary, mesh_cfg: Dictionary, playable_half: float, water: MapWater = null) -> void:
+	_water = water
 	var old_centers := centers
 	var old_zone := zone
 	var old_building := building
@@ -124,6 +126,8 @@ func _add_rows(graph: RoadGraph, sid: int, types: Dictionary, mesh_cfg: Dictiona
 func _cell_ok(centre: Vector2, graph: RoadGraph, types: Dictionary, playable_half: float, seg_index: Dictionary) -> bool:
 	var margin := cell_size * 0.5
 	if absf(centre.x) > playable_half - margin or absf(centre.y) > playable_half - margin:
+		return false
+	if _water != null and _water.distance(centre) < margin:
 		return false
 	for j in _near(_buckets, centre, overlap):
 		if centers[j].distance_to(centre) < overlap:

@@ -30,6 +30,7 @@ func _initialize() -> void:
 	_test_zone_restore_and_lots()
 	_test_households()
 	_test_economy_rules()
+	_test_water()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -426,3 +427,23 @@ func _test_economy_rules() -> void:
 	var taxed := taxes.duplicate()
 	taxed["residential"] = 30.0
 	_check(EconomyRules.demand(town, taxed, e["demand"], 10.0)["residential"] < d1["residential"], "high taxes lower demand")
+
+
+func _test_water() -> void:
+	var cfg := {"river_points": [[-1000, 0], [0, 0], [1000, 0]], "river_width_m": 80.0, "river_subdivisions": 4,
+		"lakes": [[0, 500, 100, 50]], "bank_width_m": 10.0}
+	var w := MapWater.new(cfg)
+	_check(w.distance(Vector2(0, 0)) < -39.0, "river centre is deep water")
+	_check(absf(w.distance(Vector2(300, 140)) - 100.0) < 1.0, "distance to the river bank")
+	_check(w.is_water(Vector2(0, 520)) and not w.is_water(Vector2(0, 620)), "lakes are ellipses")
+	_check(w.curve_hits_water(Vector2(0, -200), Vector2(0, 0), Vector2(0, 200), 4.0, 4.0), "a road across the river hits water")
+	_check(not w.curve_hits_water(Vector2(-300, 200), Vector2(0, 200), Vector2(300, 200), 4.0, 4.0), "a road beside the river is fine")
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(-200, -100), Vector2(200, -100), null), "street")
+	var grid := ZoneGrid.new(_zones()["cells"])
+	grid.rebuild(g, _roads()["types"], _roads()["mesh"], 2000.0, w)
+	var dry := true
+	for c in grid.size():
+		if w.distance(grid.centers[c]) < 4.0:
+			dry = false
+	_check(dry, "zoning cells stay out of the water")

@@ -78,7 +78,7 @@ func set_zone(cells: PackedInt32Array, id: int) -> int:
 
 
 func _on_roads_changed() -> void:
-	grid.rebuild(_net.graph, _net.types, _net.mesh_cfg, _playable_half)
+	grid.rebuild(_net.graph, _net.types, _net.mesh_cfg, _playable_half, MapWater.shared())
 	EventBus.zone_cells_rebuilt.emit()
 	_refresh_overlay()
 

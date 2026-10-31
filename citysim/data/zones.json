@@ -322,7 +322,9 @@
     "lit_window_ratio": 0.3,
     "kenney_margin_m": 0.4,
     "kenney_max_floors": 4,
-    "kenney_upgrade_style": "apartment"
+    "kenney_upgrade_style": "apartment",
+    "contact_spread_m": 3.5,
+    "contact_strength": 0.4
   },
   "overlay": {
     "height_m": 0.06,

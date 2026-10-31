@@ -21,7 +21,8 @@
       "detail_draw_distance_m": 1500.0,
       "tree_draw_distance_m": 500.0,
       "glow": false,
-      "terrain_detail": false
+      "terrain_detail": false,
+      "tree_shadows": false
     },
     "medium": {
       "render_scale": 0.75,
@@ -36,7 +37,8 @@
       "detail_draw_distance_m": 2500.0,
       "tree_draw_distance_m": 900.0,
       "glow": false,
-      "terrain_detail": true
+      "terrain_detail": true,
+      "tree_shadows": true
     },
     "high": {
       "render_scale": 0.9,
@@ -51,7 +53,8 @@
       "detail_draw_distance_m": 4000.0,
       "tree_draw_distance_m": 1600.0,
       "glow": true,
-      "terrain_detail": true
+      "terrain_detail": true,
+      "tree_shadows": true
     }
   },
   "dynamic_resolution": {

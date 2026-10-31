@@ -18,5 +18,108 @@
   "grid_line_strength": 0.22,
   "grid_fade_distance_m": 900.0,
   "roughness": 0.93,
-  "normal_strength": 0.55
+  "normal_strength": 0.55,
+  "water": {
+    "river_points": [
+      [
+        -7000,
+        -300
+      ],
+      [
+        -4200,
+        -650
+      ],
+      [
+        -2600,
+        -700
+      ],
+      [
+        -1800,
+        -950
+      ],
+      [
+        -950,
+        -820
+      ],
+      [
+        -250,
+        -1120
+      ],
+      [
+        500,
+        -1010
+      ],
+      [
+        1200,
+        -760
+      ],
+      [
+        1850,
+        -930
+      ],
+      [
+        2700,
+        -1250
+      ],
+      [
+        4300,
+        -1500
+      ],
+      [
+        7000,
+        -1700
+      ]
+    ],
+    "river_width_m": 84.0,
+    "river_subdivisions": 7,
+    "lakes": [
+      [
+        1150,
+        820,
+        330,
+        240
+      ],
+      [
+        -1450,
+        1250,
+        210,
+        170
+      ]
+    ],
+    "bank_width_m": 14.0,
+    "deep_color": "#1f6f9a",
+    "shallow_color": "#3fb7c9",
+    "foam_color": "#e8f6f7",
+    "sand_color": "#d8c79a",
+    "wet_sand_color": "#a89566",
+    "water_level_m": 0.05
+  },
+  "mountains": {
+    "inner_radius_m": 3100.0,
+    "outer_radius_m": 8500.0,
+    "radial_steps": 28,
+    "angular_steps": 96,
+    "max_height_m": 900.0,
+    "noise_frequency": 0.00045,
+    "seed": 77,
+    "grass_color": "#5f8f45",
+    "rock_color": "#7d7a72",
+    "snow_color": "#f2f4f6",
+    "snow_height_m": 620.0
+  },
+  "forest": {
+    "mask_size": 256,
+    "mask_extent_m": 9000.0,
+    "noise_frequency": 0.0012,
+    "seed": 4242,
+    "threshold": 0.18,
+    "spacing_m": 12.0,
+    "radius_m": 2700.0,
+    "jitter": 0.42,
+    "canopy_color": "#3f7a3a",
+    "canopy_strength": 0.55,
+    "coarse_m": 44.0,
+    "water_margin_m": 45.0,
+    "density_factor": 0.95
+  }
 }

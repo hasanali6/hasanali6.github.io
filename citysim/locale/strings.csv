@@ -140,3 +140,4 @@ SETTINGS_NEW_CITY,Yeni şehir,New city
 NOTIFY_SAVED,Şehir kaydedildi,City saved
 NOTIFY_LOADED,Şehir yüklendi,City loaded
 NOTIFY_NEW_CITY_CONFIRM,Şehri silip baştan başlamak için tekrar bas,Tap again to wipe the city and start over
+ROAD_ERR_WATER,Su üstünden geçemez (köprü yok),Cannot cross water (no bridges yet)

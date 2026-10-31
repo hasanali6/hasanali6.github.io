@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://b8c1tymain001"]
+[gd_scene load_steps=18 format=3 uid="uid://b8c1tymain001"]
 
 [ext_resource type="Script" path="res://scripts/world/day_night_cycle.gd" id="1_daynight"]
 [ext_resource type="Script" path="res://scripts/systems/terrain_system.gd" id="2_terrain"]
@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://scripts/systems/demand_system.gd" id="13_demand"]
 [ext_resource type="Script" path="res://scripts/world/build_tool.gd" id="14_buildtool"]
 [ext_resource type="Script" path="res://scripts/systems/save_system.gd" id="15_save"]
+[ext_resource type="Script" path="res://scripts/world/vegetation.gd" id="16_vegetation"]
 
 [node name="Main" type="Node3D"]
 
@@ -75,6 +76,13 @@ building_system_path = NodePath("../BuildingSystem")
 company_system_path = NodePath("../CompanySystem")
 citizen_system_path = NodePath("../CitizenSystem")
 demand_system_path = NodePath("../DemandSystem")
+
+[node name="Vegetation" type="Node3D" parent="."]
+script = ExtResource("16_vegetation")
+terrain_path = NodePath("../Terrain")
+road_network_path = NodePath("../RoadNetwork")
+zone_system_path = NodePath("../ZoneSystem")
+building_system_path = NodePath("../BuildingSystem")
 
 [node name="ReferenceScene" type="Node3D" parent="."]
 script = ExtResource("3_reference")

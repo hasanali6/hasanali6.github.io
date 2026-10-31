@@ -190,6 +190,10 @@ func _evaluate(a: Vector2, b: Vector2, control: Variant) -> Dictionary:
 	var plan: Dictionary = (_net.graph as RoadGraph).plan_road(a, b, control)
 	if not plan["ok"]:
 		return {"valid": false, "error": plan["error"], "cost": 0, "length": 0.0}
+	# No bridges yet: the road and its sidewalks must stay on land.
+	var half := RoadTypes.half_width(_net.type_config(_type))
+	if MapWater.shared().curve_hits_water(plan["a"], plan["control"], plan["b"], half, 4.0):
+		return {"valid": false, "error": "ROAD_ERR_WATER", "cost": 0, "length": plan["length"]}
 	var cost: int = _net.cost_of(plan["length"], _type)
 	if not EconomySystem.can_afford(cost):
 		return {"valid": false, "error": "ROAD_ERR_MONEY", "cost": cost, "length": plan["length"]}
