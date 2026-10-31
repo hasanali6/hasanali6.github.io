@@ -130,7 +130,7 @@ func find_segment_near(pos: Vector2, radius: float) -> Dictionary:
 		var hi := Vector2(maxf(maxf(c[0].x, c[1].x), c[2].x), maxf(maxf(c[0].y, c[1].y), c[2].y))
 		if pos.x < lo.x - radius or pos.x > hi.x + radius or pos.y < lo.y - radius or pos.y > hi.y + radius:
 			continue
-		var t := _closest_t(c[0], c[1], c[2], pos)
+		var t := closest_t(c[0], c[1], c[2], pos)
 		var p := bezier(c[0], c[1], c[2], t)
 		var d := p.distance_to(pos)
 		if d <= best_d:
@@ -139,7 +139,7 @@ func find_segment_near(pos: Vector2, radius: float) -> Dictionary:
 	return best
 
 
-func _closest_t(a: Vector2, c: Vector2, b: Vector2, pos: Vector2) -> float:
+func closest_t(a: Vector2, c: Vector2, b: Vector2, pos: Vector2) -> float:
 	var n := sample_count(a, c, b, sample_step)
 	var best_t := 0.0
 	var best_d := INF

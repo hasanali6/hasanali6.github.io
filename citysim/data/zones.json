@@ -1,0 +1,338 @@
+{
+  "order": [
+    "res_low",
+    "res_mid",
+    "res_high",
+    "com_low",
+    "com_high",
+    "office",
+    "industry",
+    "mixed"
+  ],
+  "types": {
+    "res_low": {
+      "name_key": "ZONE_RES_LOW",
+      "short_key": "ZONE_RES_LOW_S",
+      "group": "residential",
+      "color": "#5cc85a",
+      "styles": [
+        "house"
+      ],
+      "lot_widths": [
+        1,
+        2
+      ],
+      "lot_depths": [
+        2,
+        3
+      ],
+      "floors_by_level": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          2
+        ]
+      ]
+    },
+    "res_mid": {
+      "name_key": "ZONE_RES_MID",
+      "short_key": "ZONE_RES_MID_S",
+      "group": "residential",
+      "color": "#2fa84f",
+      "styles": [
+        "kenney_b",
+        "kenney_c",
+        "apartment"
+      ],
+      "lot_widths": [
+        1,
+        2
+      ],
+      "lot_depths": [
+        2,
+        3
+      ],
+      "floors_by_level": [
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          6,
+          8
+        ]
+      ]
+    },
+    "res_high": {
+      "name_key": "ZONE_RES_HIGH",
+      "short_key": "ZONE_RES_HIGH_S",
+      "group": "residential",
+      "color": "#1d7d3a",
+      "styles": [
+        "tower"
+      ],
+      "lot_widths": [
+        2,
+        3
+      ],
+      "lot_depths": [
+        3,
+        4
+      ],
+      "floors_by_level": [
+        [
+          8,
+          12
+        ],
+        [
+          12,
+          18
+        ],
+        [
+          18,
+          26
+        ]
+      ]
+    },
+    "com_low": {
+      "name_key": "ZONE_COM_LOW",
+      "short_key": "ZONE_COM_LOW_S",
+      "group": "commercial",
+      "color": "#4aa3ee",
+      "styles": [
+        "kenney_a",
+        "kenney_d"
+      ],
+      "lot_widths": [
+        1,
+        2
+      ],
+      "lot_depths": [
+        2,
+        2
+      ],
+      "floors_by_level": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "com_high": {
+      "name_key": "ZONE_COM_HIGH",
+      "short_key": "ZONE_COM_HIGH_S",
+      "group": "commercial",
+      "color": "#2268c4",
+      "styles": [
+        "tower"
+      ],
+      "lot_widths": [
+        2,
+        3
+      ],
+      "lot_depths": [
+        3,
+        4
+      ],
+      "floors_by_level": [
+        [
+          4,
+          6
+        ],
+        [
+          6,
+          10
+        ],
+        [
+          10,
+          16
+        ]
+      ]
+    },
+    "office": {
+      "name_key": "ZONE_OFFICE",
+      "short_key": "ZONE_OFFICE_S",
+      "group": "office",
+      "color": "#9a6ee0",
+      "styles": [
+        "office"
+      ],
+      "lot_widths": [
+        2,
+        3
+      ],
+      "lot_depths": [
+        3,
+        4
+      ],
+      "floors_by_level": [
+        [
+          4,
+          8
+        ],
+        [
+          8,
+          14
+        ],
+        [
+          14,
+          24
+        ]
+      ]
+    },
+    "industry": {
+      "name_key": "ZONE_INDUSTRY",
+      "short_key": "ZONE_INDUSTRY_S",
+      "group": "industrial",
+      "color": "#f0b232",
+      "styles": [
+        "factory",
+        "kenney_garage"
+      ],
+      "lot_widths": [
+        2,
+        4
+      ],
+      "lot_depths": [
+        3,
+        4
+      ],
+      "floors_by_level": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          2
+        ]
+      ]
+    },
+    "mixed": {
+      "name_key": "ZONE_MIXED",
+      "short_key": "ZONE_MIXED_S",
+      "group": "mixed",
+      "color": "#21b5a8",
+      "styles": [
+        "kenney_b",
+        "apartment"
+      ],
+      "lot_widths": [
+        1,
+        2
+      ],
+      "lot_depths": [
+        2,
+        3
+      ],
+      "floors_by_level": [
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          5,
+          7
+        ]
+      ]
+    }
+  },
+  "cells": {
+    "size_m": 8.0,
+    "depth": 6,
+    "road_clearance_m": 3.5,
+    "overlap_m": 6.5,
+    "restore_radius_m": 3.9
+  },
+  "growth": {
+    "interval_ticks": 10,
+    "attempts_per_interval": 8,
+    "base_chance": 0.7,
+    "level_up_chance_per_month": 0.3,
+    "max_level": 3,
+    "rise_seconds": 1.4,
+    "lot_margin_m": 1.2,
+    "front_setback_m": 1.0
+  },
+  "visuals": {
+    "ground_floor_height_m": 4.5,
+    "floor_height_m": 3.2,
+    "house_floor_height_m": 3.0,
+    "wall_palette": [
+      "#f4e3c1",
+      "#f2b880",
+      "#ef8e6c",
+      "#8fc1e3",
+      "#9fd6a6",
+      "#f7d774",
+      "#c6b3e6",
+      "#f5f5f0",
+      "#e7c6a0",
+      "#d9e4ec"
+    ],
+    "roof_palette": [
+      "#c25b4a",
+      "#8e5a43",
+      "#5d6b7a",
+      "#b0743f",
+      "#6e7f5c"
+    ],
+    "glass_color": "#6c8fb0",
+    "office_wall_palette": [
+      "#d8e2ea",
+      "#c4d3df",
+      "#e6e9ec",
+      "#b9c9d6"
+    ],
+    "industry_wall_palette": [
+      "#c9c2b4",
+      "#b7c1c8",
+      "#d6cfbf",
+      "#a9b4a6"
+    ],
+    "window_light_color": "#ffd08a",
+    "window_light_energy": 1.6,
+    "lit_window_ratio": 0.3,
+    "kenney_margin_m": 0.4,
+    "kenney_max_floors": 4,
+    "kenney_upgrade_style": "apartment"
+  },
+  "overlay": {
+    "height_m": 0.06,
+    "inset": 0.9,
+    "alpha_tool": 0.55,
+    "alpha_idle": 0.28,
+    "empty_color": "#ffffff",
+    "empty_alpha": 0.18
+  },
+  "tool": {
+    "brush_radius_m": 9.0
+  }
+}

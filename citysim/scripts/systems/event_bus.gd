@@ -26,6 +26,14 @@ signal build_tool_selected(tool: String, options: Dictionary)
 signal road_preview_changed(info: Dictionary)
 signal roads_changed()
 
+# --- Zoning and buildings ---
+## Zoning cells were regenerated after a road edit (indices changed).
+signal zone_cells_rebuilt()
+signal zones_changed()
+signal buildings_changed()
+## Info about a building the player long-pressed: {zone_key, level, floors, width, depth}.
+signal building_inspected(info: Dictionary)
+
 # --- Economy ---
 signal money_changed(balance: int)
 

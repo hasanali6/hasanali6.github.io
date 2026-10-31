@@ -167,7 +167,7 @@ static func build_segment(graph: RoadGraph, seg_id: int, types: Dictionary, cfg:
 	var c := graph.curve_of(seg)
 	var trim_a := junction_radius(graph, seg.a, types, cfg)
 	var trim_b := junction_radius(graph, seg.b, types, cfg)
-	var table := _arc_table(c[0], c[1], c[2], graph.sample_step * 0.5)
+	var table := arc_table(c[0], c[1], c[2], graph.sample_step * 0.5)
 	var length: float = table[table.size() - 1].y
 	var s0 := trim_a
 	var s1 := length - trim_b
@@ -186,7 +186,7 @@ static func build_segment(graph: RoadGraph, seg_id: int, types: Dictionary, cfg:
 	var to_junction := PackedFloat32Array()
 	for i in count + 1:
 		var s := lerpf(s0, s1, float(i) / count)
-		var tt := _t_at(table, s)
+		var tt := t_at(table, s)
 		var p := RoadGraph.bezier(c[0], c[1], c[2], tt)
 		var d := RoadGraph.bezier_tangent(c[0], c[1], c[2], tt).normalized()
 		var left := Vector2(-d.y, d.x)
@@ -268,7 +268,7 @@ static func _mitre_left(graph: RoadGraph, seg_id: int, node_id: int, own_dir: Ve
 
 
 ## Cumulative arc length table: Vector2(t, s) samples.
-static func _arc_table(a: Vector2, c: Vector2, b: Vector2, step: float) -> PackedVector2Array:
+static func arc_table(a: Vector2, c: Vector2, b: Vector2, step: float) -> PackedVector2Array:
 	var n := RoadGraph.sample_count(a, c, b, step)
 	var table := PackedVector2Array([Vector2(0.0, 0.0)])
 	var prev := a
@@ -282,7 +282,7 @@ static func _arc_table(a: Vector2, c: Vector2, b: Vector2, step: float) -> Packe
 	return table
 
 
-static func _t_at(table: PackedVector2Array, s: float) -> float:
+static func t_at(table: PackedVector2Array, s: float) -> float:
 	var lo := 0
 	var hi := table.size() - 1
 	while hi - lo > 1:
@@ -310,10 +310,10 @@ static func build_junction(graph: RoadGraph, node_id: int, types: Dictionary, cf
 		var seg: RoadGraph.RoadSegment = graph.segments[sid]
 		var t: Dictionary = types[seg.type]
 		var c := graph.curve_of(seg)
-		var table := _arc_table(c[0], c[1], c[2], graph.sample_step * 0.5)
+		var table := arc_table(c[0], c[1], c[2], graph.sample_step * 0.5)
 		var length: float = table[table.size() - 1].y
 		var s := radius if seg.a == node_id else length - radius
-		var tt := _t_at(table, s)
+		var tt := t_at(table, s)
 		var e := RoadGraph.bezier(c[0], c[1], c[2], tt)
 		var d := RoadGraph.bezier_tangent(c[0], c[1], c[2], tt).normalized()
 		if seg.b == node_id:

@@ -58,3 +58,24 @@ ROAD_ERR_ANGLE,Açı çok dar,Angle too sharp
 ROAD_ERR_TOO_CLOSE,Kavşaklar çok yakın,Junctions too close
 ROAD_ERR_MONEY,Para yetmiyor,Not enough money
 ROAD_ERR_OUTSIDE,Harita sınırı dışında,Outside the map
+ZONE_RES_LOW,Düşük yoğunluk konut,Low density residential
+ZONE_RES_LOW_S,Konut D,Res L
+ZONE_RES_MID,Orta yoğunluk konut,Medium density residential
+ZONE_RES_MID_S,Konut O,Res M
+ZONE_RES_HIGH,Yüksek yoğunluk konut,High density residential
+ZONE_RES_HIGH_S,Konut Y,Res H
+ZONE_COM_LOW,Düşük yoğunluk ticari,Low density commercial
+ZONE_COM_LOW_S,Ticari D,Com L
+ZONE_COM_HIGH,Yüksek yoğunluk ticari,High density commercial
+ZONE_COM_HIGH_S,Ticari Y,Com H
+ZONE_OFFICE,Ofis,Office
+ZONE_OFFICE_S,Ofis,Office
+ZONE_INDUSTRY,Sanayi,Industry
+ZONE_INDUSTRY_S,Sanayi,Industry
+ZONE_MIXED,Karma (dükkan + konut),Mixed (shops + homes)
+ZONE_MIXED_S,Karma,Mixed
+MODE_BRUSH,Fırça,Brush
+MODE_FILL,Doldur,Fill
+MODE_ERASE,Sil,Erase
+BUILDING_LEVEL,Seviye %d · %d kat,Level %d · %d floors
+BUILDING_SIZE,Arsa %d × %d m,Lot %d × %d m

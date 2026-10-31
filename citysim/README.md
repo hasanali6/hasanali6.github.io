@@ -1,4 +1,4 @@
-# Şehir Simülasyonu — Faz 1 (Temel) + Faz 2 (Yollar)
+# Şehir Simülasyonu — Faz 1 (Temel) + Faz 2 (Yollar) + Faz 3 (İmar ve Binalar)
 
 Godot 4.7.2 (Mobile renderer, Vulkan) ile Android için şehir kurma simülasyonu.
 Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
@@ -18,6 +18,24 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 | Arayüz | `scripts/ui/hud.gd`, `scripts/ui/ui_style.gd` | Mobil şehir oyunu düzeni: sol üstte nüfus/mutluluk, ortada saat ve hız, sağ üstte para ve ayarlar, sağ altta büyük **İnşa Et** düğmesi ve kategori menüsü. İkonlar Lucide (ISC), font Nunito (OFL); lisanslar `assets/ui/` içinde. |
 | Referans sahne (kapalı) | `scripts/world/reference_scene.gd` + `assets/materials/*.gdshader` | Işık testi için bina blokları ve ağaçlar. Varsayılan **kapalı** — harita boş başlar. `data/reference_scene.json` → `"enabled": true` ile açılır. |
 | Testler | `tests/run_tests.gd` | Görselsiz (headless) birim testleri: saat, hız, ay geçişi, jestler, ızgara. |
+
+## Faz 3: İmar ve binalar
+
+| Parça | Dosya | Ne yapar |
+|---|---|---|
+| İmar hücreleri | `scripts/data/zone_grid.gd` | Cities: Skylines gibi her yolun iki yanında yola hizalı 8 m hücre sıraları (en fazla 6 derinlik). Eğri ve çapraz yollarda da çalışır. Başka yolun ya da eski bir bloğun üstüne düşen hücre atılır; sıra ilk engelde durur, böylece her hücrenin yola erişimi olur. Paketli diziler, görselsiz test edilebilir. |
+| İmar sistemi | `scripts/systems/zone_system.gd` | Yol değişince hücreleri yeniden üretir; yol bölünse bile imar yerinde kalır. İmarlı boş hücreler soluk renkte, imar aracı açıkken tüm hücreler görünür. |
+| İmar aracı | `scripts/world/zone_tool.gd` | Fırça, sıra doldurma (bir dokunuşla bloğun tamamı), silgi (üstündeki binayı da yıkar). İmar ücretsiz. |
+| Binalar | `scripts/systems/building_system.gd`, `data/zones.json` | İmarlı, yola bakan boş hücrelerde rastgele parsel (genişlik × derinlik) aranır, sığarsa bina yükselerek kurulur. Ay geçtikçe seviye 1→3 atlar ve yükselir. Yol yıkılıp arsası giden bina kaldırılır. Uzun basınca bina bilgisi. |
+| Görseller | Kenney modelleri (CC0) + kod | Düşük yoğunluk ticari: Kenney dükkanlar · Orta yoğunluk / karma: Kenney apartmanlar (büyüyünce apartmana dönüşür) · Düşük yoğunluk konut: çatılı evler · Yüksek yoğunluk / ticari: kuleler · Ofis: cam kuleler · Sanayi: fabrika + baca. Hepsi MultiMesh. Gece pencereler yanar. |
+
+**İmar tipleri:** konut düşük/orta/yüksek · ticari düşük/yüksek · ofis · sanayi · karma (zemin dükkân + üst konut).
+
+**Kullanım:** İnşa Et → İmar → tip seç → fırçayla yol kenarındaki hücreleri boya (ya da Doldur ile bloğun tamamı). Oyun 1x/2x/3x hızda akarken binalar kendiliğinden gelir.
+
+**Faz 3 kabul kriterleri:** yol yapınca iki yanında hücre çıkar · hücreler yola ve birbirine binmez · boyanan hücrede zamanla bina büyür · bina yola bakar · seviye atlayınca yükselir · yolu yıkınca arsası giden bina kalkar · yol bölününce imar kaybolmaz. Otomatik testler: `75 checks, 0 failed`.
+
+**Şimdilik basit tutulanlar (Faz 4'te gerçekleşecek):** büyüme hızı sabit (gerçek RCI talebi yok), bina içinde hane ve şirket yok, seviye atlama rastgele. Nüfus göstergesi bu yüzden hâlâ 0.
 
 ## Faz 2: Yollar
 
@@ -106,7 +124,8 @@ Aynı sayfada `SehirSim-GL.apk` da var: aynı oyunun OpenGL (Compatibility) sür
 
 ## Bilinen eksikler / sonraki fazlara kalanlar
 - **Yollar:** yol yükseltme (sokak → cadde) yok, şimdilik yık + yeniden çiz. Serbest el çizimi, köprü/tünel, çıkmaz sokak dönüş cebi ve trafik ışığı yok (ışıklar Faz 6). Kavşak köşeleri çok dar açılarda sadeleşir.
-- **Kayıt:** yol ağı henüz kaydedilmiyor (Faz 8).
+- **Kayıt:** yol ağı, imar ve binalar henüz kaydedilmiyor (Faz 8).
+- **Binalar:** Kenney kitinde sadece 5 bina modeli var; çeşitlilik kod ile üretilen binalarla sağlanıyor. Kenney'nin büyük ücretsiz şehir paketleri (kenney.nl) repoya eklenirse kolayca bağlanır. Elle bina yerleştirme yok, binalar imarla kendiliğinden gelir.
 - **Doku siteleri:** ambientCG ve Poly Haven bu geliştirme ortamından erişilemedi. Yol ve kaldırım dokuları shader ile üretildi, ek dosya yok. Kenney'nin ücretsiz (CC0) şehir modelleri Faz 3'te binalar için kullanılacak.
 - Harita boş başlar; inşa araçları (yol çizme) Faz 2'de gelir. Referans bloklar sadece ışık testi için ve varsayılan kapalı.
 - Dinamik çözünürlük GPU darboğazını çözer; FPS düşüklüğü CPU kaynaklıysa (ileride kalabalık simülasyon) çözünürlük düşürmek işe yaramaz — o iş Faz 6'daki simülasyon LOD'unun.

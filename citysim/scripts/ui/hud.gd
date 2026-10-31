@@ -53,6 +53,12 @@ var _road_type_buttons: Dictionary = {}
 var _road_mode_buttons: Dictionary = {}
 var _road_type: String = ""
 var _road_mode: String = "straight"
+var _zone_panel: PanelContainer
+var _zone_buttons: Dictionary = {}
+var _zone_mode_buttons: Dictionary = {}
+var _zone_key: String = ""
+var _zone_mode: String = "brush"
+var _building_shown_frame: int = -1
 var _cost_pill: PanelContainer
 var _cost_label: Label
 var _cost_ok_badge: Control
@@ -85,6 +91,8 @@ func _ready() -> void:
 	_tray = _build_tray()
 	_road_panel = _build_road_panel()
 	_place(_road_panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
+	_zone_panel = _build_zone_panel()
+	_place(_zone_panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
 	_cost_pill = _build_cost_pill()
 	_layer.add_child(_cost_pill)
 	_place(_tray, Vector2(1, 1), Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_BEGIN, Vector2(-BUILD_SIZE - 16, 0))
@@ -104,6 +112,7 @@ func _ready() -> void:
 	EventBus.tapped.connect(func(_p: Vector2) -> void: _set_tray_open(false))
 	EventBus.money_changed.connect(func(balance: int) -> void: _money_label.text = UiStyle.format_int(balance))
 	EventBus.road_preview_changed.connect(_on_road_preview)
+	EventBus.building_inspected.connect(_on_building_inspected)
 	_on_speed_changed(TimeSystem.get_speed_index())
 	_on_preset_changed(GraphicsSettings.current_preset)
 
@@ -304,6 +313,8 @@ func _build_tray() -> PanelContainer:
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		if key == "TOOL_ROADS":
 			b.pressed.connect(_open_road_panel)
+		elif key == "TOOL_ZONING":
+			b.pressed.connect(_open_zone_panel)
 		else:
 			b.pressed.connect(func() -> void: show_toast(tr("TOOL_LOCKED") % tr(key)))
 		col.add_child(b)
@@ -484,6 +495,94 @@ func _build_road_panel() -> PanelContainer:
 	return panel
 
 
+func _build_zone_panel() -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.visible = false
+	var box := UiStyle.pill_box()
+	box.set_corner_radius_all(28)
+	box.set_content_margin_all(14)
+	panel.add_theme_stylebox_override("panel", box)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 12)
+	panel.add_child(col)
+
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 12)
+	var mode_group := ButtonGroup.new()
+	for entry: Array in [["brush", "paintbrush", "MODE_BRUSH"], ["fill", "paint-bucket", "MODE_FILL"], ["erase", "eraser", "MODE_ERASE"]]:
+		var mode: String = entry[0]
+		var b := UiStyle.round_button(entry[1], UiStyle.SLATE, MIN_TOUCH, true,
+			UiStyle.RED if mode == "erase" else UiStyle.GREEN)
+		b.button_group = mode_group
+		b.pressed.connect(func() -> void: _select_zone(_zone_key, mode))
+		_zone_mode_buttons[mode] = b
+		top.add_child(b)
+		top.add_child(_label(entry[2], FONT_SIZE - 4))
+	var fill := Control.new()
+	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(fill)
+	var close := UiStyle.round_button("x", UiStyle.RED, MIN_TOUCH * 0.85)
+	close.pressed.connect(_close_zone_panel)
+	top.add_child(close)
+	col.add_child(top)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var group := ButtonGroup.new()
+	for key: String in GameData.value("zones/order"):
+		var cfg := GameData.section("zones/types/" + key)
+		var color := DataLoader.to_color(cfg["color"])
+		var b := UiStyle.chip_button(cfg["short_key"], color.darkened(0.25), color.lightened(0.15), Vector2(118, MIN_TOUCH))
+		b.add_theme_font_size_override("font_size", FONT_SIZE - 6)
+		b.button_group = group
+		b.pressed.connect(func() -> void: _select_zone(key, _zone_mode if _zone_mode != "erase" else "brush"))
+		_zone_buttons[key] = b
+		row.add_child(b)
+	col.add_child(row)
+	return panel
+
+
+func _open_zone_panel() -> void:
+	_road_panel.visible = false
+	_cost_pill.visible = false
+	_set_tray_open(false)
+	_settings_panel.visible = false
+	_info_panel.visible = false
+	_zone_panel.visible = true
+	_build_button.get_parent().visible = false
+	if _zone_key == "":
+		_zone_key = str((GameData.value("zones/order") as Array)[0])
+	_select_zone(_zone_key, _zone_mode)
+
+
+func _close_zone_panel() -> void:
+	_zone_panel.visible = false
+	_build_button.get_parent().visible = true
+	EventBus.build_tool_selected.emit("", {})
+
+
+func _select_zone(key: String, mode: String) -> void:
+	_zone_key = key
+	_zone_mode = mode
+	for k: String in _zone_buttons:
+		(_zone_buttons[k] as Button).set_pressed_no_signal(k == key and mode != "erase")
+	for k: String in _zone_mode_buttons:
+		(_zone_mode_buttons[k] as Button).set_pressed_no_signal(k == mode)
+	EventBus.build_tool_selected.emit("zone", {"zone": key, "mode": mode})
+
+
+func _on_building_inspected(info: Dictionary) -> void:
+	_building_shown_frame = Engine.get_process_frames()
+	_info_label.text = "%s\n%s\n%s" % [
+		tr(info["zone_key"]),
+		tr("BUILDING_LEVEL") % [info["level"], info["floors"]],
+		tr("BUILDING_SIZE") % [roundi(info["width"]), roundi(info["depth"])],
+	]
+	_settings_panel.visible = false
+	_set_tray_open(false)
+	_info_panel.visible = true
+
+
 func _build_cost_pill() -> PanelContainer:
 	var pill := PanelContainer.new()
 	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -502,6 +601,7 @@ func _build_cost_pill() -> PanelContainer:
 
 
 func _open_road_panel() -> void:
+	_zone_panel.visible = false
 	_set_tray_open(false)
 	_settings_panel.visible = false
 	_info_panel.visible = false
@@ -601,6 +701,12 @@ func _on_preset_changed(preset: String) -> void:
 
 
 func _on_ground_long_pressed(world_pos: Vector3) -> void:
+	_show_location.call_deferred(world_pos)
+
+
+func _show_location(world_pos: Vector3) -> void:
+	if _building_shown_frame == Engine.get_process_frames():
+		return
 	var cell := MapGrid.world_to_cell(world_pos, _cell_size)
 	var inside := MapGrid.is_inside(world_pos, _playable_half)
 	_info_label.text = "%s\n%s\n%s" % [
@@ -616,6 +722,9 @@ func _on_ground_long_pressed(world_pos: Vector3) -> void:
 func _on_back_requested() -> void:
 	if _road_panel.visible:
 		_close_road_panel()
+		return
+	if _zone_panel.visible:
+		_close_zone_panel()
 		return
 	if _settings_panel.visible or _info_panel.visible or _tray.visible:
 		_settings_panel.visible = false

@@ -26,6 +26,8 @@ func _initialize() -> void:
 	_test_road_rejections()
 	_test_road_curve_and_remove()
 	_test_road_mesh()
+	_test_zone_cells()
+	_test_zone_restore_and_lots()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -46,7 +48,7 @@ func _input_config() -> Dictionary:
 
 
 func _test_data_files() -> void:
-	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy"]:
+	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy", "zones"]:
 		_check(not DataLoader.load_json("res://data/%s.json" % f).is_empty(), "data file %s loads" % f)
 	var db := DataLoader.load_files(PackedStringArray(["graphics"]))
 	for preset: String in DataLoader.lookup(db, "graphics/preset_order"):
@@ -306,3 +308,65 @@ func _test_road_mesh() -> void:
 	boulevard.commit_road(boulevard.plan_road(Vector2(0, 0), Vector2(80, 0), null), "boulevard")
 	var bparts := RoadMeshBuilder.build_segment(boulevard, boulevard.segments.keys()[0], cfg["types"], cfg["mesh"])
 	_check(bparts.data.has("median"), "boulevard has a median")
+
+
+func _zones() -> Dictionary:
+	return DataLoader.load_json("res://data/zones.json")
+
+
+func _zone_grid(g: RoadGraph) -> ZoneGrid:
+	var cfg := _roads()
+	var grid := ZoneGrid.new(_zones()["cells"])
+	grid.rebuild(g, cfg["types"], cfg["mesh"], 2000.0)
+	return grid
+
+
+func _test_zone_cells() -> void:
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(0, 0), Vector2(96, 0), null), "street")
+	var grid := _zone_grid(g)
+	_check(grid.size() == 2 * 12 * 6, "straight 96 m street gets 12 x 6 cells per side (%d)" % grid.size())
+	var i := grid.index_of(g.segments.keys()[0], 1, 0, 0)
+	_check(i >= 0 and absf(absf(grid.centers[i].y) - 8.0) < 0.01, "first row sits right behind the 8 m street")
+	_check(grid.fronts[i].dot(-grid.centers[i].normalized()) > 0.5, "cell front points back to the road")
+	# A crossing road must not end up with cells on top of it.
+	g.commit_road(g.plan_road(Vector2(48, -80), Vector2(48, 80), null), "avenue")
+	grid = _zone_grid(g)
+	var clear := true
+	for c in grid.size():
+		var hit := g.find_segment_near(grid.centers[c], 80.0)
+		var hw := RoadTypes.half_width(_roads()["types"][(g.segments[hit["segment"]] as RoadGraph.RoadSegment).type])
+		if float(hit["distance"]) - hw < 3.4:
+			clear = false
+	_check(clear, "no zoning cell overlaps a road")
+	var overlap_free := true
+	for a in grid.size():
+		for b in grid.cells_near(grid.centers[a], 6.0):
+			if b != a:
+				overlap_free = false
+	_check(overlap_free, "zoning cells never overlap each other")
+
+
+func _test_zone_restore_and_lots() -> void:
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(0, 0), Vector2(160, 0), null), "street")
+	var grid := _zone_grid(g)
+	for c in grid.size():
+		if grid.side[c] == 1:
+			grid.zone[c] = 1
+	var row := grid.row_cells(grid.index_of(g.segments.keys()[0], 1, 3, 0))
+	_check(row.size() == 20 * 6, "row_cells returns the whole block side")
+	var lot := grid.find_lot(grid.index_of(g.segments.keys()[0], 1, 2, 0), 2, 3, 1)
+	_check(lot.size() == 6, "a 2 x 3 lot fits on zoned free cells")
+	_check(grid.find_lot(grid.index_of(g.segments.keys()[0], -1, 2, 0), 2, 3, 1).is_empty(), "no lot on unzoned side")
+	var zoned_before := 0
+	for c in grid.size():
+		zoned_before += 1 if grid.zone[c] == 1 else 0
+	# Drawing a road across splits the segment; zoning away from it must survive.
+	var cfg := _roads()
+	g.commit_road(g.plan_road(Vector2(80, -60), Vector2(80, 60), null), "street")
+	grid.rebuild(g, cfg["types"], cfg["mesh"], 2000.0)
+	var zoned_after := 0
+	for c in grid.size():
+		zoned_after += 1 if grid.zone[c] == 1 else 0
+	_check(zoned_after > zoned_before * 0.6, "zoning survives a road being split (%d -> %d)" % [zoned_before, zoned_after])
