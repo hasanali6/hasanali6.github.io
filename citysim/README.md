@@ -1,6 +1,7 @@
 # Şehir Simülasyonu — Faz 1–9 (tüm fazlar)
 
 Godot 4.7.2 (Mobile renderer, Vulkan) ile Android için şehir kurma simülasyonu.
+**Oyunu nasıl oynayacağını anlatan genel rehber: [OYUN_REHBERI.md](OYUN_REHBERI.md).**
 Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 
 ## Faz 1'de ne var
