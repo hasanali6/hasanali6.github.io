@@ -20,6 +20,8 @@ signal long_pressed(screen_pos: Vector2)
 # --- Build tools ---
 ## Single-finger stroke while a tool captures input (GestureTracker.Pointer phase).
 signal tool_pointer(phase: int, screen_pos: Vector2)
+## While a build tool is open: true = one finger moves the camera, false = it builds.
+signal camera_mode_changed(on: bool)
 ## Tool or tool option chosen in the UI. tool == "" means no tool.
 signal build_tool_selected(tool: String, options: Dictionary)
 ## Live info about the stroke in progress: {active, valid, cost, length, error, screen_pos}.

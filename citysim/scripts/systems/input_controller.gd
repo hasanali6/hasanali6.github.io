@@ -3,6 +3,9 @@ extends Node
 ## Uses _unhandled_input so touches on UI controls never move the camera.
 
 var tracker: GestureTracker
+## One finger moves the camera even though a build tool is open (HUD toggle).
+var camera_mode: bool = false
+var _tool: String = ""
 
 var _wheel_step: float
 var _rotate_per_px: float
@@ -25,7 +28,26 @@ func _ready() -> void:
 	tracker.long_press.connect(EventBus.long_pressed.emit)
 	tracker.pointer.connect(EventBus.tool_pointer.emit)
 	EventBus.build_tool_selected.connect(func(tool: String, _options: Dictionary) -> void:
-		tracker.capture_single = tool != "")
+		_tool = tool
+		if tool == "" and camera_mode:
+			camera_mode = false
+			EventBus.camera_mode_changed.emit(false)
+		_apply_capture())
+
+
+## Switches one-finger input between building and moving the camera while a
+## tool stays open.
+func set_camera_mode(on: bool) -> void:
+	if on == camera_mode:
+		return
+	camera_mode = on
+	tracker.reset()
+	_apply_capture()
+	EventBus.camera_mode_changed.emit(on)
+
+
+func _apply_capture() -> void:
+	tracker.capture_single = _tool != "" and not camera_mode
 
 
 func _process(delta: float) -> void:

@@ -173,16 +173,18 @@ func _test_gesture_pinch_rotate() -> void:
 
 func _test_gesture_tilt() -> void:
 	var g := GestureTracker.new(_input_config())
-	var tilt := [0.0]
+	var panned := [Vector2.ZERO]
 	var zooms := [0]
-	g.tilt.connect(func(d: float) -> void: tilt[0] += d)
+	var turns := [0]
+	g.pan.connect(func(d: Vector2) -> void: panned[0] += d)
 	g.zoom.connect(func(_f: float, _c: Vector2) -> void: zooms[0] += 1)
+	g.rotate.connect(func(_a: float) -> void: turns[0] += 1)
 	g.touch_pressed(0, Vector2(400, 400))
 	g.touch_pressed(1, Vector2(600, 400))
 	for i in 10:
-		g.touch_moved(0, Vector2(400, 400 - (i + 1) * 8))
-		g.touch_moved(1, Vector2(600, 400 - (i + 1) * 8))
-	_check(tilt[0] < -40.0 and zooms[0] == 0, "two-finger vertical slide tilts only (%.1f)" % tilt[0])
+		g.touch_moved(0, Vector2(400 + (i + 1) * 3, 400 - (i + 1) * 8))
+		g.touch_moved(1, Vector2(600 + (i + 1) * 3, 400 - (i + 1) * 8))
+	_check(panned[0].y < -50.0 and zooms[0] == 0 and turns[0] == 0, "two fingers moving together pan only (%s)" % str(panned[0]))
 
 
 func _test_map_grid() -> void:

@@ -35,6 +35,8 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 - **Bina yıkma:** İnşa Et menüsünde kırmızı **Yık** düğmesi. Dokunulan bina (yoksa yol) kırmızı işaretlenir, bırakınca yıkılır. Elle konan ve hizmet binaları fiyatının yarısını, yollar %75'ini geri verir.
 - **Düz yol çizimi:** açı adımları artık başlanan yola göre ölçülüyor ve her zaman 15°'ye kilitleniyor (eskiden ±4° tolerans vardı, parmak titreyince yol eğri/kırık çıkıyordu). Uç nokta yakındaki kavşağa veya yola ancak yön bozulmuyorsa yapışıyor.
 
+- **Kamera kolaylığı:** araç açıkken sağda **İnşa / Kamera** düğmesi; Kamera'da tek parmak haritayı kaydırır, araç açık kalır. İki parmak artık her yönde kaydırır (eskiden dikey kaydırma eğim yapıyordu), döndürme ancak belirgin bir bükmeyle başlar (yakınlaştırırken görüntü dönmez). Solda 45° döndürme ve eğim düğmeleri.
+
 **Neden dokular ve sesler burada üretildi:** bu geliştirme ortamının ağ ayarları ambientcg.com, polyhaven.com, kenney.nl, freesound.org ve opengameart.org'a erişimi engelliyor. Dokular ve sesler bu yüzden repodaki Python betikleriyle sıfırdan üretildi (lisans derdi yok, istenirse yeniden üretilebilir). Ortamın ağ izni açılırsa (bulut ortamı ayarları → Network access → bu alan adlarını ekle) taranmış PBR dokular ve kayıt sesleri aynı dosya adlarıyla değiştirilebilir; kodda değişiklik gerekmez.
 
 **Faz 9 kabul kriterleri:**

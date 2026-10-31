@@ -90,6 +90,9 @@ var _overlay_buttons: Dictionary = {}
 var _overlay_legend: Label
 var _overlay_key: String = ""
 var _tray_locks: Dictionary = {}       # tray button -> unlock id
+var _mode_toggle: Control
+var _mode_button: Button
+var _mode_caption: Label
 var _cell_size: float
 var _playable_half: float
 
@@ -114,6 +117,8 @@ func _ready() -> void:
 	_place(_build_top_right(), Vector2(1, 0), Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_END)
 	_place(_build_left_column(), Vector2(0, 0.5), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BOTH)
 	_place(_build_build_button(), Vector2(1, 1), Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_BEGIN)
+	_mode_toggle = _build_mode_toggle()
+	_place(_mode_toggle, Vector2(1, 0.5), Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_BOTH)
 	_tray = _build_tray()
 	_road_panel = _build_road_panel()
 	_place(_road_panel, Vector2(0.5, 1), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
@@ -172,6 +177,8 @@ func _ready() -> void:
 		if _overlay_panel.visible:
 			_refresh_overlay_legend())
 	EventBus.progression_changed.connect(_refresh_locks)
+	EventBus.build_tool_selected.connect(func(tool: String, _o: Dictionary) -> void: _mode_toggle.visible = tool != "")
+	EventBus.camera_mode_changed.connect(_on_camera_mode)
 	EventBus.weather_changed.connect(_on_weather)
 	_on_weather(WeatherSystem.info())
 	_on_speed_changed(TimeSystem.get_speed_index())
@@ -362,6 +369,21 @@ func _build_left_column() -> Control:
 		else:
 			_open_overlay_panel())
 	col.add_child(overlays)
+	# Camera helpers: turn 45° either way, tilt the view up or down.
+	var cam_grid := GridContainer.new()
+	cam_grid.columns = 2
+	cam_grid.add_theme_constant_override("h_separation", 6)
+	cam_grid.add_theme_constant_override("v_separation", 6)
+	for entry: Array in [["rotate-ccw", "rotate", -PI / 4.0], ["rotate-cw", "rotate", PI / 4.0], ["chevron-up", "tilt", -50.0], ["chevron-down", "tilt", 50.0]]:
+		var cb := UiStyle.round_button(entry[0], UiStyle.SLATE, MIN_TOUCH * 0.62)
+		var kind: String = entry[1]
+		var amount: float = entry[2]
+		cb.pressed.connect(func() -> void:
+			if kind == "rotate":
+				EventBus.rotate_requested.emit(amount)
+			else:
+				EventBus.tilt_requested.emit(amount))
+		cam_grid.add_child(cb)
 	var economy := UiStyle.round_button("chart-no-axes-column", UiStyle.GREEN, MIN_TOUCH)
 	economy.pressed.connect(func() -> void:
 		_settings_panel.visible = false
@@ -369,7 +391,41 @@ func _build_left_column() -> Control:
 		_set_tray_open(false)
 		_economy.open())
 	col.add_child(economy)
+	col.add_child(cam_grid)
+	# Keep the round buttons round although the camera grid is wider.
+	for child: Control in [overlays, economy]:
+		child.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	return col
+
+
+## Big switch on the right while a tool is open: build with one finger, or
+## move the camera with one finger without closing the tool.
+func _build_mode_toggle() -> Control:
+	var col := VBoxContainer.new()
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_theme_constant_override("separation", 0)
+	col.visible = false
+	_mode_button = UiStyle.round_button("pencil", UiStyle.ORANGE, MIN_TOUCH * 1.15)
+	_mode_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_mode_button.pressed.connect(func() -> void: InputController.set_camera_mode(not InputController.camera_mode))
+	col.add_child(_mode_button)
+	_mode_caption = _label("MODE_BUILDING", FONT_SIZE - 6)
+	_mode_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(_mode_caption)
+	return col
+
+
+func _on_camera_mode(on: bool) -> void:
+	_mode_button.icon = UiStyle.icon("move" if on else "pencil")
+	var color := UiStyle.BLUE if on else UiStyle.ORANGE
+	var lip := maxi(int(_mode_button.custom_minimum_size.x * 0.07), 3)
+	var box := UiStyle.circle_box(color, _mode_button.custom_minimum_size.x, lip, false)
+	var pad := int(_mode_button.custom_minimum_size.x * 0.24)
+	box.set_content_margin_all(pad)
+	_mode_button.add_theme_stylebox_override("normal", box)
+	_mode_button.add_theme_stylebox_override("hover", box)
+	_mode_caption.text = "MODE_CAMERA" if on else "MODE_BUILDING"
+	show_toast(tr("NOTIFY_CAMERA_MODE") if on else tr("NOTIFY_BUILD_MODE"))
 
 
 func _build_build_button() -> Control:

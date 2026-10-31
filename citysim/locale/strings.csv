@@ -304,3 +304,7 @@ SETTINGS_SFX,Efekt,Effects
 SETTINGS_AMBIENT,Ortam,Ambience
 BUILDING_DEMOLISHED,Bina yıkıldı (+%s iade),Building demolished (+%s refund)
 TOOL_BULLDOZE,Yık,Demolish
+MODE_BUILDING,İnşa,Build
+MODE_CAMERA,Kamera,Camera
+NOTIFY_CAMERA_MODE,"Kamera modu: tek parmakla haritayı kaydır, araç açık kalır","Camera mode: drag with one finger to move, the tool stays open"
+NOTIFY_BUILD_MODE,İnşa modu: tek parmakla inşa et,Build mode: draw with one finger

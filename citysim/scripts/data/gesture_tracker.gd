@@ -4,8 +4,11 @@ extends RefCounted
 ## engine input dependency, so it can be unit-tested headless.
 ##   1 finger drag            -> pan (+ fling on release)
 ##   1 finger tap / hold      -> tap / long press
-##   2 fingers pinch + twist  -> zoom + rotate (+ pan by centroid)
-##   2 fingers vertical slide -> tilt
+##   2 fingers move together  -> pan
+##   2 fingers pinch          -> zoom (keeps panning with the centroid)
+##   2 fingers twist          -> rotate (only after a clear twist, so zooming
+##                               and panning do not spin the view)
+## Tilt has its own buttons in the HUD.
 ## With capture_single on (a build tool is active) one finger produces tool
 ## pointer events instead of pan/tap/long press; two fingers still navigate.
 
@@ -27,6 +30,7 @@ var long_press_seconds: float
 var tap_max_move_px: float
 var two_finger_decide_px: float
 var two_finger_decide_angle: float
+var two_finger_rotate_angle: float
 var velocity_smoothing: float
 
 var _touches: Dictionary = {}  # finger index -> Vector2
@@ -44,6 +48,9 @@ var _start_angle: float = 0.0
 var _last_centroid: Vector2 = Vector2.ZERO
 var _last_dist: float = 0.0
 var _last_angle: float = 0.0
+var _zooming: bool = false
+var _rotating: bool = false
+var _panning: bool = false
 
 
 func _init(config: Dictionary) -> void:
@@ -51,6 +58,7 @@ func _init(config: Dictionary) -> void:
 	tap_max_move_px = float(config["tap_max_move_px"])
 	two_finger_decide_px = float(config["two_finger_decide_px"])
 	two_finger_decide_angle = deg_to_rad(float(config["two_finger_decide_angle_deg"]))
+	two_finger_rotate_angle = deg_to_rad(float(config.get("two_finger_rotate_angle_deg", 10.0)))
 	velocity_smoothing = float(config["velocity_smoothing"])
 
 
@@ -157,6 +165,9 @@ func _begin_two_finger() -> void:
 	_last_centroid = _start_centroid
 	_last_dist = _start_dist
 	_last_angle = _start_angle
+	_zooming = false
+	_rotating = false
+	_panning = false
 
 
 func _update_two_finger() -> void:
@@ -164,25 +175,21 @@ func _update_two_finger() -> void:
 	var centroid := (p[0] + p[1]) * 0.5
 	var dist := maxf(p[0].distance_to(p[1]), 1.0)
 	var angle := (p[1] - p[0]).angle()
-
-	if _mode == Mode.TWO_UNDECIDED:
-		var spread := absf(dist - _start_dist)
-		var twist := absf(wrapf(angle - _start_angle, -PI, PI))
-		var slide_y := absf(centroid.y - _start_centroid.y)
-		if spread > two_finger_decide_px or twist > two_finger_decide_angle:
-			_mode = Mode.PINCH_ROTATE
-		elif slide_y > two_finger_decide_px:
-			_mode = Mode.TILT
-
-	match _mode:
-		Mode.PINCH_ROTATE:
-			zoom.emit(_last_dist / dist, centroid)
-			rotate.emit(wrapf(angle - _last_angle, -PI, PI))
-			pan.emit(centroid - _last_centroid)
-		Mode.TILT:
-			tilt.emit(centroid.y - _last_centroid.y)
-
-	if _mode != Mode.TWO_UNDECIDED:
-		_last_centroid = centroid
-		_last_dist = dist
-		_last_angle = angle
+	# Each part of the gesture starts once it is clearly meant.
+	if not _zooming and absf(dist - _start_dist) > two_finger_decide_px:
+		_zooming = true
+	if not _rotating and absf(wrapf(angle - _start_angle, -PI, PI)) > two_finger_rotate_angle:
+		_rotating = true
+	if not _panning and centroid.distance_to(_start_centroid) > two_finger_decide_px:
+		_panning = true
+	if _zooming or _rotating or _panning:
+		_mode = Mode.PINCH_ROTATE
+	if _zooming:
+		zoom.emit(_last_dist / dist, centroid)
+	if _rotating:
+		rotate.emit(wrapf(angle - _last_angle, -PI, PI))
+	if _panning or _zooming:
+		pan.emit(centroid - _last_centroid)
+	_last_centroid = centroid
+	_last_dist = dist
+	_last_angle = angle

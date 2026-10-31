@@ -31,17 +31,25 @@ dakika sürer. Aylık bütçe her gün sonunda kapanır. Hız: Dur / 1x / 2x / 3
 
 | Hareket | Ne yapar |
 |---|---|
-| Tek parmakla sürükle | Haritayı kaydırır (bir araç açıkken çizer/boyar) |
+| Tek parmakla sürükle | Haritayı kaydırır (inşa modunda çizer/boyar) |
+| İki parmakla birlikte kaydır | Haritayı kaydırır (inşa modunda da çalışır) |
 | İki parmakla sıkıştır | Yakınlaştırır / uzaklaştırır |
-| İki parmakla döndür | Kamerayı çevirir |
-| İki parmakla yukarı-aşağı | Eğim |
+| İki parmakla belirgin döndür | Kamerayı çevirir (yakınlaştırırken kendiliğinden dönmez) |
+| Soldaki ⟲ ⟳ düğmeleri | Kamerayı 45° çevirir |
+| Soldaki ˄ ˅ düğmeleri | Bakış açısını yükseltir / alçaltır |
 | Uzun bas | Binada bina bilgisi, yolda yol bilgisi, boş arazide konum |
 | Geri tuşu | Açık paneli kapatır; iki kez basınca çıkar |
 
+**İnşa / Kamera düğmesi:** bir araç açıkken (yol, imar, bina, ulaşım, bölge,
+yık) sağda büyük bir düğme çıkar.
+- Turuncu kalem = **İnşa**: tek parmak çizer.
+- Dokununca mavi = **Kamera** olur: tek parmak haritayı kaydırır, araç ve
+  seçimin açık kalır.
+- Tekrar dokununca inşaya dönersin. Paneli kapatınca kendiliğinden İnşa'ya
+  döner.
+
 Kamera uzaktayken harita görünümüne, yakındayken sokak seviyesine yumuşakça
 geçer.
-
----
 
 ## 3. Ekran
 
