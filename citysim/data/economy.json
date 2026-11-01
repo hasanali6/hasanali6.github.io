@@ -52,7 +52,9 @@
     "rent_level_factor": [
       1.0,
       1.25,
-      1.55
+      1.55,
+      1.94,
+      2.42
     ],
     "broke_months_to_move": 2,
     "savings_target_months": 2

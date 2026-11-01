@@ -78,6 +78,12 @@ func try_spend(amount: int) -> bool:
 	return true
 
 
+## Sandbox money (Hileler): straight into the treasury, not in the books.
+func cheat_money(amount: int) -> void:
+	balance += amount
+	EventBus.money_changed.emit(balance)
+
+
 ## One-off income such as a milestone reward (shown in next month's books).
 func add_bonus(amount: int) -> void:
 	balance += amount

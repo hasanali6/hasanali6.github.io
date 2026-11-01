@@ -114,6 +114,19 @@ hücrelerde, talep varsa büyür.
 - Ofis, sanayi
 - Karma (altta dükkân, üstte konut)
 
+**Binalar zamanla gelişir (seviye 1–5).** Dolu ve mutlu bir ev, ya da birkaç ay
+üst üste kâr eden bir dükkân, seviye atlar: kat sayısı artar, kira ve vergi
+yükselir. Seviye 5'te yüksek konut 34–46, ofis 32–44 kat olur.
+
+**Yoğunlaşma (ev → apartman → gökdelen).** Seviye 3+ ve hak eden bir bina,
+talep varsa yanındaki aynı imarlı binalarla birleşip bir üst imara dönüşür:
+
+- düşük konut → orta konut → yüksek konut (kule)
+- düşük ticari → yüksek ticari, karma → yüksek konut
+
+Yeni bina seviye 1'den başlar ve yine 5'e kadar büyür. Yüksek bina yasağı olan
+bölgelerde olmaz. Ayarlar → Hileler'den kapatılabilir.
+
 ### Binalar
 Ev, apartman, kule, dükkân, AVM, ofis, fabrika, atölye, park, koru ve çeşmeli
 meydanı katalogdan elle yerleştirebilirsin. Parklar mutluluğu artırır.
@@ -195,6 +208,20 @@ panelden değiştir.
 Başta 60.000 para ile başlarsın. Küçük şehre azalan bir devlet desteği ve
 işsizlik yardımı gelir.
 
+### Para nasıl kazanılır
+
+Muhasebe mantığı: kasa = aylık gelirler − aylık giderler.
+
+- **En büyük gelir vergidir.** Hane sayısı ve şirket kârı arttıkça vergi artar.
+  Seviye atlamış binalar daha çok kira ve vergi öder; bu yüzden **mutlu ve
+  dolu** mahalle en kârlı varlıktır.
+- **Ücretler:** su ve elektrik ücreti, otobüs/tramvay bileti, otopark.
+- **Ticaret:** şehirde üretilen mal önce şehirde satılır, fazlası otoyoldan
+  ihraç edilir. Otoyola bağlı değilsen ticaret zayıflar.
+- **Kilometre taşı ödülleri** tek seferlik büyük para verir.
+- **Giderler:** yol bakımı, hizmet binaları, toplu taşıma, kredi taksidi.
+  Kullanılmayan hizmetin bütçesini kısmak hızlı tasarruftur.
+
 ---
 
 ## 6. Kilometre taşları (ilerleme)
@@ -273,6 +300,15 @@ sokaklar yeşildir ve hatlar renkli şerit olarak görünür.
 - **Ses:** Müzik / Efekt / Ortam kaydırıcıları.
 - **Ortam sesleri:** alçakta kuşlar ve trafik, gece cırcır böcekleri, yağmur,
   yükseklerde rüzgâr.
+- **Hileler (serbest mod):** Ayarlar → Kayıt satırındaki **Hileler** düğmesi.
+  - **+100.000 / +1.000.000 / +10.000.000:** kasaya anında para (bütçede
+    görünmez).
+  - **Tüm kilitleri aç:** bütün yollar, binalar ve harita alanı açılır.
+  - **Sınırsız para:** kasa 1 milyonun altına düşünce 2 milyona tamamlanır.
+  - **Hızlı büyüme:** 3 kat göç, büyüme ve seviye atlama; yoğunlaşma talep
+    beklemez.
+  - **Kendiliğinden yoğunlaşma:** ev → apartman → gökdelen (varsayılan açık).
+  Seçimler `settings.cfg` içinde saklanır, istediğin zaman kapatırsın.
 
 ---
 
@@ -312,7 +348,7 @@ sokaklar yeşildir ve hatlar renkli şerit olarak görünür.
   araçlar çizilir, uzaktakiler veri olarak, geri kalanı istatistik olarak
   hesaplanır (simülasyon LOD).
 - **Testler:** `godot --headless --path citysim -s res://tests/run_tests.gd`
-  (164 kontrol).
+  (170 kontrol).
 - **APK:** her push'ta GitHub Actions derler, Releases → `citysim-latest`.
 - Ayrıntılı faz notları, kabul kriterleri ve bilinen eksikler: `README.md`.
 

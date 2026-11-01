@@ -20,6 +20,14 @@ Mimari Cities: Skylines 2'den ilham alır; bu klasör **Faz 1**'i içerir.
 | Referans sahne (kapalı) | `scripts/world/reference_scene.gd` + `assets/materials/*.gdshader` | Işık testi için bina blokları ve ağaçlar. Varsayılan **kapalı** — harita boş başlar. `data/reference_scene.json` → `"enabled": true` ile açılır. |
 | Testler | `tests/run_tests.gd` | Görselsiz (headless) birim testleri: saat, hız, ay geçişi, jestler, ızgara. |
 
+## Gelişme, gökdelenler ve hileler
+
+| Parça | Dosya | Ne yapar |
+|---|---|---|
+| Seviye 1–5 | `data/zones.json` (`floors_by_level`, `growth.max_level`), `data/economy.json` (`rent_level_factor`) | Hak eden binalar 5 seviyeye kadar büyür; yüksek konut ve ofis 40+ kata çıkar. |
+| Yoğunlaşma | `building_system.gd` (`_densify`, `_redevelop_site`), `zones.json` → `growth.densify` | Seviye 3+ binalar komşularıyla birleşip üst imara geçer (düşük → orta → yüksek konut, düşük → yüksek ticari, karma → yüksek konut). Talep ≥ 0,1; yükseklik yasağında olmaz. |
+| Hileler | `scripts/systems/cheats.gd` (autoload `Cheats`), `scripts/ui/cheats_panel.gd` | Ayarlar → Hileler: para ekleme, tüm kilitleri açma, sınırsız para, hızlı büyüme (×3), yoğunlaşma aç/kapa. `settings.cfg` → `[cheats]`. |
+
 ## Faz 9: Görsel cila ve ses
 
 | Parça | Dosya | Ne yapar |

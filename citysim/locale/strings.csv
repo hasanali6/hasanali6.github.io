@@ -341,3 +341,12 @@ PROD_RAW_EXPORT,İhraç edilen hammadde: %s,Raw material exported: %s
 PROD_GOODS,"Mamul ürün: üretilen %s, dükkânlarda satılan %s","Goods: produced %s, sold in shops %s"
 PROD_TRADE,"Mamul ürün ihracatı %s, ithalatı %s","Goods exported %s, imported %s"
 PROD_HINT,İpucu: yerel hammadde fabrikalara ithal hammaddeden ucuza gelir. Fazlası otoyoldan ucuza ihraç edilir.,Tip: local raw material is cheaper for factories than imports; the surplus is exported cheaply by highway.
+SETTINGS_CHEATS,Hileler,Cheats
+CHEATS_TITLE,Hileler (serbest mod),Cheats (sandbox)
+CHEATS_UNLOCK_ALL,"Tüm kilitleri aç (bütün yollar, binalar, harita)","Unlock everything (all roads, buildings, map)"
+CHEATS_UNLIMITED,Sınırsız para (kasa 1 milyonun altına düşmez),Unlimited money (never below one million)
+CHEATS_FAST_GROWTH,"Hızlı büyüme (3 kat göç, büyüme ve seviye atlama)","Fast growth (3x newcomers, growth and level-ups)"
+CHEATS_DENSIFY,Kendiliğinden yoğunlaşma (ev → apartman → gökdelen),Automatic densification (house → apartments → tower)
+CHEATS_HINT,Para düğmeleri kasaya doğrudan ekler (bütçede görünmez). Yoğunlaşma normal oyunun parçasıdır ve açık başlar; yüksek bina yasağı olan bölgelerde çalışmaz.,Money buttons add straight to the treasury (not in the books). Densification is part of normal play and starts on; it skips districts with a high-rise ban.
+NOTIFY_UNLOCKED_ALL,"Her şey açıldı: bütün yollar, binalar ve harita","Everything unlocked: all roads, buildings and the map"
+NOTIFY_DENSIFIED,%d bina daha yoğun olarak yeniden yapıldı,%d buildings were rebuilt at a higher density

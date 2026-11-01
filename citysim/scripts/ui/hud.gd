@@ -79,6 +79,7 @@ var _cost_pill: PanelContainer
 var _economy: EconomyPanel
 var _catalog: CatalogPanel
 var _saves: SavesPanel
+var _cheats: CheatsPanel
 var _transit_panel: TransitPanel
 var _district_panel: DistrictPanel
 var _rci: RciBars
@@ -152,6 +153,8 @@ func _ready() -> void:
 	_place(_economy.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
 	_saves = SavesPanel.new(get_parent().get_node("SaveSystem"), FONT_SIZE, MIN_TOUCH)
 	_place(_saves.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+	_cheats = CheatsPanel.new(FONT_SIZE, MIN_TOUCH)
+	_place(_cheats.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
 
 	EventBus.speed_changed.connect(_on_speed_changed)
 	EventBus.ground_long_pressed.connect(_on_ground_long_pressed)
@@ -609,6 +612,15 @@ func _build_settings_panel() -> PanelContainer:
 		_settings_panel.visible = false
 		_saves.open())
 	save_row.add_child(save)
+	var cheats := Button.new()
+	cheats.text = "SETTINGS_CHEATS"
+	cheats.focus_mode = Control.FOCUS_NONE
+	cheats.custom_minimum_size.y = MIN_TOUCH * 0.8
+	cheats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cheats.pressed.connect(func() -> void:
+		_settings_panel.visible = false
+		_cheats.open())
+	save_row.add_child(cheats)
 	var fresh := Button.new()
 	fresh.text = "SETTINGS_NEW_CITY"
 	fresh.focus_mode = Control.FOCUS_NONE
@@ -1254,6 +1266,9 @@ func _on_back_requested() -> void:
 		return
 	if _saves.card.visible:
 		_saves.card.visible = false
+		return
+	if _cheats.card.visible:
+		_cheats.card.visible = false
 		return
 	if _settings_panel.visible or _info_panel.visible or _tray.visible:
 		_settings_panel.visible = false

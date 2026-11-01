@@ -142,7 +142,7 @@ func _on_tick(_t: int) -> void:
 		var cell := candidates[_rng.randi_range(0, candidates.size() - 1)]
 		if grid.building[cell] != ZoneGrid.FREE:
 			continue
-		var chance := float(_growth["base_chance"]) * clampf(_group_demand(_zones.zone_key(grid.zone[cell])), 0.0, 1.0)
+		var chance := float(_growth["base_chance"]) * clampf(_group_demand(_zones.zone_key(grid.zone[cell])), 0.0, 1.0) * Cheats.growth_factor()
 		if _rng.randf() >= chance:
 			continue
 		if _try_grow(cell):
@@ -265,7 +265,7 @@ func _on_month(_m: int) -> void:
 				continue
 		else:
 			b["no_utility_months"] = 0
-		if b["level"] < max_level and _rng.randf() < float(_growth["level_up_chance_per_month"]) and _deserves_level(b):
+		if b["level"] < max_level and _rng.randf() < float(_growth["level_up_chance_per_month"]) * Cheats.growth_factor() and _deserves_level(b):
 			b["level"] += 1
 			var floors := maxi(b["floors"], _floors_for(_zones.zone_config(b["zone"]), b["level"]))
 			var cap := _floor_cap(b["centre"])
@@ -279,9 +279,115 @@ func _on_month(_m: int) -> void:
 			changed = true
 	if abandoned_for_utilities > 0:
 		EventBus.notification_posted.emit("services", tr("NOTIFY_ABANDONED_UTILITIES") % abandoned_for_utilities)
+	if Cheats.densify and _densify() > 0:
+		changed = true
 	if changed:
 		_render_all()
 		EventBus.buildings_changed.emit()
+
+
+## A lot of w x d cells for rebuilding b: a run of cells along its street
+## that b covers, made only of b, free cells of the same zone and other grown
+## buildings of the same zone. Returns {cells, ids} or {}.
+func _redevelop_site(b: Dictionary, w: int, d: int) -> Dictionary:
+	var grid: ZoneGrid = _zones.grid
+	var cells: PackedInt32Array = b["cells"]
+	var front := cells[0]
+	for c in cells:
+		if grid.depth[c] == 0 and (grid.depth[front] != 0 or grid.along[c] < grid.along[front]):
+			front = c
+	if grid.depth[front] != 0:
+		return {}
+	var seg := grid.segment[front]
+	var side := grid.side[front]
+	var zid := grid.zone[front]
+	var first := grid.along[front]
+	for start in range(first - w + 1, first + 1):
+		var lot := PackedInt32Array()
+		var ids := {}
+		var ok := true
+		for k in range(start, start + w):
+			for dep in d:
+				var j := grid.index_of(seg, side, k, dep)
+				if j < 0:
+					ok = false
+					break
+				var owner := grid.building[j]
+				if owner == ZoneGrid.FREE:
+					if grid.zone[j] != zid:
+						ok = false
+						break
+				elif owner != int(b["id"]):
+					var o: Dictionary = buildings.get(owner, {})
+					if o.is_empty() or o["manual"] or o["zone"] != b["zone"]:
+						ok = false
+						break
+					ids[owner] = true
+				lot.append(j)
+			if not ok:
+				break
+		if not ok:
+			continue
+		# Every building touched must fit wholly inside the new lot.
+		ids[int(b["id"])] = true
+		var inside := {}
+		for j in lot:
+			inside[j] = true
+		for id: int in ids:
+			for c: int in buildings[id]["cells"]:
+				if not inside.has(c):
+					ok = false
+		if ok:
+			return {"cells": lot, "ids": ids.keys()}
+	return {}
+
+
+## Redevelopment: thriving high-level houses and shops in a busy city are
+## rebuilt at the next density (house -> apartment block -> tower), the way
+## neighbourhoods grow denser. Only where the bigger lot fits and the
+## district allows tall buildings. Returns how many were rebuilt.
+func _densify() -> int:
+	var cfg: Dictionary = _growth["densify"]
+	var chain: Dictionary = cfg["chain"]
+	var grid: ZoneGrid = _zones.grid
+	var done := 0
+	for id: int in buildings.keys():
+		if done >= int(cfg["max_per_month"]):
+			break
+		var b: Dictionary = buildings.get(id, {})
+		if b.is_empty() or b["manual"] or b["abandoned"] or not chain.has(b["zone_key"]):
+			continue
+		if int(b["level"]) < int(cfg["min_level"]) or not _deserves_level(b):
+			continue
+		var need := -1.0 if Cheats.fast_growth else float(cfg["min_demand"])
+		if _group_demand(b["zone_key"]) < need or _rng.randf() > float(cfg["chance_per_month"]) * Cheats.growth_factor():
+			continue
+		if _floor_cap(b["centre"]) > 0:
+			continue
+		var new_key := str(chain[b["zone_key"]])
+		var new_zid: int = _zones.zone_id(new_key)
+		var zcfg: Dictionary = _zones.zone_config(new_zid)
+		var w := int((zcfg["lot_widths"] as Array)[0])
+		var dd := int((zcfg["lot_depths"] as Array)[0])
+		var site := _redevelop_site(b, w, dd)
+		if site.is_empty():
+			continue
+		var lot: PackedInt32Array = site["cells"]
+		# Neighbours merged into the bigger lot go too (their people move).
+		for other: int in site["ids"]:
+			for c: int in buildings[other]["cells"]:
+				grid.building[c] = ZoneGrid.FREE
+			buildings.erase(other)
+			_rising.erase(other)
+		for c in lot:
+			grid.zone[c] = new_zid
+		var styles: Array = zcfg["styles"]
+		var nid := _create(new_zid, lot, lot[0], w, dd, str(styles[_rng.randi_range(0, styles.size() - 1)]), _floors_for(zcfg, 1), false)
+		buildings[nid]["level"] = 1
+		done += 1
+	if done > 0:
+		EventBus.notification_posted.emit("zones", tr("NOTIFY_DENSIFIED") % done)
+	return done
 
 
 func _deserves_level(b: Dictionary) -> bool:

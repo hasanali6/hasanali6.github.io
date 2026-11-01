@@ -29,6 +29,7 @@ EconomySystem="*res://scripts/systems/economy_system.gd"
 ProgressionSystem="*res://scripts/systems/progression_system.gd"
 WeatherSystem="*res://scripts/systems/weather_system.gd"
 AudioSystem="*res://scripts/systems/audio_system.gd"
+Cheats="*res://scripts/systems/cheats.gd"
 
 [display]
 
