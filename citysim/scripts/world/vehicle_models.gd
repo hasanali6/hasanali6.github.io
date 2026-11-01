@@ -97,6 +97,30 @@ static func tram_stop() -> ArrayMesh:
 	return st.commit()
 
 
+## Metro entrance along the sidewalk (long side = x, road side = +z): a
+## stair well with glass railings and canopy, a coloured band and a pylon
+## with a lit box in the line colour.
+static func metro_entrance() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(-1)
+	_box(st, Vector3(0, 0.07, 0), Vector3(5.2, 0.14, 2.4), 4)
+	_box(st, Vector3(-0.3, 0.15, 0), Vector3(4.0, 0.02, 1.7), 0)
+	for sz in [-1.0, 1.0]:
+		_box(st, Vector3(-0.3, 0.65, sz * 0.95), Vector3(4.2, 1.0, 0.06), 1)
+		_box(st, Vector3(-0.3, 1.16, sz * 0.95), Vector3(4.2, 0.06, 0.1), 0)
+	_box(st, Vector3(-2.4, 0.65, 0), Vector3(0.06, 1.0, 1.96), 1)
+	for sx in [-2.3, 1.7]:
+		for sz in [-1.0, 1.0]:
+			_box(st, Vector3(sx, 1.45, sz * 1.05), Vector3(0.1, 2.6, 0.1), 0)
+	_box(st, Vector3(-0.3, 2.78, 0), Vector3(4.6, 0.08, 2.5), 1)
+	_box(st, Vector3(-0.3, 2.9, 1.24), Vector3(4.6, 0.3, 0.05), 2)
+	_box(st, Vector3(2.3, 1.8, 0.7), Vector3(0.14, 3.6, 0.14), 0)
+	_box(st, Vector3(2.3, 3.75, 0.7), Vector3(0.75, 0.75, 0.75), 2)
+	st.generate_normals()
+	return st.commit()
+
+
 # --- Bodies ---------------------------------------------------------------------
 
 ## Car: two-tone body (lower part second colour), glass cabin with a painted

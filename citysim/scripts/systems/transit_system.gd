@@ -19,6 +19,13 @@ extends Node3D
 ## changes) come back on their own. Stops have shelters, tram lines rails,
 ## and the lines show as coloured ribbons while drawing or on the transit
 ## overlay. Books: tickets in and vehicle upkeep out every month.
+##
+## Metro ("underground" types): stations are tapped next to any road (the
+## entrance sits on the sidewalk) and the tunnel runs smoothly under
+## everything, rivers included, from the first station to the last. Trains
+## run there and back, so a ride is the plain distance between two
+## stations. Trains stay underground (not drawn); the tunnels show on the
+## transit overlay. Building costs a fee per station plus per tunnel metre.
 
 const STOP_SHADER := preload("res://assets/materials/transit_stop.gdshader")
 const CHECK_SECONDS := 0.5
@@ -30,6 +37,7 @@ const WALK_DETOUR := 1.15
 const TAP_PIXELS := 28.0
 const MAP_AABB := AABB(Vector3(-2600, -20, -2600), Vector3(5200, 80, 5200))
 const RIBBON_WIDTH := 3.2
+const TUNNEL_STEP := 12.0
 
 @export var traffic_system_path: NodePath
 @export var vehicle_system_path: NodePath
@@ -96,7 +104,7 @@ func _process(delta: float) -> void:
 	_check_timer = 0.0
 	# Keep every line's vehicles on the road (one more per line per check).
 	for line: Dictionary in lines:
-		if not line["ok"]:
+		if not line["ok"] or _underground(line["type"]):
 			continue
 		var want := int(line["vehicles"])
 		var have: int = _vehicles.line_vehicles(line["id"])
@@ -116,8 +124,17 @@ func _make_line(type: String, points: Array, color: int, number: int) -> Diction
 		"vehicles": int(_types[type]["default_vehicles"]), "spawned": 0,
 		# Derived from the roads (not saved).
 		"ok": false, "error": "", "route": PackedInt32Array(), "stop_lane": PackedVector2Array(),
-		"stop_dist": PackedFloat32Array(), "stop_seg": PackedInt32Array(), "length": 0.0,
+		"stop_dist": PackedFloat32Array(), "stop_seg": PackedInt32Array(), "length": 0.0, "path": [],
 	}
+
+
+## Metro and other lines that run in tunnels, there and back.
+func _underground(type: String) -> bool:
+	return bool((_types[type] as Dictionary).get("underground", false))
+
+
+func is_underground(line: Dictionary) -> bool:
+	return _underground(line["type"])
 
 
 func line_name(line: Dictionary) -> String:
@@ -170,6 +187,8 @@ func headway_s(line: Dictionary) -> float:
 	var t: Dictionary = _types[line["type"]]
 	var cycle := float(line["length"]) / (float(t["speed_ms"]) * SPEED_FACTOR) \
 		+ (line["points"] as Array).size() * float(t["dwell_s"])
+	if _underground(line["type"]):
+		cycle *= 2.0   # there and back
 	return cycle / maxf(float(line["vehicles"]), 1.0)
 
 
@@ -182,6 +201,8 @@ func _rebuild_lines() -> void:
 		var old: PackedInt32Array = line["route"]
 		var old_stops: PackedVector2Array = line["stop_lane"]
 		_route_line(line, g, rg, lanes)
+		if _underground(line["type"]):
+			continue
 		if line["route"] != old or line["stop_lane"] != old_stops or not line["ok"]:
 			_vehicles.despawn_line(line["id"])
 			if line["ok"]:
@@ -234,6 +255,18 @@ func _route_line(line: Dictionary, g: TrafficGraph, rg: RoadGraph, lanes: LaneGe
 			line["error"] = "TRANSIT_ERR_STOP_LOST"
 			return
 		stops.append(snap)
+	if _underground(line["type"]):
+		var path := TransitRules.tunnel_path(line["points"], TUNNEL_STEP)
+		var segs := PackedInt32Array()
+		for snap: Array in stops:
+			segs.append(g.seg_ids[int(snap[0])])
+		line["stop_seg"] = segs
+		line["stop_dist"] = path["stop_dist"]
+		line["length"] = float(path["length"])
+		line["path"] = path["pts"]
+		line["error"] = ""
+		line["ok"] = true
+		return
 	var res := _loop(line["type"], stops, g)
 	if not res["ok"]:
 		line["error"] = res["error"]
@@ -276,6 +309,9 @@ func _loop(type: String, stops: Array, g: TrafficGraph) -> Dictionary:
 
 func _respawn(line: Dictionary) -> void:
 	var n := (line["stop_lane"] as PackedVector2Array).size()
+	if n == 0 or _underground(line["type"]):
+		line["spawned"] = int(line["vehicles"])
+		return
 	var want := int(line["vehicles"])
 	for k in want:
 		_spawn_on(line, int(float(k) * n / maxf(want, 1)) % n)
@@ -301,11 +337,12 @@ func _rebuild_cover() -> void:
 			continue
 		var id: int = line["id"]
 		var points: Array = line["points"]
+		var reach := float((_types[line["type"]] as Dictionary).get("walk_radius_m", radius))
 		for i in points.size():
 			var p: Vector2 = points[i]
 			for s in mids.size():
 				var d := mids[s].distance_to(p) * WALK_DETOUR
-				if d > radius:
+				if d > reach:
 					continue
 				var sid := g.seg_ids[s]
 				if not _cover.has(sid):
@@ -340,6 +377,9 @@ func transit_minutes(o: int, d: int) -> Vector3:
 		var n := dist.size()
 		var ride := TransitRules.along(dist[int(a.x)], dist[int(b.x)], float(line["length"]))
 		var hops := posmod(int(b.x) - int(a.x), n)
+		if _underground(line["type"]):
+			ride = TransitRules.shuttle(dist[int(a.x)], dist[int(b.x)])
+			hops = absi(int(b.x) - int(a.x))
 		var seconds := (a.y + b.y) / walk_speed + headway_s(line) * 0.5 \
 			+ ride / (float(t["speed_ms"]) * SPEED_FACTOR) + maxi(hops - 1, 0) * float(t["dwell_s"])
 		var minutes := seconds / 60.0
@@ -367,7 +407,7 @@ func set_vehicles(id: int, count: int) -> void:
 	if n == int(line["vehicles"]):
 		return
 	line["vehicles"] = n
-	if line["ok"]:
+	if line["ok"] and not _underground(line["type"]):
 		_vehicles.despawn_line(id)
 		_respawn(line)
 	EventBus.transit_changed.emit()
@@ -393,9 +433,9 @@ func delete_line(id: int) -> void:
 	EventBus.transit_changed.emit()
 
 
-func draft_cost(type: String, stops: int) -> int:
+func draft_cost(type: String, stops: int, length: float = 0.0) -> int:
 	var t: Dictionary = _types[type]
-	return int(t["line_cost"]) + stops * int(t["stop_cost"])
+	return int(t["line_cost"]) + stops * int(t["stop_cost"]) + int(length * float(t.get("tunnel_cost_per_m", 0.0)))
 
 
 ## Opens the line being drawn as a real line. Returns false (and posts the
@@ -411,7 +451,7 @@ func finish_draft() -> bool:
 		_draft_info["error"] = "TRANSIT_ERR_MAX_LINES"
 		EventBus.transit_draft_changed.emit(_draft_info)
 		return false
-	var cost := draft_cost(_draft_type, _draft.size())
+	var cost := draft_cost(_draft_type, _draft.size(), float(_draft_info.get("length", 0.0)))
 	if not EconomySystem.try_spend(cost):
 		_draft_info["error"] = "ROAD_ERR_MONEY"
 		EventBus.transit_draft_changed.emit(_draft_info)
@@ -491,7 +531,7 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 
 ## Adds a stop at the road nearest to p, or removes the draft stop there.
 func toggle_stop(p: Vector2) -> void:
-	var spacing := float(_cfg["min_stop_spacing_m"])
+	var spacing := float((_types[_draft_type] as Dictionary).get("min_stop_spacing_m", _cfg["min_stop_spacing_m"]))
 	for i in _draft.size():
 		if (_draft[i] as Vector2).distance_to(p) < spacing * 0.5:
 			_draft.remove_at(i)
@@ -528,7 +568,20 @@ func _update_draft() -> void:
 	var info := {"type": _draft_type, "stops": _draft.size(), "cost": draft_cost(_draft_type, _draft.size()),
 		"ok": false, "error": "", "length": 0.0}
 	var route_pts: Array = []
-	if _draft.size() >= 2:
+	if _underground(_draft_type):
+		var all_snapped := true
+		for p: Vector2 in _draft:
+			if _snap(p, _draft_type, _traffic.graph, _net.graph).is_empty():
+				all_snapped = false
+		if _draft.size() >= 2:
+			var path := TransitRules.tunnel_path(_draft, TUNNEL_STEP)
+			route_pts = path["pts"]
+			info["length"] = float(path["length"])
+			info["cost"] = draft_cost(_draft_type, _draft.size(), float(path["length"]))
+			info["ok"] = all_snapped
+			if not all_snapped:
+				info["error"] = "TRANSIT_ERR_STOP_LOST"
+	elif _draft.size() >= 2:
 		var g: TrafficGraph = _traffic.graph
 		var rg: RoadGraph = _net.graph
 		var stops := []
@@ -572,8 +625,8 @@ func _on_month(_m: int) -> void:
 func _build_visuals() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = STOP_SHADER
-	for type: String in ["bus", "tram"]:
-		var mesh := VehicleModels.bus_stop() if type == "bus" else VehicleModels.tram_stop()
+	for type: String in ["bus", "tram", "metro"]:
+		var mesh: ArrayMesh = VehicleModels.bus_stop() if type == "bus" else (VehicleModels.tram_stop() if type == "tram" else VehicleModels.metro_entrance())
 		mesh.surface_set_material(0, mat)
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -646,7 +699,7 @@ func _on_lanes_rebuilt() -> void:
 
 func _rebuild_visuals() -> void:
 	var rg: RoadGraph = _net.graph
-	var per_type := {"bus": [], "tram": []}
+	var per_type := {"bus": [], "tram": [], "metro": []}
 	var ribbon := SurfaceTool.new()
 	ribbon.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var rails := SurfaceTool.new()
@@ -660,6 +713,10 @@ func _rebuild_visuals() -> void:
 		var stop_lane: PackedVector2Array = line["stop_lane"]
 		var points: Array = line["points"]
 		var color := line_color(line)
+		if _underground(line["type"]):
+			_metro_visuals(line, color, per_type["metro"], ribbon)
+			any_ribbon = true
+			continue
 		for i in stop_lane.size():
 			var entry := route[int(stop_lane[i].x)]
 			var seg: RoadGraph.RoadSegment = rg.segments.get(entry >> 1)
@@ -708,6 +765,33 @@ func _rebuild_visuals() -> void:
 		_rails.mesh = m
 	else:
 		_rails.mesh = null
+
+
+## Station entrances on the sidewalk and the tunnel drawn as a dark-edged
+## ribbon (seen only on the transit overlay).
+func _metro_visuals(line: Dictionary, color: Color, out: Array, ribbon: SurfaceTool) -> void:
+	var rg: RoadGraph = _net.graph
+	for p: Vector2 in line["points"]:
+		var hit: Dictionary = rg.find_segment_near(p, float(_cfg["snap_radius_m"]))
+		if hit.is_empty():
+			continue
+		var seg: RoadGraph.RoadSegment = rg.segments[int(hit["segment"])]
+		# Keep the entrance off the junction and its crossings.
+		var keep := minf(16.0 / maxf(seg.length, 1.0), 0.5)
+		var t := clampf(float(hit["t"]), keep, 1.0 - keep)
+		var at := rg.point_on(seg.id, t)
+		var d := rg.tangent_on(seg.id, t)
+		var right := Vector2(-d.y, d.x)
+		var rt: Dictionary = _road_types[seg.type]
+		var c := at + right * (RoadTypes.carriageway_width(rt) * 0.5 + float(rt["sidewalk_width_m"]) * 0.5)
+		var z := Vector3(-right.x, 0.0, -right.y)
+		var x := Vector3.UP.cross(z)
+		var depth := clampf(float(rt["sidewalk_width_m"]) / 2.4, 0.5, 1.0)
+		out.append([Transform3D(Basis(x, Vector3.UP, z * depth), Vector3(c.x, 0.0, c.y)), color])
+	var pts: Array = line["path"]
+	if pts.size() >= 2:
+		_strip(ribbon, pts, 0.0, RIBBON_WIDTH * 2.0 + 3.0, RIBBON_HEIGHT, color.darkened(0.6), true)
+		_strip(ribbon, pts, 0.0, RIBBON_WIDTH * 2.0, RIBBON_HEIGHT + 0.08, color, true)
 
 
 func _rebuild_draft_mesh(route_pts: Array) -> void:

@@ -1,7 +1,7 @@
 class_name TransitPanel
 extends RefCounted
 ## Bottom panel of the transit tool ("Ulaşım"):
-##   row 1: bus / tram, what the line being drawn costs (or why it cannot be
+##   row 1: bus / tram / metro, what the line being drawn costs (or why it cannot be
 ##          built), open the line, clear the stops, close;
 ##   row 2: one chip per line in its colour, and the shared ticket price;
 ##   row 3: the chosen line: riders, how full it is, length, vehicles (- / +)
@@ -45,9 +45,9 @@ func _init(transit: Node, font_size: int, min_touch: float, on_close: Callable) 
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", GAP)
 	var group := ButtonGroup.new()
-	for type: String in ["bus", "tram"]:
+	for type: String in ["bus", "tram", "metro"]:
 		var cfg := GameData.section("transit/types/" + type)
-		var color := UiStyle.BLUE if type == "bus" else UiStyle.TEAL
+		var color: Color = {"bus": UiStyle.BLUE, "tram": UiStyle.TEAL, "metro": UiStyle.PURPLE}[type]
 		var b := UiStyle.chip_button(cfg["name_key"], color.darkened(0.3), color.lightened(0.1), Vector2(130, min_touch * 0.72))
 		b.add_theme_font_size_override("font_size", font_size - 5)
 		b.button_group = group
@@ -180,10 +180,11 @@ func _on_draft(info: Dictionary) -> void:
 		_info.add_theme_color_override("font_color", Color(1.0, 0.62, 0.58))
 		return
 	_info.remove_theme_color_override("font_color")
+	var metro := bool(GameData.section("transit/types/" + str(info.get("type", "bus"))).get("underground", false))
 	if stops == 0:
-		_info.text = TranslationServer.translate("TRANSIT_HINT")
+		_info.text = TranslationServer.translate("TRANSIT_HINT_METRO" if metro else "TRANSIT_HINT")
 	else:
-		_info.text = TranslationServer.translate("TRANSIT_DRAFT") % [stops, float(info.get("length", 0.0)) / 1000.0,
+		_info.text = TranslationServer.translate("TRANSIT_DRAFT_METRO" if metro else "TRANSIT_DRAFT") % [stops, float(info.get("length", 0.0)) / 1000.0,
 			UiStyle.format_int(int(info.get("cost", 0)))]
 
 

@@ -174,6 +174,17 @@ terk edilir. Kirli suyun aşağısına pompa koyma.
 ### Ulaşım (toplu taşıma)
 - **Otobüs:** yola dokunarak durak koy, "Hattı aç".
 - **Tramvay:** sadece cadde ve bulvarlarda; asfalta gömülü ray çizilir.
+- **Metro (Büyük Şehir, 10.000 nüfus):** istasyonlar herhangi bir yolun
+  kenarına konur (aralarında en az 250 m). Tünel istasyonlar arasında yerin
+  altından, nehrin altından bile geçer; yollara bağlı değildir. Trenler ilk
+  istasyondan sonuncusuna gidip gelir, bu yüzden döngü gerekmez.
+  - Hızlı (22 m/sn) ve çok yolcu taşır (tren başına 4.500 yolcu/gün).
+    İnsanlar istasyona 650 m'ye kadar yürür.
+  - Pahalı: hat 20.000 + istasyon başına 12.000 + tünelin metresi 40. Tren
+    başına aylık bakım 1.600.
+  - Trenler yerin altında olduğu için görünmez. Tüneller Katmanlar → Toplu
+    taşıma'da kalın renkli çizgi olarak görünür. Sokakta cam korkuluklu,
+    renkli tabelalı metro girişleri durur.
 - Araçlar yolun ortasında U dönüşü yapamaz. Hat bir yapı adasını dolaşan bir
   döngü olmalı; çıkmaz sokağa hat açılmaz.
 - Her hatta araç sayısı (−/+), yolcu/gün, doluluk ve sefer aralığı görünür.
@@ -233,7 +244,7 @@ Muhasebe mantığı: kasa = aylık gelirler − aylık giderler.
 | Kasaba | 1.000 | 15.000 | Ofis, hastane, arıtma, çöp yakma, meydan, **bölgeler**; alan 3,2 km |
 | İlçe | 2.500 | 25.000 | **Bulvar**, yüksek ticari, AVM, krematoryum, **tramvay** |
 | Şehir | 5.000 | 40.000 | Yüksek konut, kule, üniversite; **tüm harita (4 km)** |
-| Büyük Şehir | 10.000 | 60.000 | Daha yüksek kredi limiti |
+| Büyük Şehir | 10.000 | 60.000 | Metro, daha yüksek kredi limiti |
 | Metropol | 25.000 | 100.000 | Daha yüksek kredi limiti |
 | Megakent | 50.000 | 200.000 | En yüksek kredi limiti |
 
@@ -348,13 +359,14 @@ sokaklar yeşildir ve hatlar renkli şerit olarak görünür.
   araçlar çizilir, uzaktakiler veri olarak, geri kalanı istatistik olarak
   hesaplanır (simülasyon LOD).
 - **Testler:** `godot --headless --path citysim -s res://tests/run_tests.gd`
-  (170 kontrol).
+  (172 kontrol).
 - **APK:** her push'ta GitHub Actions derler, Releases → `citysim-latest`.
 - Ayrıntılı faz notları, kabul kriterleri ve bilinen eksikler: `README.md`.
 
 ## 14. Bilinen sınırlar (kısaca)
 
-- Tünel, otoyol rampaları, metro, tren ve liman yok.
+- Karayolu tüneli, otoyol rampaları, banliyö treni ve liman yok. Metro trenleri
+  yerin altında olduğu için çizilmiyor.
 - Hammaddeler tek havuzda: fabrikalar hangi türün geldiğine bakmaz; ürün
   çeşitleri (gıda, kereste, metal…) ayrı ayrı izlenmiyor.
 - Yayalar, bisikletler ve park etmiş araçlar görünmüyor; sayılar arka planda

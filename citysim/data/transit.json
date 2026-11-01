@@ -25,6 +25,23 @@
       "default_vehicles": 2,
       "dwell_s": 8.0,
       "road_types": ["avenue", "avenue_oneway", "boulevard"]
+    },
+    "metro": {
+      "name_key": "TRANSIT_METRO",
+      "model": "metro",
+      "underground": true,
+      "speed_ms": 22.0,
+      "daily_capacity_per_vehicle": 4500,
+      "upkeep_per_vehicle": 1600,
+      "line_cost": 20000,
+      "stop_cost": 12000,
+      "tunnel_cost_per_m": 40,
+      "max_vehicles": 10,
+      "default_vehicles": 2,
+      "dwell_s": 25.0,
+      "min_stop_spacing_m": 250.0,
+      "walk_radius_m": 650.0,
+      "road_types": []
     }
   },
   "colors": ["#e8452c", "#2d7be0", "#29a85b", "#f2b01e", "#9a4fd6", "#e0559e", "#18b2b2", "#8a6a3a"],

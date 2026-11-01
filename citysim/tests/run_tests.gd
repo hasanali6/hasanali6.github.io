@@ -664,6 +664,18 @@ func _test_transit_rules() -> void:
 	var dist := TransitRules.stop_distances(tg, loop["route"], loop["stop_edge"], stops)
 	var ride := TransitRules.along(dist[0], dist[1], float(loop["length"]))
 	_check(absf(ride - 800.0) < 1.0, "riding half way round the loop (%.0f m)" % ride)
+	# Metro: a smooth tunnel through the stations, ridden there and back.
+	var tunnel := TransitRules.tunnel_path([Vector2(0, 0), Vector2(600, 0), Vector2(600, 800)], 12.0)
+	var tpts: Array = tunnel["pts"]
+	var tdist: PackedFloat32Array = tunnel["stop_dist"]
+	var max_step := 0.0
+	for k in range(1, tpts.size()):
+		max_step = maxf(max_step, (tpts[k] as Vector2).distance_to(tpts[k - 1]))
+	_check(tdist.size() == 3 and is_zero_approx(tdist[0]) and tdist[1] > 595.0 and tdist[2] > 1395.0 and tdist[2] < 1500.0
+		and is_equal_approx(float(tunnel["length"]), tdist[2]) and max_step <= 12.5 and (tpts.back() as Vector2) == Vector2(600, 800),
+		"a metro tunnel passes through every station (%.0f m)" % float(tunnel["length"]))
+	_check(is_equal_approx(TransitRules.shuttle(tdist[2], tdist[1]), TransitRules.shuttle(tdist[1], tdist[2])),
+		"metro rides are the same length both ways")
 	var mc: Dictionary = DataLoader.load_json("res://data/transit.json")["mode_choice"]
 	var fast := TransitRules.transit_share(20.0, 10.0, mc)
 	var slow := TransitRules.transit_share(20.0, 40.0, mc)

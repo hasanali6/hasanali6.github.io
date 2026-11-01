@@ -170,6 +170,44 @@ static func along(a: float, b: float, loop: float) -> float:
 	return loop if d < 0.01 else d
 
 
+## Underground (metro) line: a smooth open tunnel through the stations in
+## order, trains running there and back. Returns {pts: Array of Vector2 every
+## <= `step` m, stop_dist: distance of each station from the first, length}.
+static func tunnel_path(stations: Array, step: float) -> Dictionary:
+	var pts: Array = []
+	var stop_dist := PackedFloat32Array()
+	var n := stations.size()
+	if n < 2:
+		return {"pts": pts, "stop_dist": stop_dist, "length": 0.0}
+	var acc := 0.0
+	var last: Vector2 = stations[0]
+	pts.append(last)
+	stop_dist.append(0.0)
+	for i in n - 1:
+		# Catmull-Rom between station i and i + 1, ends held straight.
+		var p0: Vector2 = stations[maxi(i - 1, 0)]
+		var p1: Vector2 = stations[i]
+		var p2: Vector2 = stations[i + 1]
+		var p3: Vector2 = stations[mini(i + 2, n - 1)]
+		var parts := maxi(int(ceil(p1.distance_to(p2) * 1.5 / step)), 1)   # curve speed varies
+		for k in range(1, parts + 1):
+			var t := float(k) / parts
+			var q := 0.5 * ((2.0 * p1) + (p2 - p0) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t * t
+				+ (3.0 * p1 - p0 - 3.0 * p2 + p3) * t * t * t)
+			if k == parts:
+				q = p2
+			acc += last.distance_to(q)
+			last = q
+			pts.append(q)
+		stop_dist.append(acc)
+	return {"pts": pts, "stop_dist": stop_dist, "length": acc}
+
+
+## Ride between two stations of a there-and-back line.
+static func shuttle(a: float, b: float) -> float:
+	return absf(b - a)
+
+
 ## Share of trips taking transit: logit on generalised minutes, capped
 ## (some people always drive). transit_minutes < 0 means no transit option.
 static func transit_share(car_minutes: float, transit_minutes: float, cfg: Dictionary) -> float:

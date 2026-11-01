@@ -220,6 +220,9 @@ BUILDING_COMMUTE,İşe gidiş: %d dk,Commute: %d min
 NOTIFY_TRAFFIC_JAM,Trafik sıkışık! %d yolda yoğunluk çok yüksek,Traffic jam! %d roads are over capacity
 TRANSIT_BUS,Otobüs,Bus
 TRANSIT_TRAM,Tramvay,Tram
+TRANSIT_METRO,Metro,Metro
+TRANSIT_HINT_METRO,"İstasyon için bir yola dokun (en az 250 m arayla). Tünel yerin altından, nehrin altından bile geçer","Tap a road for a station (at least 250 m apart). The tunnel runs underground, even under the river"
+TRANSIT_DRAFT_METRO,%d istasyon · %.1f km tünel (gidiş-dönüş) · %s,%d stations · %.1f km tunnel (there and back) · %s
 TRANSIT_HINT,Durak eklemek için bir yola dokun (durağa tekrar dokunmak siler),Tap a road to add a stop (tap a stop again to remove it)
 TRANSIT_DRAFT,%d durak · %.1f km döngü · %s,%d stops · %.1f km loop · %s
 TRANSIT_OPEN,Hattı aç,Open line
