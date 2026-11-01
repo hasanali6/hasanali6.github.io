@@ -79,8 +79,8 @@ yapar). Bir binaya ya da yola dokun: kırmızı işaretlenir, parmağını kald�
 yıkılır.
 - Yollar fiyatının %75'ini geri verir.
 - Elle konan binalar ve hizmet binaları fiyatının yarısını geri verir.
-- İmarla kendiliğinden büyüyen binalar para vermez. İmar duruyorsa yerine
-  zamanla yenisi gelir; tamamen boşaltmak için imarı da silgiyle sil.
+- İmarla kendiliğinden büyüyen binalar para vermez. Yık aracı binanın imarını
+  da siler, yerine yeni bina çıkmaz; tekrar bina istersen imarı yeniden boya.
 
 | Yol | Şerit | m başı maliyet |
 |---|---|---|
@@ -140,7 +140,9 @@ verimli toprak, yeşil orman, kahverengi maden, mor petrol.
 - Ekonomi → **Üretim** sekmesinde hammadde ve mamul ürün dengesi görünür.
 
 ### Hizmetler ve Altyapı
-Yerleştirirken kapsama haritası açılır.
+Yerleştirirken kapsama haritası açılır. Hizmet binalarının yol kenarında kendi
+renginde bir tabelası var (elektrik sarı, su mavi, sağlık kırmızı, eğitim mor,
+polis lacivert, itfaiye turuncu, çöp yeşil, defin gri); evlerden kolayca ayrılır.
 
 | Hizmet | Bina (maliyet / aylık bakım) |
 |---|---|

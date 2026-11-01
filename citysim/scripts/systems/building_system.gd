@@ -341,12 +341,15 @@ func burn(id: int) -> void:
 	_abandon(id)
 
 
-func demolish(id: int) -> void:
+func demolish(id: int, clear_zone: bool = false) -> void:
 	if not buildings.has(id):
 		return
 	var grid: ZoneGrid = _zones.grid
 	for c: int in buildings[id]["cells"]:
 		grid.building[c] = ZoneGrid.FREE
+		# Bulldozed on purpose: the lot is left empty instead of regrowing.
+		if clear_zone:
+			grid.zone[c] = ZoneGrid.UNZONED
 	buildings.erase(id)
 	_rising.erase(id)
 	_render_all()
@@ -716,6 +719,7 @@ func _parts_for(b: Dictionary, rise: float) -> Array[Dictionary]:
 			_:
 				if style.begins_with("svc_"):
 					ServiceModels.parts(b, ctx, parts)
+					_service_sign(b, ctx, parts)
 	parts.append(_part("lot", _basis(ctx, ctx["lot_w"], 1.0, ctx["lot_d"]), ctx["centre"], 0.04, Color.WHITE,
 		Color(_lot_kind(b), float(b["seed"]), 0.0, 0.0)))
 	if b["abandoned"]:
@@ -883,6 +887,26 @@ func _parts_factory(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) ->
 	var annex: Vector2 = pos + ctx["f"] * (d * 0.5 + 2.6) - ctx["side"] * (w * 0.3)
 	parts.append(_part("house", _basis(ctx, w * 0.3, 4.0 * e, 5.0), annex, 2.0 * e, wall.lightened(0.1), Color(b["seed"], 0.5, 2.4, 0.0)))
 	_contact(parts, ctx, pos, w, d)
+
+
+## A sign by the street in the service's colour (power yellow, water blue,
+## health red...), so public buildings stand apart from homes and shops.
+func _service_sign(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> void:
+	var t: Dictionary = {}
+	for entry: Dictionary in GameData.value("services/types"):
+		if entry["id"] == str(b.get("service", "")):
+			t = entry
+	if t.is_empty():
+		return
+	var color := DataLoader.to_color(GameData.value("services/categories/%s/color" % t["category"]))
+	var e: float = ctx["e"]
+	var f: Vector2 = ctx["f"]
+	var side: Vector2 = ctx["side"]
+	var spot: Vector2 = (ctx["centre"] as Vector2) + f * (float(ctx["lot_d"]) * 0.5 - 1.2) + side * (float(ctx["lot_w"]) * 0.5 - 2.0)
+	for k in [-1.0, 1.0]:
+		parts.append(_part("chimney", _basis(ctx, 0.25, 4.6 * e, 0.25), spot + side * k * 1.8, 2.3 * e, Color(0.3, 0.32, 0.35), Color()))
+	parts.append(_part("roof_box", _basis(ctx, 4.2, 2.0 * e, 0.22), spot, 4.6 * e, color, Color()))
+	parts.append(_part("roof_box", _basis(ctx, 4.4, 0.18 * e, 0.28), spot, 5.69 * e, Color(0.95, 0.95, 0.95), Color()))
 
 
 ## Farms, lumber camps, mines and oil wells from boxes, cylinders and gables.

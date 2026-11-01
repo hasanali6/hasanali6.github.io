@@ -165,7 +165,8 @@ func _on_up(screen_pos: Vector2) -> void:
 			_pick_target(screen_pos)
 			if _target_building >= 0:
 				var back: int = _buildings.refund_of(_target_building)
-				_buildings.demolish(_target_building)
+				_buildings.demolish(_target_building, true)
+				EventBus.zones_changed.emit()
 				if back > 0:
 					EconomySystem.refund(back)
 				EventBus.sfx_requested.emit("bulldoze")

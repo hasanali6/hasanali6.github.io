@@ -360,11 +360,14 @@ static func parts(b: Dictionary, ctx: Dictionary, out: Array[Dictionary]) -> voi
 			for k in 2:
 				_put(out, ctx, "roof_box", -8 + k * 3.5, 10.5, 2.2, 2.2, 1.6, Color(0.88, 0.89, 0.9))
 		"svc_pump":
-			_put(out, ctx, "house", -2, 2, 9, 5, 7, Color(0.6, 0.72, 0.82), 0, _facade(s, 0.5, 2.4))
-			_put(out, ctx, "house_roof", -2, 2, 9.6, 2.4, 7.6, Color(0.22, 0.36, 0.56), 5)
-			_shadow(out, ctx, -2, 2, 9, 7)
-			_put(out, ctx, "tank", 4.5, -3.5, 5, 6.5, 5, Color(0.3, 0.53, 0.78))
-			_put(out, ctx, "dome", 4.5, -3.5, 5, 1.2, 5, Color(0.3, 0.53, 0.78), 6.5)
+			# Concrete pump hall with a blue band, and a water tower on legs.
+			_put(out, ctx, "factory", -3, 3, 8, 4.5, 6, Color(0.78, 0.79, 0.8), 0, _facade(s, 0.12, 6.0))
+			_put(out, ctx, "roof_box", -3, 3, 8.2, 0.8, 6.2, Color(0.22, 0.5, 0.82), 3.4)
+			_shadow(out, ctx, -3, 3, 8, 6)
+			for k in 4:
+				_put(out, ctx, "chimney", 4.5 + (1.6 if k % 2 == 0 else -1.6), -3.5 + (1.6 if k < 2 else -1.6), 0.35, 9.0, 0.35, Color(0.55, 0.58, 0.62))
+			_put(out, ctx, "tank", 4.5, -3.5, 5.2, 4.5, 5.2, Color(0.26, 0.55, 0.85), 9.0)
+			_put(out, ctx, "dome", 4.5, -3.5, 5.2, 1.4, 5.2, Color(0.26, 0.55, 0.85), 13.5)
 			_pipe_to_water(out, ctx, 0.9, Color(0.36, 0.42, 0.48), false)
 		"svc_outlet":
 			_put(out, ctx, "factory", 0, 3, 6, 3.2, 6, CONCRETE, 0, _facade(s, 0.15, 5.0))

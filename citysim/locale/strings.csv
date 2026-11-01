@@ -302,7 +302,7 @@ SEASON_WINTER,Kış,Winter
 SETTINGS_MUSIC,Müzik,Music
 SETTINGS_SFX,Efekt,Effects
 SETTINGS_AMBIENT,Ortam,Ambience
-BUILDING_DEMOLISHED,Bina yıkıldı (+%s iade),Building demolished (+%s refund)
+BUILDING_DEMOLISHED,"Bina yıkıldı, imarı da silindi (+%s iade)","Building demolished and its zoning cleared (+%s refund)"
 TOOL_BULLDOZE,Yık,Demolish
 MODE_BUILDING,İnşa,Build
 MODE_CAMERA,Kamera,Camera
