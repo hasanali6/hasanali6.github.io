@@ -36,6 +36,7 @@ uniform float canopy_strength = 0.55;
 uniform vec3 sand_color : source_color = vec3(0.85, 0.78, 0.6);
 uniform vec3 wet_sand_color : source_color = vec3(0.66, 0.58, 0.4);
 uniform float bank_width = 14.0;
+uniform float beach_width = 48.0;
 
 varying vec3 world_pos;
 
@@ -82,6 +83,10 @@ void fragment() {
 	float wd = water_distance(p);
 	float bank = 1.0 - smoothstep(bank_width * 0.4, bank_width, wd + (fine - 0.5) * 3.0);
 	col = mix(col, mix(wet_sand_color, sand_color, smoothstep(0.0, bank_width * 0.5, wd)), bank);
+	// Wide sea beach with a soft, wavy edge towards the grass.
+	float cd = coast_distance(p) + (mid - 0.5) * 14.0 + (fine - 0.5) * 3.0;
+	float beach = 1.0 - smoothstep(beach_width * 0.7, beach_width, cd);
+	col = mix(col, mix(wet_sand_color, sand_color * 1.04, smoothstep(0.0, 7.0, cd)), beach);
 
 	// Seasons and weather: drier, browner grass in autumn, snow that settles
 	// unevenly, darker ground when wet.

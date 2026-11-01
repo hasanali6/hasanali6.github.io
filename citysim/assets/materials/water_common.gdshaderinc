@@ -4,6 +4,24 @@ uniform int river_count = 0;
 uniform float river_half = 40.0;
 uniform vec4 lakes[4];
 uniform int lake_count = 0;
+uniform float coast_z = 1e9;       // sea south of the wavy shoreline (MapWater.coast_at)
+uniform vec3 coast_waves[2];       // amplitude, wavelength, phase
+
+// Signed distance to the sea shore (negative = sea).
+float coast_distance(vec2 p) {
+	if (coast_z > 1e8) {
+		return 1e9;
+	}
+	float z = coast_z;
+	float slope = 0.0;
+	for (int k = 0; k < 2; k++) {
+		vec3 w = coast_waves[k];
+		float a = p.x * 6.2831853 / w.y + w.z;
+		z += w.x * sin(a);
+		slope += w.x * 6.2831853 / w.y * cos(a);
+	}
+	return (z - p.y) / sqrt(1.0 + slope * slope);
+}
 
 float segment_distance(vec2 p, vec2 a, vec2 b) {
 	vec2 pa = p - a;
@@ -40,5 +58,5 @@ float water_distance(vec2 p) {
 		vec4 l = lakes[j];
 		d = min(d, (length((p - l.xy) / l.zw) - 1.0) * min(l.z, l.w));
 	}
-	return d;
+	return min(d, coast_distance(p));
 }

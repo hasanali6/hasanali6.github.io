@@ -10,7 +10,7 @@ extends RefCounted
 ##               unlocks.
 
 const ROW_HEIGHT := 40.0
-const INCOME_KEYS := ["residential", "commercial", "office", "industrial", "subsidy", "power_fees", "water_fees", "tickets", "parking", "milestones"]
+const INCOME_KEYS := ["residential", "commercial", "office", "industrial", "subsidy", "power_fees", "water_fees", "tickets", "parking", "tourism", "milestones"]
 
 var card: PanelContainer
 
@@ -154,7 +154,7 @@ func _build_budget() -> VBoxContainer:
 func _expense_keys() -> Array:
 	var keys := ["roads"]
 	keys.append_array(_categories.keys())
-	keys.append_array(["transit", "recycling", "loan"])
+	keys.append_array(["transit", "parks", "recycling", "loan"])
 	return keys
 
 

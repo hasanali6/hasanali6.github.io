@@ -152,6 +152,38 @@ verimli toprak, yeşil orman, kahverengi maden, mor petrol.
   orman kirlilikten etkilenir; sanayiyi onlardan uzak tut.
 - Ekonomi → **Üretim** sekmesinde hammadde ve mamul ürün dengesi görünür.
 
+### Park ve sahil (yeni)
+Tepsideki **çiçek** simgeli düğme. Parklar çevresindeki evlerin mutluluğunu
+artırır; büyük parkların etki alanı daha geniştir. Turistik olanlar her ay
+**turizm geliri** getirir ama bakım gideri de vardır. Şehir otoyola bağlı
+değilse turist az gelir (gelirin yaklaşık üçte biri).
+
+| Yapı | Etki alanı | Turizm/ay | Bakım/ay | Açılış |
+|---|---|---|---|---|
+| Oyun parkı | 170 m | – | 60 | Baştan |
+| Heykelli park | 200 m | 250 | 90 | Köy |
+| Futbol sahası | 240 m | 150 | 160 | Köy |
+| Botanik bahçesi (cam kubbe) | 260 m | 900 | 240 | Kasaba |
+| Hayvanat bahçesi (fil, zürafa, aslan, zebra) | 320 m | 3.200 | 700 | İlçe |
+| Lunapark (dönme dolap, hız treni, atlıkarınca) | 340 m | 4.800 | 1.000 | İlçe |
+
+**Deniz ve sahil kenti:** haritanın güneyinde dalgalı bir sahil şeridi ve
+geniş bir kumsal var (başlangıç alanının hemen güneyi; Kasaba olunca tamamı
+açılır). Denize yakın evler (220 m) **deniz manzarası** sayesinde daha mutlu
+olur ve daha çok tercih edilir. Sahil yapıları ancak kıyıya kurulur:
+
+| Yapı | Ne yapar | Turizm/ay | Açılış |
+|---|---|---|---|
+| Plaj | Şemsiyeler, şezlonglar, cankurtaran kulesi, voleybol filesi | 1.400 | Baştan |
+| Sahil kafesi | Küçük ticari bina, terasta masalar | – | Baştan |
+| İskele | Denize uzanan ahşap iskele, ucunda köşk | 1.100 | Köy |
+| Deniz feneri | Kırmızı-beyaz kule, gece yanıp sönen ışık | 700 | Köy |
+| Marina | Kulüp binası, denize uzanan iskeleler ve tekneler | 2.400 | Kasaba |
+| Sahil oteli | Balkonlu yüksek otel, havuz; ticari bina | 1.500 | Kasaba |
+
+Ekonomi → Bütçe'de **Turizm** geliri ve **Park bakımı** gideri ayrı satır
+olarak görünür.
+
 ### Hizmetler ve Altyapı
 Yerleştirirken kapsama haritası açılır. Hizmet binalarının yol kenarında kendi
 renginde bir tabelası var (elektrik sarı, su mavi, sağlık kırmızı, eğitim mor,
@@ -359,7 +391,7 @@ sokaklar yeşildir ve hatlar renkli şerit olarak görünür.
   araçlar çizilir, uzaktakiler veri olarak, geri kalanı istatistik olarak
   hesaplanır (simülasyon LOD).
 - **Testler:** `godot --headless --path citysim -s res://tests/run_tests.gd`
-  (172 kontrol).
+  (174 kontrol).
 - **APK:** her push'ta GitHub Actions derler, Releases → `citysim-latest`.
 - Ayrıntılı faz notları, kabul kriterleri ve bilinen eksikler: `README.md`.
 

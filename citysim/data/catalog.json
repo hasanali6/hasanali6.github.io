@@ -211,5 +211,189 @@
       "cost": 15000,
       "extractor": "oil"
     }
-  ]
+  ],
+  "leisure": [
+    {
+      "id": "playground",
+      "name_key": "CAT_PLAYGROUND",
+      "style": "park_playground",
+      "zone": "",
+      "lot": [
+        2,
+        2
+      ],
+      "floors": 1,
+      "cost": 1800,
+      "upkeep": 60,
+      "park_radius_m": 170,
+      "tourism": 0
+    },
+    {
+      "id": "statue_park",
+      "name_key": "CAT_STATUE_PARK",
+      "style": "park_statue",
+      "zone": "",
+      "lot": [
+        2,
+        2
+      ],
+      "floors": 1,
+      "cost": 4000,
+      "upkeep": 90,
+      "park_radius_m": 200,
+      "tourism": 250
+    },
+    {
+      "id": "sports_field",
+      "name_key": "CAT_SPORTS_FIELD",
+      "style": "park_sports",
+      "zone": "",
+      "lot": [
+        4,
+        6
+      ],
+      "floors": 1,
+      "cost": 7000,
+      "upkeep": 160,
+      "park_radius_m": 240,
+      "tourism": 150
+    },
+    {
+      "id": "botanic_garden",
+      "name_key": "CAT_BOTANIC_GARDEN",
+      "style": "park_garden",
+      "zone": "",
+      "lot": [
+        4,
+        4
+      ],
+      "floors": 1,
+      "cost": 10000,
+      "upkeep": 240,
+      "park_radius_m": 260,
+      "tourism": 900
+    },
+    {
+      "id": "zoo",
+      "name_key": "CAT_ZOO",
+      "style": "park_zoo",
+      "zone": "",
+      "lot": [
+        6,
+        6
+      ],
+      "floors": 1,
+      "cost": 26000,
+      "upkeep": 700,
+      "park_radius_m": 320,
+      "tourism": 3200
+    },
+    {
+      "id": "amusement_park",
+      "name_key": "CAT_AMUSEMENT_PARK",
+      "style": "park_amusement",
+      "zone": "",
+      "lot": [
+        6,
+        6
+      ],
+      "floors": 1,
+      "cost": 40000,
+      "upkeep": 1000,
+      "park_radius_m": 340,
+      "tourism": 4800
+    },
+    {
+      "id": "beach",
+      "name_key": "CAT_BEACH",
+      "style": "park_beach",
+      "zone": "",
+      "lot": [
+        4,
+        3
+      ],
+      "floors": 1,
+      "cost": 3000,
+      "upkeep": 100,
+      "park_radius_m": 260,
+      "tourism": 1400,
+      "near_coast": true
+    },
+    {
+      "id": "pier",
+      "name_key": "CAT_PIER",
+      "style": "park_pier",
+      "zone": "",
+      "lot": [
+        2,
+        3
+      ],
+      "floors": 1,
+      "cost": 6000,
+      "upkeep": 140,
+      "park_radius_m": 220,
+      "tourism": 1100,
+      "near_coast": true
+    },
+    {
+      "id": "lighthouse",
+      "name_key": "CAT_LIGHTHOUSE",
+      "style": "park_lighthouse",
+      "zone": "",
+      "lot": [
+        2,
+        3
+      ],
+      "floors": 1,
+      "cost": 7000,
+      "upkeep": 90,
+      "park_radius_m": 180,
+      "tourism": 700,
+      "near_coast": true
+    },
+    {
+      "id": "marina",
+      "name_key": "CAT_MARINA",
+      "style": "park_marina",
+      "zone": "",
+      "lot": [
+        5,
+        4
+      ],
+      "floors": 1,
+      "cost": 18000,
+      "upkeep": 420,
+      "park_radius_m": 260,
+      "tourism": 2400,
+      "near_coast": true
+    },
+    {
+      "id": "beach_cafe",
+      "name_key": "CAT_BEACH_CAFE",
+      "style": "beach_cafe",
+      "zone": "com_low",
+      "lot": [
+        2,
+        2
+      ],
+      "floors": 1,
+      "cost": 2500,
+      "near_coast": true
+    },
+    {
+      "id": "sea_hotel",
+      "name_key": "CAT_SEA_HOTEL",
+      "style": "sea_hotel",
+      "zone": "com_high",
+      "lot": [
+        3,
+        3
+      ],
+      "floors": 10,
+      "cost": 16000,
+      "near_coast": true,
+      "tourism": 1500
+    }
+  ],
+  "coast_reach_m": 40.0
 }

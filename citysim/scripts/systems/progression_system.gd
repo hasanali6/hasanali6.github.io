@@ -109,7 +109,7 @@ func unlock_name_key(id: String) -> String:
 		"districts":
 			return "TOOL_DISTRICTS"
 		"item":
-			for item: Dictionary in GameData.value("catalog/items"):
+			for item: Dictionary in GameData.value("catalog/items") + GameData.value("catalog/production") + GameData.value("catalog/leisure"):
 				if item["id"] == parts[1]:
 					return str(item["name_key"])
 		"svc":

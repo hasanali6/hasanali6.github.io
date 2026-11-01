@@ -68,6 +68,8 @@ var _office_palette: Array[Color] = []
 var _industry_palette: Array[Color] = []
 var _overlay_tint: Dictionary = {}   # building id -> Color while an info overlay is shown
 var _utility_abandon_months: int
+var _leisure: Dictionary = {}          # style -> catalog leisure item
+var last_leisure: Dictionary = {"upkeep": 0.0, "tourism": 0.0}
 var _service_names: Dictionary = {}  # service id -> name key
 
 
@@ -227,7 +229,30 @@ func _floors_for(cfg: Dictionary, level: int) -> int:
 
 # --- Monthly life of buildings ---------------------------------------------------------
 
+## Monthly upkeep and visitor income of parks and the sea front (catalog
+## "leisure" items, by style). Visitors come by the highway: an unlinked
+## city earns a part of it.
+func _report_leisure() -> void:
+	if _leisure.is_empty():
+		for item: Dictionary in GameData.value("catalog/leisure"):
+			_leisure[str(item["style"])] = item
+	var upkeep := 0.0
+	var tourism := 0.0
+	for b: Dictionary in buildings.values():
+		var item: Dictionary = _leisure.get(b["style"], {})
+		if item.is_empty() or b["abandoned"]:
+			continue
+		upkeep += float(item.get("upkeep", 0.0))
+		tourism += float(item.get("tourism", 0.0))
+	var net: Node = get_tree().current_scene.get_node_or_null("RoadNetwork") if get_tree().current_scene != null else null
+	if net != null and net.has_method("city_connected") and not net.city_connected():
+		tourism *= float(GameData.value("economy/tourism_isolated_factor"))
+	last_leisure = {"upkeep": upkeep, "tourism": tourism}
+	EventBus.leisure_reported.emit(last_leisure.duplicate())
+
+
 func _on_month(_m: int) -> void:
+	_report_leisure()
 	var changed := false
 	var abandoned_for_utilities := 0
 	var max_level := int(_growth["max_level"])
@@ -718,6 +743,7 @@ func _build_meshes() -> void:
 	_add_multimesh("beacon", beacon, false, true)
 	(_meshes["beacon"] as MultiMeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
+	LeisureModels.build_meshes(_add_multimesh)
 	for key in ServiceModels.build_meshes(_add_multimesh):
 		(_meshes[key] as MultiMeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Plumes and rotors move in their shaders, beyond their mesh bounds.
@@ -803,6 +829,14 @@ func _parts_for(b: Dictionary, rise: float) -> Array[Dictionary]:
 	var parts: Array[Dictionary] = []
 	var ctx := _context(b, rise)
 	var style: String = b["style"]
+	if LeisureModels.has_style(style):
+		LeisureModels.parts(b, ctx, parts)
+		parts.append(_part("lot", _basis(ctx, ctx["lot_w"], 1.0, ctx["lot_d"]), ctx["centre"], 0.04, Color.WHITE,
+			Color(LeisureModels.lot_kind(style), float(b["seed"]), 0.0, 0.0)))
+		if b["abandoned"]:
+			for part in parts:
+				part["color"] = _tint(b, part["color"])
+		return parts
 	if style.begins_with("park"):
 		# Park tiles cover the whole lot.
 		var ps := minf(ctx["lot_w"], ctx["lot_d"])

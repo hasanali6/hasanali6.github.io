@@ -87,6 +87,7 @@
       ]
     ],
     "bank_width_m": 14.0,
+    "coast": {"z": 1300.0, "waves": [[95.0, 820.0, 0.7], [38.0, 290.0, 2.1]], "beach_width_m": 48.0},
     "deep_color": "#1f6f9a",
     "shallow_color": "#3fb7c9",
     "foam_color": "#e8f6f7",

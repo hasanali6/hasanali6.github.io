@@ -39,7 +39,7 @@ var _default_tax: float
 var _ticks_per_month: int
 var _homes: Dictionary = {}       # building id -> {cap, residents: PackedInt32Array, rent, pos, shop}
 var _vacant: Dictionary = {}      # building id -> true
-var _parks := PackedVector2Array()
+var _parks := PackedVector3Array()   # x, z, reach in metres
 var _cursor: int = 0
 var _budget: float = 0.0
 var _immigration: float = 0.0
@@ -96,11 +96,15 @@ func _reset_month() -> void:
 
 func _sync_homes() -> void:
 	var records: Dictionary = _buildings.buildings
-	_parks = PackedVector2Array()
+	_parks = PackedVector3Array()
+	var reach_by_style := {}
+	for item: Dictionary in GameData.value("catalog/leisure"):
+		reach_by_style[str(item["style"])] = float(item.get("park_radius_m", 0.0))
 	for bid: int in records:
 		var b: Dictionary = records[bid]
 		if str(b["style"]).begins_with("park"):
-			_parks.append(b["centre"])
+			var c: Vector2 = b["centre"]
+			_parks.append(Vector3(c.x, c.y, float(reach_by_style.get(b["style"], _happy["park_radius_m"]))))
 		var cap: int = 0 if b.get("abandoned", false) else int(b.get("households_cap", 0))
 		if cap <= 0 and not _homes.has(bid):
 			continue
@@ -159,11 +163,16 @@ func _refresh_shops() -> void:
 
 
 func _near_park(pos: Vector2) -> bool:
-	var r := float(_happy["park_radius_m"])
 	for p in _parks:
-		if p.distance_to(pos) <= r:
+		if Vector2(p.x, p.y).distance_to(pos) <= p.z:
 			return true
 	return false
+
+
+## Homes near the sea are sought after (sea view).
+func _near_sea(pos: Vector2) -> bool:
+	var d := MapWater.shared().coast_distance(pos)
+	return d >= 0.0 and d <= float(_happy.get("coast_radius_m", 0.0))
 
 
 func _pick_home(max_rent: float, exclude: int) -> int:
@@ -186,6 +195,8 @@ func _pick_home(max_rent: float, exclude: int) -> int:
 		if int(home["shop"]) >= 0:
 			score += 0.5
 		if _near_park(home["pos"]):
+			score += 0.3
+		if _near_sea(home["pos"]):
 			score += 0.3
 		if score > best_score:
 			best_score = score
@@ -404,6 +415,8 @@ func _update(i: int) -> void:
 		_near_park(home["pos"]), _happy, _default_tax)
 	var record: Dictionary = _buildings.buildings.get(bid, {})
 	h += float(record.get("service_happiness", 0.0))
+	if _near_sea(home["pos"]):
+		h += float(_happy.get("coast_bonus", 0.0))
 	if _districts != null and not record.is_empty():
 		h += float(_districts.happiness_of(record))
 	if _traffic != null:

@@ -1,7 +1,8 @@
 class_name MapWater
 extends RefCounted
-## Rivers and lakes of the map (data/map.json "water"). The river is a
-## polyline smoothed with Catmull-Rom; lakes are ellipses. Provides a signed
+## Rivers, lakes and the sea of the map (data/map.json "water"). The river is a
+## polyline smoothed with Catmull-Rom; lakes are ellipses; the sea lies south
+## of a wavy coastline z = coast_z + sum(amp * sin(x * TAU / wavelength + phase)). Provides a signed
 ## distance (negative inside water) used by roads, zoning, trees and service
 ## placement. The same maths runs in water_common.gdshaderinc for the visuals.
 
@@ -13,6 +14,9 @@ var river := PackedVector2Array()
 var river_half: float
 var lakes: Array[Vector4] = []   # centre x, centre z, radius x, radius z
 var bank_width: float
+var coast_z: float = INF           # INF = no sea
+var coast_waves: Array[Vector3] = []   # amplitude, wavelength, phase
+var beach_width: float = 0.0
 
 static var _shared: MapWater
 
@@ -36,6 +40,35 @@ func _init(cfg: Dictionary) -> void:
 	for l: Array in cfg["lakes"]:
 		if lakes.size() < MAX_LAKES:
 			lakes.append(Vector4(float(l[0]), float(l[1]), float(l[2]), float(l[3])))
+	var coast: Dictionary = cfg.get("coast", {})
+	if not coast.is_empty():
+		coast_z = float(coast["z"])
+		beach_width = float(coast.get("beach_width_m", bank_width))
+		for w: Array in coast.get("waves", []):
+			if coast_waves.size() < 2:
+				coast_waves.append(Vector3(float(w[0]), float(w[1]), float(w[2])))
+
+
+func has_coast() -> bool:
+	return coast_z < INF
+
+
+## z of the shoreline at x (the sea is on the +z side).
+func coast_at(x: float) -> float:
+	var z := coast_z
+	for w in coast_waves:
+		z += w.x * sin(x * TAU / w.y + w.z)
+	return z
+
+
+## Signed distance to the shoreline (negative = in the sea), INF without sea.
+func coast_distance(p: Vector2) -> float:
+	if not has_coast():
+		return INF
+	var slope := 0.0
+	for w in coast_waves:
+		slope += w.x * TAU / w.y * cos(p.x * TAU / w.y + w.z)
+	return (coast_at(p.x) - p.y) / sqrt(1.0 + slope * slope)
 
 
 static func _catmull_rom(ctrl: PackedVector2Array, subdiv: int) -> PackedVector2Array:
@@ -71,7 +104,7 @@ func distance(p: Vector2) -> float:
 	for l in lakes:
 		var rel := Vector2((p.x - l.x) / l.z, (p.y - l.y) / l.w)
 		d = minf(d, (rel.length() - 1.0) * minf(l.z, l.w))
-	return d
+	return minf(d, coast_distance(p))
 
 
 func is_water(p: Vector2, margin: float = 0.0) -> bool:
@@ -125,3 +158,8 @@ func apply_to_material(mat: ShaderMaterial) -> void:
 	mat.set_shader_parameter("river_half", river_half)
 	mat.set_shader_parameter("lakes", lake_arr)
 	mat.set_shader_parameter("lake_count", lakes.size())
+	var waves: Array[Vector3] = coast_waves.duplicate()
+	while waves.size() < 2:
+		waves.append(Vector3(0.0, 1000.0, 0.0))
+	mat.set_shader_parameter("coast_z", coast_z if has_coast() else 1e9)
+	mat.set_shader_parameter("coast_waves", waves)

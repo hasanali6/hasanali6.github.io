@@ -144,6 +144,7 @@ func _build_material() -> ShaderMaterial:
 	_material.set_shader_parameter("sand_color", DataLoader.to_color(water["sand_color"]))
 	_material.set_shader_parameter("wet_sand_color", DataLoader.to_color(water["wet_sand_color"]))
 	_material.set_shader_parameter("bank_width", float(water["bank_width_m"]))
+	_material.set_shader_parameter("beach_width", MapWater.shared().beach_width)
 	MapWater.shared().apply_to_material(_material)
 	return _material
 
@@ -180,6 +181,14 @@ func _build_water() -> void:
 			var p0 := c + Vector2(cos(t0) * l.z, sin(t0) * l.w)
 			var p1 := c + Vector2(cos(t1) * l.z, sin(t1) * l.w)
 			_tri(st, c, p0, p1, y)
+	# The sea: from the shoreline out to the edge of the terrain.
+	if water.has_coast():
+		var far := float(GameData.num("map/terrain_extent_m")) * 0.5
+		var x := -far
+		while x < far:
+			var x1 := x + 16.0
+			_quad(st, Vector2(x, far), Vector2(x1, far), Vector2(x1, water.coast_at(x1)), Vector2(x, water.coast_at(x)), y)
+			x = x1
 	var mi := MeshInstance3D.new()
 	mi.name = "Water"
 	mi.mesh = st.commit()
@@ -236,7 +245,9 @@ func _build_mountains() -> void:
 			var ang := TAU * a / angular
 			var p := Vector2(cos(ang), sin(ang)) * radius
 			var n := clampf(noise.get_noise_2dv(p) * 0.5 + 0.5, 0.0, 1.0)
-			row.append(Vector3(p.x, pow(n, 1.6) * max_h * ramp, p.y))
+			# No mountains out at sea: they sink towards the shore.
+			var shore := clampf(MapWater.shared().coast_distance(p) / 900.0, 0.0, 1.0)
+			row.append(Vector3(p.x, pow(n, 1.6) * max_h * ramp * shore, p.y))
 		grid.append(row)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)

@@ -449,6 +449,14 @@ func _test_water() -> void:
 	_check(w.is_water(Vector2(0, 520)) and not w.is_water(Vector2(0, 620)), "lakes are ellipses")
 	_check(w.curve_hits_water(Vector2(0, -200), Vector2(0, 0), Vector2(0, 200), 4.0, 4.0), "a road across the river hits water")
 	_check(not w.curve_hits_water(Vector2(-300, 200), Vector2(0, 200), Vector2(300, 200), 4.0, 4.0), "a road beside the river is fine")
+	_check(not w.has_coast() and w.coast_distance(Vector2(0, 5000)) == INF, "no sea unless the map has a coast")
+	var sea_cfg := cfg.duplicate()
+	sea_cfg["coast"] = {"z": 1000.0, "waves": [[50.0, 400.0, 0.0]], "beach_width_m": 40.0}
+	var sw := MapWater.new(sea_cfg)
+	var shore := sw.coast_at(100.0)
+	_check(is_equal_approx(shore, 1000.0 + 50.0 * sin(100.0 * TAU / 400.0)) and sw.is_water(Vector2(100, shore + 5.0))
+		and not sw.is_water(Vector2(100, shore - 5.0)) and sw.distance(Vector2(100, shore - 30.0)) > 20.0,
+		"the sea lies beyond a wavy shoreline (%.0f m)" % shore)
 	var g := _graph()
 	g.commit_road(g.plan_road(Vector2(-200, -100), Vector2(200, -100), null), "street")
 	var grid := ZoneGrid.new(_zones()["cells"])
@@ -741,7 +749,7 @@ func _test_progression() -> void:
 	var zones: Dictionary = DataLoader.load_json("res://data/zones.json")["types"]
 	var items := {}
 	var catalog: Dictionary = DataLoader.load_json("res://data/catalog.json")
-	for it: Dictionary in catalog["items"] + catalog.get("production", []):
+	for it: Dictionary in catalog["items"] + catalog.get("production", []) + catalog.get("leisure", []):
 		items["item:" + str(it["id"])] = true
 	for it: Dictionary in DataLoader.load_json("res://data/services.json")["types"]:
 		items["svc:" + str(it["id"])] = true

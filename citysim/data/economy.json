@@ -127,6 +127,7 @@
     "candidates_sampled": 6,
     "isolated_factor": 0.5
   },
+  "tourism_isolated_factor": 0.35,
   "happiness": {
     "base": 50.0,
     "employed": 15.0,
@@ -137,7 +138,9 @@
     "no_shop": -10.0,
     "tax_per_point_over_default": -1.2,
     "park_bonus": 8.0,
-    "park_radius_m": 160.0
+    "park_radius_m": 160.0,
+    "coast_bonus": 6.0,
+    "coast_radius_m": 220.0
   },
   "taxes": {
     "min": -10,

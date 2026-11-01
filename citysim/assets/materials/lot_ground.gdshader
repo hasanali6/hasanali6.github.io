@@ -100,13 +100,17 @@ void fragment() {
 		col = gravel * (0.8 + n * 0.3);
 		col = mix(col, concrete, band(edge, 0.6, aa));
 		rough = 0.95;
+	} else if (kind == 9) {
+		// Beach sand with faint ripples.
+		col = vec3(0.86, 0.78, 0.6) * (0.9 + n * 0.18 + sin(p.y * 1.7 + n * 4.0) * 0.02);
+		rough = 0.95;
 	} else {
 		col = grass * (0.86 + n * 0.26);
 		float walk = band(abs(p.x - v_size.x * 0.5), 0.9, aa) * step(v_size.y * 0.3, p.y);
 		walk = max(walk, band(abs(p.y - v_size.y * 0.3), 0.8, aa));
 		col = mix(col, paving * 0.95, walk);
 	}
-	if (kind == 0 || kind == 6 || kind >= 8) {
+	if (kind == 0 || kind == 6 || kind == 8 || kind >= 10) {
 		col = mix(col, col * vec3(1.15, 0.95, 0.6), autumn * 0.45);
 	}
 	col *= 1.0 - wetness * 0.2;

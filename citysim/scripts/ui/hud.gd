@@ -24,6 +24,7 @@ const BUILD_TOOLS: Array = [
 	["TOOL_TRANSIT", "bus", UiStyle.BLUE],
 	["TOOL_DISTRICTS", "map", UiStyle.PURPLE],
 	["TOOL_PRODUCTION", "factory", Color(0.8, 0.58, 0.12)],
+	["TOOL_LEISURE", "flower-2", Color(0.2, 0.62, 0.4)],
 	["TOOL_BULLDOZE", "trash-2", UiStyle.RED],
 ]
 ## Info overlay layers: [key, label key, colour].
@@ -476,6 +477,8 @@ func _build_tray() -> PanelContainer:
 			b.pressed.connect(_open_zone_panel)
 		elif key == "TOOL_PRODUCTION":
 			b.pressed.connect(_open_catalog.bind("production"))
+		elif key == "TOOL_LEISURE":
+			b.pressed.connect(_open_catalog.bind("leisure"))
 		elif key == "TOOL_BULLDOZE":
 			# Demolish roads and buildings: the road panel in its bulldoze mode.
 			b.pressed.connect(func() -> void:
@@ -926,6 +929,8 @@ func _open_catalog(group: String) -> void:
 		_catalog.open("BUILD_CATALOG", GameData.value("catalog/items"))
 	elif group == "production":
 		_catalog.open("BUILD_PRODUCTION", GameData.value("catalog/production"))
+	elif group == "leisure":
+		_catalog.open("BUILD_LEISURE", GameData.value("catalog/leisure"))
 	else:
 		_catalog.open("SVC_CATALOG_" + group.to_upper(), _service_system().catalog_items(group))
 

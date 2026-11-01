@@ -73,6 +73,14 @@ func _water_ok(centre: Vector2, w: float, d: float) -> bool:
 	return MapWater.shared().distance(centre) <= maxf(w, d) * 0.5 + _water_reach
 
 
+## Sea-front buildings need their lot by the sea shore.
+func _coast_ok(centre: Vector2, w: float, d: float) -> bool:
+	if not _item.get("near_coast", false):
+		return true
+	var cd := MapWater.shared().coast_distance(centre)
+	return cd <= maxf(w, d) * 0.5 + float(GameData.value("catalog/coast_reach_m"))
+
+
 func _preview_at(screen_pos: Vector2) -> void:
 	var g: Variant = _ground(screen_pos)
 	_cell = -1
@@ -98,13 +106,14 @@ func _preview_at(screen_pos: Vector2) -> void:
 	_preview.transform = Transform3D(Basis(dx * w, Vector3.UP * 3.0, fz * d), Vector3(centre.x, 1.5, centre.y))
 	var cost := int(_item["cost"])
 	var water_ok := _water_ok(centre, w, d)
+	var coast_ok := _coast_ok(centre, w, d)
 	# Farms, camps, mines and wells need their resource under the lot.
 	var richness := 1.0
 	if _item.has("extractor"):
 		var field := str(GameData.value("resources/types/%s/field" % _item["extractor"]))
 		richness = ResourceMap.shared().lot_richness(field, centre, w, d)
 	var rich_ok := richness >= GameData.num("resources/min_richness")
-	var valid: bool = not lot.is_empty() and EconomySystem.can_afford(cost) and water_ok and rich_ok
+	var valid: bool = not lot.is_empty() and EconomySystem.can_afford(cost) and water_ok and rich_ok and coast_ok
 	_valid = valid
 	_preview.material_override = _ok_mat if valid else _bad_mat
 	_preview.visible = true
@@ -113,6 +122,8 @@ func _preview_at(screen_pos: Vector2) -> void:
 		error = "BUILD_ERR_SPACE"
 	elif not water_ok:
 		error = "BUILD_ERR_WATER"
+	elif not coast_ok:
+		error = "BUILD_ERR_COAST"
 	elif not rich_ok:
 		error = "BUILD_ERR_RESOURCE"
 	elif not EconomySystem.can_afford(cost):
