@@ -31,6 +31,7 @@ const KENNEY_MODELS := {
 	"park_fountain": "pavement-fountain", "park_trees": "grass-trees", "park_trees_tall": "grass-trees-tall",
 }
 const ABANDONED_TINT := Color(0.4, 0.38, 0.36)
+const PARKED_COLORS: Array[Color] = [Color(0.8, 0.12, 0.12), Color(0.15, 0.3, 0.65), Color(0.85, 0.85, 0.86), Color(0.12, 0.12, 0.13), Color(0.55, 0.57, 0.6), Color(0.9, 0.7, 0.15), Color(0.2, 0.45, 0.3)]
 const LOT_SHADER := preload("res://assets/materials/lot_ground.gdshader")
 const CONTACT_SHADER := preload("res://assets/materials/contact_shadow.gdshader")
 const ROOF_SHADER := preload("res://assets/materials/roof.gdshader")
@@ -951,6 +952,13 @@ func _parts_house(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> v
 	var chimney_pos: Vector2 = pos + ctx["side"] * (w * 0.28) - ctx["f"] * (d * 0.18)
 	parts.append(_part("roof_box", _basis(ctx, 0.7, (rh + 0.8) * e, 0.7), chimney_pos, h * e + (rh + 0.8) * e * 0.5, Color(0.62, 0.36, 0.3), Color()))
 	_contact(parts, ctx, pos, w, d)
+	# Most lived-in houses have a car parked in the front yard, along the street.
+	if int(b["occupants"]) > 0 and fposmod(float(b["seed"]) * 7.13, 1.0) < 0.8:
+		var cu := clampf(w * 0.22, 0.0, 3.0)
+		var cv: float = float(ctx["lot_d"]) * 0.5 - float(_growth["front_setback_m"]) - 1.0
+		var paint: Color = PARKED_COLORS[int(float(b["seed"]) * 13.0) % PARKED_COLORS.size()]
+		ServiceModels._put(parts, ctx, "roof_box", cu, cv, 1.8, 0.9, 4.2, paint, 0.3, Color(), true)
+		ServiceModels._put(parts, ctx, "roof_box", cu - 0.25, cv, 1.55, 0.6, 2.1, Color(0.2, 0.24, 0.3), 1.2, Color(), true)
 
 
 func _parts_apartment(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> void:

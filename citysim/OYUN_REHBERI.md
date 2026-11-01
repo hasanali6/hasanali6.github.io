@@ -325,6 +325,13 @@ sokaklar yeşildir ve hatlar renkli şerit olarak görünür.
 
 ---
 
+### Yayalar ve park etmiş arabalar
+Kaldırımlarda insanlar yürür. Bir sokakta ne kadar çok kişi yaşar ve
+çalışırsa o kadar kalabalık olur; gece sayıları azalır. Oyun durunca onlar
+da durur. Sayı tavanı kaliteye göre: Düşük 400, Orta 1.200, Yüksek 2.500.
+İçinde oturulan evlerin çoğunun ön bahçesinde, yola paralel park etmiş bir
+araba durur.
+
 ## 9. Hava ve mevsimler
 
 - **Mevsimler takvimden gelir:** Mart–Mayıs ilkbahar, Haziran–Ağustos yaz,
@@ -417,8 +424,8 @@ sokaklar yeşildir ve hatlar renkli şerit olarak görünür.
   yerin altında olduğu için çizilmiyor.
 - Hammaddeler tek havuzda: fabrikalar hangi türün geldiğine bakmaz; ürün
   çeşitleri (gıda, kereste, metal…) ayrı ayrı izlenmiyor.
-- Yayalar, bisikletler ve park etmiş araçlar görünmüyor; sayılar arka planda
-  hesaplanıyor.
+- Yayalar süs amaçlı: yürüyüş yolları gerçek yolculuklardan değil sokağın
+  nüfusundan gelir. Bisiklet yok.
 - Doku ve sesler sentetik. Geliştirme ortamı ücretsiz asset sitelerine
   erişemedi; aynı dosya adlarıyla gerçek asset'lerle değiştirilebilir.
 - Tek dil dosyası: Türkçe ve İngilizce metinler hazır, arayüz şimdilik Türkçe.

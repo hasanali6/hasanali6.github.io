@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3 uid="uid://b8c1tymain001"]
+[gd_scene load_steps=26 format=3 uid="uid://b8c1tymain001"]
 
 [ext_resource type="Script" path="res://scripts/world/day_night_cycle.gd" id="1_daynight"]
 [ext_resource type="Script" path="res://scripts/systems/terrain_system.gd" id="2_terrain"]
@@ -16,6 +16,7 @@
 [ext_resource type="Script" path="res://scripts/world/build_tool.gd" id="14_buildtool"]
 [ext_resource type="Script" path="res://scripts/systems/save_system.gd" id="15_save"]
 [ext_resource type="Script" path="res://scripts/world/vegetation.gd" id="16_vegetation"]
+[ext_resource type="Script" path="res://scripts/world/pedestrians.gd" id="40_pedestrians"]
 [ext_resource type="Script" path="res://scripts/systems/service_system.gd" id="17_services"]
 [ext_resource type="Script" path="res://scripts/world/info_overlay.gd" id="18_overlay"]
 [ext_resource type="Script" path="res://scripts/systems/traffic_system.gd" id="19_traffic"]
@@ -139,6 +140,11 @@ script = ExtResource("16_vegetation")
 terrain_path = NodePath("../Terrain")
 road_network_path = NodePath("../RoadNetwork")
 zone_system_path = NodePath("../ZoneSystem")
+building_system_path = NodePath("../BuildingSystem")
+
+[node name="Pedestrians" type="Node3D" parent="."]
+script = ExtResource("40_pedestrians")
+road_network_path = NodePath("../RoadNetwork")
 building_system_path = NodePath("../BuildingSystem")
 
 [node name="WeatherEffects" type="Node3D" parent="."]
