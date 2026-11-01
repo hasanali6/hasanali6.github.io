@@ -314,7 +314,9 @@ func _on_tick(_t: int) -> void:
 	var per_month := float(_mig["immigrants_per_month_base"]) + float(_mig["immigrants_per_month_per_demand"]) * maxf(_demand_res, 0.0)
 	per_month *= Cheats.growth_factor()
 	# Newcomers arrive by highway: a town not linked to one grows slower.
-	if not road_network_path.is_empty() and not get_node(road_network_path).city_connected():
+	var transit: Node = get_parent().get_node_or_null("TransitSystem")
+	var by_rail: bool = transit != null and transit.has_intercity()
+	if not by_rail and not road_network_path.is_empty() and not get_node(road_network_path).city_connected():
 		per_month *= float(_mig.get("isolated_factor", 0.5))
 	if _demand_res > -0.2 and not _vacant.is_empty():
 		_immigration += per_month / _ticks_per_month

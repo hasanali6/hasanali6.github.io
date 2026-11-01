@@ -30,7 +30,7 @@
     },
     {
       "name_key": "MILESTONE_4", "population": 5000, "reward": 40000, "loan_limit": 200000, "area_half_m": 2000,
-      "unlocks": ["zone:res_high", "item:tower", "svc:university"]
+      "unlocks": ["zone:res_high", "item:tower", "svc:university", "transit:train"]
     },
     {"name_key": "MILESTONE_5", "population": 10000, "reward": 60000, "loan_limit": 300000, "unlocks": ["transit:metro"]},
     {"name_key": "MILESTONE_6", "population": 25000, "reward": 100000, "loan_limit": 600000, "unlocks": []},

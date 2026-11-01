@@ -217,6 +217,15 @@ terk edilir. Kirli suyun aşağısına pompa koyma.
   - Trenler yerin altında olduğu için görünmez. Tüneller Katmanlar → Toplu
     taşıma'da kalın renkli çizgi olarak görünür. Sokakta cam korkuluklu,
     renkli tabelalı metro girişleri durur.
+- **Tren (Şehir, 5.000 nüfus):** istasyonlar yol üstüne konur (en az 400 m
+  arayla). Hat 8 m yükseklikte **viyadük** üzerinden gider; ayaklar yollara ve
+  binalara basmaz. Trenler (3 vagon) gidip gelir ve görünür.
+  - En hızlı (30 m/sn) ve en çok yolcu taşıyan araç (tren başına 6.000/gün).
+  - Pahalı: hat 30.000 + istasyon 15.000 + viyadük metresi 55; tren başına
+    aylık 2.400.
+  - **Şehirlerarası hat:** ilk ya da son istasyon açık haritanın kenarına
+    260 m'den yakınsa viyadük ufka kadar uzar. Bu durumda şehir otoyola bağlı
+    olmasa bile göç ve turist tam gelir.
 - Araçlar yolun ortasında U dönüşü yapamaz. Hat bir yapı adasını dolaşan bir
   döngü olmalı; çıkmaz sokağa hat açılmaz.
 - Her hatta araç sayısı (−/+), yolcu/gün, doluluk ve sefer aralığı görünür.
@@ -275,7 +284,7 @@ Muhasebe mantığı: kasa = aylık gelirler − aylık giderler.
 | Köy | 300 | 5.000 | Caddeler, orta konut, karma, fabrika, doğalgaz/güneş, lise, **otobüs** |
 | Kasaba | 1.000 | 15.000 | Ofis, hastane, arıtma, çöp yakma, meydan, **bölgeler**; alan 3,2 km |
 | İlçe | 2.500 | 25.000 | **Bulvar**, yüksek ticari, AVM, krematoryum, **tramvay** |
-| Şehir | 5.000 | 40.000 | Yüksek konut, kule, üniversite; **tüm harita (4 km)** |
+| Şehir | 5.000 | 40.000 | Yüksek konut, kule, üniversite, tren; **tüm harita (4 km)** |
 | Büyük Şehir | 10.000 | 60.000 | Metro, daha yüksek kredi limiti |
 | Metropol | 25.000 | 100.000 | Daha yüksek kredi limiti |
 | Megakent | 50.000 | 200.000 | En yüksek kredi limiti |

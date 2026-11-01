@@ -245,7 +245,9 @@ func _report_leisure() -> void:
 		upkeep += float(item.get("upkeep", 0.0))
 		tourism += float(item.get("tourism", 0.0))
 	var net: Node = get_tree().current_scene.get_node_or_null("RoadNetwork") if get_tree().current_scene != null else null
-	if net != null and net.has_method("city_connected") and not net.city_connected():
+	var transit: Node = get_parent().get_node_or_null("TransitSystem")
+	var by_rail: bool = transit != null and transit.has_intercity()
+	if net != null and net.has_method("city_connected") and not net.city_connected() and not by_rail:
 		tourism *= float(GameData.value("economy/tourism_isolated_factor"))
 	last_leisure = {"upkeep": upkeep, "tourism": tourism}
 	EventBus.leisure_reported.emit(last_leisure.duplicate())

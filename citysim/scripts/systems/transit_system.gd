@@ -74,6 +74,12 @@ var _ribbons: MeshInstance3D
 var _draft_mesh: MeshInstance3D
 var _ribbon_mat: StandardMaterial3D
 var _rail_mat: StandardMaterial3D
+var _viaduct: MeshInstance3D
+var _viaduct_mat: StandardMaterial3D
+var _pillar_mm: MultiMeshInstance3D
+var _platform_mm: MultiMeshInstance3D
+var _trains: MultiMeshInstance3D
+var _train_time: float = 0.0
 
 
 func _ready() -> void:
@@ -98,13 +104,14 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_move_trains(delta)
 	_check_timer += delta
 	if _check_timer < CHECK_SECONDS:
 		return
 	_check_timer = 0.0
 	# Keep every line's vehicles on the road (one more per line per check).
 	for line: Dictionary in lines:
-		if not line["ok"] or _underground(line["type"]):
+		if not line["ok"] or _open_line(line["type"]):
 			continue
 		var want := int(line["vehicles"])
 		var have: int = _vehicles.line_vehicles(line["id"])
@@ -128,13 +135,27 @@ func _make_line(type: String, points: Array, color: int, number: int) -> Diction
 	}
 
 
-## Metro and other lines that run in tunnels, there and back.
-func _underground(type: String) -> bool:
-	return bool((_types[type] as Dictionary).get("underground", false))
+## Metro (tunnel) and train (viaduct) lines: open lines run there and back.
+func _open_line(type: String) -> bool:
+	var t: Dictionary = _types[type]
+	return bool(t.get("underground", false)) or bool(t.get("elevated", false))
+
+
+func _elevated(type: String) -> bool:
+	return bool((_types[type] as Dictionary).get("elevated", false))
 
 
 func is_underground(line: Dictionary) -> bool:
-	return _underground(line["type"])
+	return bool((_types[line["type"]] as Dictionary).get("underground", false))
+
+
+## True when a train line reaches the edge of the map: the city is linked to
+## the outside by rail (newcomers and tourists come even without a highway).
+func has_intercity() -> bool:
+	for line: Dictionary in lines:
+		if line["ok"] and bool(line.get("intercity", false)) and int(line["vehicles"]) > 0:
+			return true
+	return false
 
 
 func line_name(line: Dictionary) -> String:
@@ -187,7 +208,7 @@ func headway_s(line: Dictionary) -> float:
 	var t: Dictionary = _types[line["type"]]
 	var cycle := float(line["length"]) / (float(t["speed_ms"]) * SPEED_FACTOR) \
 		+ (line["points"] as Array).size() * float(t["dwell_s"])
-	if _underground(line["type"]):
+	if _open_line(line["type"]):
 		cycle *= 2.0   # there and back
 	return cycle / maxf(float(line["vehicles"]), 1.0)
 
@@ -201,7 +222,7 @@ func _rebuild_lines() -> void:
 		var old: PackedInt32Array = line["route"]
 		var old_stops: PackedVector2Array = line["stop_lane"]
 		_route_line(line, g, rg, lanes)
-		if _underground(line["type"]):
+		if _open_line(line["type"]):
 			continue
 		if line["route"] != old or line["stop_lane"] != old_stops or not line["ok"]:
 			_vehicles.despawn_line(line["id"])
@@ -255,7 +276,7 @@ func _route_line(line: Dictionary, g: TrafficGraph, rg: RoadGraph, lanes: LaneGe
 			line["error"] = "TRANSIT_ERR_STOP_LOST"
 			return
 		stops.append(snap)
-	if _underground(line["type"]):
+	if _open_line(line["type"]):
 		var path := TransitRules.tunnel_path(line["points"], TUNNEL_STEP)
 		var segs := PackedInt32Array()
 		for snap: Array in stops:
@@ -264,6 +285,11 @@ func _route_line(line: Dictionary, g: TrafficGraph, rg: RoadGraph, lanes: LaneGe
 		line["stop_dist"] = path["stop_dist"]
 		line["length"] = float(path["length"])
 		line["path"] = path["pts"]
+		line["cum"] = RailVisuals.cumulative(path["pts"])
+		line["ext"] = []
+		line["intercity"] = false
+		if _elevated(line["type"]):
+			_link_outside(line)
 		line["error"] = ""
 		line["ok"] = true
 		return
@@ -307,9 +333,32 @@ func _loop(type: String, stops: Array, g: TrafficGraph) -> Dictionary:
 	return res
 
 
+## A train line whose first or last station is near the edge of the open
+## map runs on out of it: an extra viaduct to the horizon (drawn only).
+func _link_outside(line: Dictionary) -> void:
+	var pts: Array = line["path"]
+	if pts.size() < 2:
+		return
+	var half: float = ProgressionSystem.area_half()
+	var reach := float(_cfg.get("intercity_reach_m", 260.0))
+	for end in [0, pts.size() - 1]:
+		var p: Vector2 = pts[end]
+		var gap := half - maxf(absf(p.x), absf(p.y))
+		if gap > reach:
+			continue
+		var out := Vector2(signf(p.x), 0.0) if absf(p.x) > absf(p.y) else Vector2(0.0, signf(p.y))
+		var ext: Array = [p]
+		var k := 30.0
+		while k <= gap + 1500.0:
+			ext.append(p + out * k)
+			k += 30.0
+		(line["ext"] as Array).append(ext)
+		line["intercity"] = true
+
+
 func _respawn(line: Dictionary) -> void:
 	var n := (line["stop_lane"] as PackedVector2Array).size()
-	if n == 0 or _underground(line["type"]):
+	if n == 0 or _open_line(line["type"]):
 		line["spawned"] = int(line["vehicles"])
 		return
 	var want := int(line["vehicles"])
@@ -377,7 +426,7 @@ func transit_minutes(o: int, d: int) -> Vector3:
 		var n := dist.size()
 		var ride := TransitRules.along(dist[int(a.x)], dist[int(b.x)], float(line["length"]))
 		var hops := posmod(int(b.x) - int(a.x), n)
-		if _underground(line["type"]):
+		if _open_line(line["type"]):
 			ride = TransitRules.shuttle(dist[int(a.x)], dist[int(b.x)])
 			hops = absi(int(b.x) - int(a.x))
 		var seconds := (a.y + b.y) / walk_speed + headway_s(line) * 0.5 \
@@ -407,7 +456,7 @@ func set_vehicles(id: int, count: int) -> void:
 	if n == int(line["vehicles"]):
 		return
 	line["vehicles"] = n
-	if line["ok"] and not _underground(line["type"]):
+	if line["ok"] and not _open_line(line["type"]):
 		_vehicles.despawn_line(id)
 		_respawn(line)
 	EventBus.transit_changed.emit()
@@ -435,7 +484,7 @@ func delete_line(id: int) -> void:
 
 func draft_cost(type: String, stops: int, length: float = 0.0) -> int:
 	var t: Dictionary = _types[type]
-	return int(t["line_cost"]) + stops * int(t["stop_cost"]) + int(length * float(t.get("tunnel_cost_per_m", 0.0)))
+	return int(t["line_cost"]) + stops * int(t["stop_cost"]) + int(length * float(t.get("track_cost_per_m", t.get("tunnel_cost_per_m", 0.0))))
 
 
 ## Opens the line being drawn as a real line. Returns false (and posts the
@@ -568,7 +617,7 @@ func _update_draft() -> void:
 	var info := {"type": _draft_type, "stops": _draft.size(), "cost": draft_cost(_draft_type, _draft.size()),
 		"ok": false, "error": "", "length": 0.0}
 	var route_pts: Array = []
-	if _underground(_draft_type):
+	if _open_line(_draft_type):
 		var all_snapped := true
 		for p: Vector2 in _draft:
 			if _snap(p, _draft_type, _traffic.graph, _net.graph).is_empty():
@@ -658,10 +707,31 @@ func _build_visuals() -> void:
 	_ribbons.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_ribbons.visible = false
 	add_child(_ribbons)
+	_viaduct_mat = RailVisuals.material()
+	_viaduct = MeshInstance3D.new()
+	_viaduct.name = "Viaducts"
+	add_child(_viaduct)
+	_pillar_mm = _instances("ViaductPillars", RailVisuals.pillar_mesh(), false)
+	_platform_mm = _instances("TrainPlatforms", RailVisuals.platform_mesh(), false)
+	_trains = _instances("Trains", RailVisuals.car_mesh(), true)
+	_trains.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_draft_mesh = MeshInstance3D.new()
 	_draft_mesh.name = "DraftLine"
 	_draft_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_draft_mesh)
+
+
+func _instances(node_name: String, mesh: Mesh, colors: bool) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = colors
+	mm.mesh = mesh
+	mm.custom_aabb = MAP_AABB
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = node_name
+	mmi.multimesh = mm
+	add_child(mmi)
+	return mmi
 
 
 ## World polyline (Vector2) a vehicle follows along a route of entries.
@@ -706,6 +776,11 @@ func _rebuild_visuals() -> void:
 	rails.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var any_ribbon := false
 	var any_rail := false
+	var any_viaduct := false
+	var viaduct := SurfaceTool.new()
+	viaduct.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var pillars: Array = []
+	var platforms: Array = []
 	for line: Dictionary in lines:
 		if not line["ok"]:
 			continue
@@ -713,8 +788,12 @@ func _rebuild_visuals() -> void:
 		var stop_lane: PackedVector2Array = line["stop_lane"]
 		var points: Array = line["points"]
 		var color := line_color(line)
-		if _underground(line["type"]):
-			_metro_visuals(line, color, per_type["metro"], ribbon)
+		if _open_line(line["type"]):
+			if _elevated(line["type"]):
+				_train_visuals(line, color, viaduct, pillars, platforms, ribbon)
+				any_viaduct = true
+			else:
+				_metro_visuals(line, color, per_type["metro"], ribbon)
 			any_ribbon = true
 			continue
 		for i in stop_lane.size():
@@ -752,6 +831,15 @@ func _rebuild_visuals() -> void:
 		for i in list.size():
 			mm.set_instance_transform(i, list[i][0])
 			mm.set_instance_color(i, list[i][1])
+	_viaduct.mesh = viaduct.commit() if any_viaduct else null
+	if any_viaduct:
+		_viaduct.mesh.surface_set_material(0, _viaduct_mat)
+	for pair: Array in [[_pillar_mm, pillars], [_platform_mm, platforms]]:
+		var mm := (pair[0] as MultiMeshInstance3D).multimesh
+		var list: Array = pair[1]
+		mm.instance_count = list.size()
+		for i in list.size():
+			mm.set_instance_transform(i, list[i])
 	if any_ribbon:
 		var m := ribbon.commit()
 		m.surface_set_material(0, _ribbon_mat)
@@ -765,6 +853,83 @@ func _rebuild_visuals() -> void:
 		_rails.mesh = m
 	else:
 		_rails.mesh = null
+
+
+## Viaduct (stations section and any outside link), pillars where the
+## ground is free (not on roads or buildings) and a platform per station.
+func _train_visuals(line: Dictionary, color: Color, viaduct: SurfaceTool, pillars: Array, platforms: Array, ribbon: SurfaceTool) -> void:
+	var rg: RoadGraph = _net.graph
+	var bsys: Node = get_parent().get_node_or_null("BuildingSystem")
+	var runs: Array = [line["path"]]
+	runs.append_array(line["ext"])
+	for pts: Array in runs:
+		if pts.size() < 2:
+			continue
+		RailVisuals.add_viaduct(viaduct, pts)
+		var cum := RailVisuals.cumulative(pts)
+		var s := 6.0
+		while s < cum[cum.size() - 1]:
+			var at: Array = RailVisuals.sample(pts, cum, s)
+			var p: Vector2 = at[0]
+			var d: Vector2 = at[1]
+			var free := rg.find_segment_near(p, 9.0).is_empty() and not MapWater.shared().is_water(p, -2.0)
+			if free and bsys != null and int(bsys.call("building_at", p)) >= 0:
+				free = false
+			if free:
+				var z := Vector3(d.x, 0, d.y)
+				pillars.append(Transform3D(Basis(Vector3.UP.cross(z), Vector3.UP * (RailVisuals.DECK_Y - RailVisuals.DECK_THICK), z), Vector3(p.x, 0, p.y)))
+			s += 32.0
+	var stop_dist: PackedFloat32Array = line["stop_dist"]
+	for i in stop_dist.size():
+		var at: Array = RailVisuals.sample(line["path"], line["cum"], stop_dist[i])
+		var p: Vector2 = at[0]
+		var d: Vector2 = at[1]
+		var z := Vector3(d.x, 0, d.y)
+		platforms.append(Transform3D(Basis(Vector3.UP.cross(z), Vector3.UP, z), Vector3(p.x, 0, p.y)))
+	var path: Array = line["path"]
+	if path.size() >= 2:
+		_strip(ribbon, path, 0.0, RIBBON_WIDTH * 2.0 + 3.0, RIBBON_HEIGHT, color.darkened(0.6), true)
+		_strip(ribbon, path, 0.0, RIBBON_WIDTH * 2.0, RIBBON_HEIGHT + 0.08, color, true)
+
+
+## Moves every train along its viaduct, there and back (cars follow the path).
+func _move_trains(delta: float) -> void:
+	var mult := float((GameData.value("time/speed_multipliers") as Array)[TimeSystem.get_speed_index()])
+	_train_time += delta * mult
+	var xforms: Array = []
+	var colors: Array = []
+	for line: Dictionary in lines:
+		if not line["ok"] or not _elevated(line["type"]):
+			continue
+		var pts: Array = line["path"]
+		var cum: PackedFloat32Array = line["cum"]
+		var length := float(line["length"])
+		if length < 1.0:
+			continue
+		var speed := float(_types[line["type"]]["speed_ms"]) * SPEED_FACTOR
+		var n := int(line["vehicles"])
+		var cars := int(_types[line["type"]].get("cars", 3))
+		var tint := line_color(line).lightened(0.35)
+		for k in n:
+			var s := fposmod(_train_time * speed + k * 2.0 * length / maxf(n, 1), 2.0 * length)
+			var forward := s < length
+			var head := s if forward else 2.0 * length - s
+			for c in cars:
+				var along := head - (c * (RailVisuals.CAR_LENGTH + RailVisuals.CAR_GAP) + RailVisuals.CAR_LENGTH * 0.5) * (1.0 if forward else -1.0)
+				var at: Array = RailVisuals.sample(pts, cum, along)
+				var p: Vector2 = at[0]
+				var d: Vector2 = at[1] if forward else -(at[1] as Vector2)
+				var right := Vector2(-d.y, d.x)
+				p += right * 1.6
+				var z := Vector3(d.x, 0, d.y)
+				xforms.append(Transform3D(Basis(Vector3.UP.cross(z), Vector3.UP, z), Vector3(p.x, RailVisuals.DECK_Y + 0.15, p.y)))
+				colors.append(tint)
+	var mm := _trains.multimesh
+	if mm.instance_count != xforms.size():
+		mm.instance_count = xforms.size()
+	for i in xforms.size():
+		mm.set_instance_transform(i, xforms[i])
+		mm.set_instance_color(i, colors[i])
 
 
 ## Station entrances on the sidewalk and the tunnel drawn as a dark-edged

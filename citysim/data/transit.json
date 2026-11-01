@@ -42,8 +42,27 @@
       "min_stop_spacing_m": 250.0,
       "walk_radius_m": 650.0,
       "road_types": []
+    },
+    "train": {
+      "name_key": "TRANSIT_TRAIN",
+      "model": "train",
+      "elevated": true,
+      "speed_ms": 30.0,
+      "daily_capacity_per_vehicle": 6000,
+      "upkeep_per_vehicle": 2400,
+      "line_cost": 30000,
+      "stop_cost": 15000,
+      "track_cost_per_m": 55,
+      "max_vehicles": 8,
+      "default_vehicles": 2,
+      "dwell_s": 40.0,
+      "cars": 3,
+      "min_stop_spacing_m": 400.0,
+      "walk_radius_m": 700.0,
+      "road_types": []
     }
   },
+  "intercity_reach_m": 260.0,
   "colors": ["#e8452c", "#2d7be0", "#29a85b", "#f2b01e", "#9a4fd6", "#e0559e", "#18b2b2", "#8a6a3a"],
   "max_lines": 12,
   "max_stops": 16,
