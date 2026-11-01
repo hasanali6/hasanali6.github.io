@@ -443,11 +443,17 @@ araba durur.
   araçlar çizilir, uzaktakiler veri olarak, geri kalanı istatistik olarak
   hesaplanır (simülasyon LOD).
 - **Testler:** `godot --headless --path citysim -s res://tests/run_tests.gd`
-  (183 kontrol).
+  (185 kontrol).
 - **APK:** her push'ta GitHub Actions derler, Releases → `citysim-latest`.
 - Ayrıntılı faz notları, kabul kriterleri ve bilinen eksikler: `README.md`.
 
 ## 14. Bilinen sınırlar (kısaca)
+
+- **Büyük şehirde yol yapmak:** her yolda sadece çevresindeki imar
+  hücreleri yeniden hesaplanır. Bu, 300 yollu bir şehirde yol başına
+  ~12 sn'den ~0,6 sn'ye indi (masaüstünde ölçüldü). Ama çok büyük ızgaralarda
+  (500+ yol) telefonda yol koyarken kısa bir takılma hâlâ olabilir.
+  Simülasyon ve kare süresi büyük şehirde de sınırın altında kaldı.
 
 - Karayolu tüneli yok. Üst geçitler tek katlı (iki üst geçit üst üste binemez). Metro trenleri
   yerin altında olduğu için çizilmiyor.
