@@ -218,12 +218,15 @@ static func build_segment(graph: RoadGraph, seg_id: int, types: Dictionary, cfg:
 	var any_bridge := false
 	var lift_h := float(cfg.get("bridge_lift_m", 0.14))
 	var ramp := float(cfg.get("bridge_ramp_m", 5.0))
-	for p in points:
+	var raised := graph.is_elevated(seg_id)
+	for i in points.size():
+		var p := points[i]
 		var wd := MapWater.shared().distance(p) - hw
 		var k := 1.0 - smoothstep(0.0, ramp, wd)
-		lifts.append(lift_h * k)
-		over.append(1.0 if wd < 1.0 else 0.0)
-		if k > 0.0:
+		var up := RoadGraph.ramp_lift(dist[i], length, graph.overpass_height, graph.overpass_ramp) if raised else 0.0
+		lifts.append(maxf(lift_h * k, up))
+		over.append(1.0 if wd < 1.0 or up > 0.8 else 0.0)
+		if k > 0.0 or up > 0.0:
 			any_bridge = true
 	if not any_bridge:
 		lifts = PackedFloat32Array()
@@ -275,6 +278,8 @@ static func _bridge_parts(parts: Parts, points: PackedVector2Array, lefts: Packe
 				_strip(parts, CURB, pts, ls, ds, tj, inner, inner, curb_h, top, custom, -int(side), lf)
 				_strip(parts, CURB, pts, ls, ds, tj, inner, outer, top, top, custom, 0, lf)
 				_strip(parts, CURB, pts, ls, ds, tj, outer, outer, -2.0, top, custom, int(side), lf)
+			# Underside of the deck (seen from below an overpass).
+			_strip(parts, CURB, pts, ls, ds, tj, hw, -hw, -1.2, -1.2, custom, 0, lf)
 			start = -1
 
 

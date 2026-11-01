@@ -382,3 +382,8 @@ PRODUCT_METAL,Metal eşya,Metal goods
 PRODUCT_FUEL,Yakıt,Fuel
 PROD_PRODUCTS,Ürünler: %s,Products: %s
 PROD_PRODUCT_ITEM,%s %s (%%%d yerel hammadde),%s %s (%d%% local raw)
+ROAD_OVERPASS,Üst geçit yolu,Overpass
+ROAD_ERR_OVERPASS_JOIN,Üst geçidin ortasına yol bağlanamaz (uçlarına bağla),Roads cannot join an overpass in the middle (use its ends)
+ROAD_ERR_OVERPASS_SHORT,Üst geçit en az 120 m olmalı (rampalar için),An overpass must be at least 120 m long (for its ramps)
+ROAD_ERR_OVERPASS_RAMP,Kesişme rampaya denk geliyor: yolu üst geçidin ortasından geçir,The crossing falls on a ramp: cross near the middle of the overpass
+ROAD_ERR_OVERPASS_UPGRADE,Üst geçit başka yola dönüştürülemez (yıkıp yeniden yap),An overpass cannot be converted (demolish and rebuild)

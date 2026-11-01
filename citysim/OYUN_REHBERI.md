@@ -73,6 +73,19 @@ yola göre ölçülür; parmağın titrese de yol ya o yolun düz devamı olur y
 tam dik keser. Uç nokta yakındaki bir kavşağa veya yola ancak çizdiğin yön
 bozulmuyorsa yapışır. Serbest açı veya kavis için eğri modunu kullan.
 
+### Üst geçit yolu (yeni)
+Yollar menüsünde **Üst geçit yolu** (İlçe'de açılır). Çift yönlü, 2+2
+şeritli, 70 km/sa'lik bir yol. Altından geçtiği yollarla **kavşak yapmaz**:
+uçlarında 55 m'lik rampalarla 7 m yükselir, ayaklar boş zemine konur. Trafik
+sıkışan kavşakları rahatlatmak ve otoyola kavşaksız bağlantı (rampa) yapmak
+için kullan.
+- En az 120 m olmalı. Kesiştiği yol, üst geçidin rampasına değil yüksek
+  kısmına denk gelmeli.
+- Ortasına yol bağlanamaz; bağlantılar uçlardan yapılır. Başka yol türüne
+  dönüştürülemez (yıkıp yeniden yap). Üst geçit, başka bir üst geçidin
+  üstünden geçemez.
+- Kenarında imar olmaz. Araçlar güvertenin üstünden gider.
+
 ### Yık
 Menüdeki kırmızı **Yık** düğmesi (yol panelindeki yıkma modu da aynı işi
 yapar). Bir binaya ya da yola dokun: kırmızı işaretlenir, parmağını kaldırınca
@@ -430,13 +443,13 @@ araba durur.
   araçlar çizilir, uzaktakiler veri olarak, geri kalanı istatistik olarak
   hesaplanır (simülasyon LOD).
 - **Testler:** `godot --headless --path citysim -s res://tests/run_tests.gd`
-  (177 kontrol).
+  (183 kontrol).
 - **APK:** her push'ta GitHub Actions derler, Releases → `citysim-latest`.
 - Ayrıntılı faz notları, kabul kriterleri ve bilinen eksikler: `README.md`.
 
 ## 14. Bilinen sınırlar (kısaca)
 
-- Karayolu tüneli, otoyol rampaları, banliyö treni ve liman yok. Metro trenleri
+- Karayolu tüneli yok. Üst geçitler tek katlı (iki üst geçit üst üste binemez). Metro trenleri
   yerin altında olduğu için çizilmiyor.
 - Yayalar süs amaçlı: yürüyüş yolları gerçek yolculuklardan değil sokağın
   nüfusundan gelir. Bisiklet yok.

@@ -21,6 +21,7 @@ global uniform float traffic_time;
 global uniform float night_factor;
 
 uniform sampler2D lanes : filter_nearest;
+uniform sampler2D lane_heights : filter_nearest;   // deck height per texel (overpasses)
 uniform float hide_distance = 1100.0;
 uniform float accel_time = 1.4;
 uniform float stop_softness = 2.5;
@@ -36,6 +37,11 @@ varying float v_seed;
 vec2 lane_point(float offset, float k) {
 	int i = int(offset + k + 0.5);
 	return texelFetch(lanes, ivec2(i % 1024, i / 1024), 0).xy;
+}
+
+float lane_height(float offset, float k) {
+	int i = int(offset + k + 0.5);
+	return texelFetch(lane_heights, ivec2(i % 1024, i / 1024), 0).r;
 }
 
 void vertex() {
@@ -62,11 +68,12 @@ void vertex() {
 	vec2 a = lane_point(offset, k);
 	vec2 b = lane_point(offset, k + 1.0);
 	vec2 p = mix(a, b, clamp(u - k, 0.0, 1.0));
+	float lift = mix(lane_height(offset, k), lane_height(offset, k + 1.0), clamp(u - k, 0.0, 1.0));
 	vec2 d = b - a;
 	d = dot(d, d) > 1e-8 ? normalize(d) : vec2(0.0, 1.0);
 	vec3 fwd = vec3(d.x, 0.0, d.y);
 	vec3 side = vec3(d.y, 0.0, -d.x);
-	vec3 pos = vec3(p.x, road_height, p.y);
+	vec3 pos = vec3(p.x, road_height + lift, p.y);
 	float scale = (piece.y < 1.5 || length(CAMERA_POSITION_WORLD - pos) > hide_distance) ? 0.0 : 1.0;
 	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(vec4(side * scale, 0.0), vec4(0.0, scale, 0.0, 0.0), vec4(fwd * scale, 0.0), vec4(pos, 1.0));
 	MODELVIEW_NORMAL_MATRIX = mat3(VIEW_MATRIX) * mat3(side, vec3(0.0, 1.0, 0.0), fwd);

@@ -21,6 +21,7 @@ const SURFACE_ORDER: PackedStringArray = [
 	RoadMeshBuilder.ASPHALT, RoadMeshBuilder.SIDEWALK, RoadMeshBuilder.CURB, RoadMeshBuilder.MEDIAN,
 ]
 
+var _pillars: MultiMeshInstance3D
 var graph: RoadGraph
 var types: Dictionary
 var mesh_cfg: Dictionary
@@ -44,6 +45,11 @@ func _ready() -> void:
 	types = GameData.section("roads/types")
 	mesh_cfg = GameData.section("roads/mesh")
 	graph = RoadGraph.new(GameData.section("roads/graph"))
+	for key: String in GameData.section("roads/types"):
+		if bool(GameData.value("roads/types/%s" % key).get("elevated", false)):
+			graph.elevated_types[key] = true
+	graph.overpass_height = GameData.num("roads/overpass/height_m")
+	graph.overpass_ramp = GameData.num("roads/overpass/ramp_m")
 	_chunk_size = float(mesh_cfg["chunk_size_m"])
 	_refund_ratio = GameData.num("economy/road_refund_ratio")
 	_build_materials()
@@ -87,7 +93,7 @@ func water_error(plan: Dictionary, type: String) -> String:
 
 ## Plans and, if affordable, builds a road. Returns the plan with "cost" added.
 func build_road(start: Vector2, end: Vector2, control: Variant, type: String) -> Dictionary:
-	var plan := graph.plan_road(start, end, control)
+	var plan := graph.plan_road(start, end, control, graph.elevated_types.has(type))
 	if not plan["ok"]:
 		return plan
 	var wet := water_error(plan, type)
@@ -119,6 +125,8 @@ func upgrade(seg_id: int, type: String) -> Dictionary:
 	var seg: RoadGraph.RoadSegment = graph.segments[seg_id]
 	if seg.type == type:
 		return {"ok": false, "error": "ROAD_ERR_UPGRADE_SAME"}
+	if graph.elevated_types.has(type) or graph.elevated_types.has(seg.type):
+		return {"ok": false, "error": "ROAD_ERR_OVERPASS_UPGRADE"}
 	if is_outside_segment(seg_id):
 		return {"ok": false, "error": "ROAD_ERR_OUTSIDE_LINK"}
 	var c := graph.curve_of(seg)
@@ -492,11 +500,44 @@ func _rebuild_lamps() -> void:
 				# Lamp arm (+X) points towards the road centre.
 				var inward := -left * side
 				var basis := Basis(Vector3(inward.x, 0, inward.y), Vector3.UP, Vector3(-inward.y, 0, inward.x))
-				transforms.append(Transform3D(basis, Vector3(base.x, curb_h, base.y)))
+				var lift := graph.lift_at(seg.id, tt)
+				transforms.append(Transform3D(basis, Vector3(base.x, curb_h + lift, base.y)))
 				var pool := base + inward * 2.2
-				pools.append(Transform3D(Basis(), Vector3(pool.x, curb_h + 0.03, pool.y)))
+				pools.append(Transform3D(Basis(), Vector3(pool.x, curb_h + 0.03 + lift, pool.y)))
+	_rebuild_pillars()
 	_fill(_lamps.multimesh, transforms)
 	_fill(_pools.multimesh, pools)
+
+
+## Concrete pillars under the raised part of overpasses, not on roads below.
+func _rebuild_pillars() -> void:
+	if _pillars == null:
+		_pillars = MultiMeshInstance3D.new()
+		_pillars.name = "OverpassPillars"
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = RailVisuals.pillar_mesh()
+		mm.custom_aabb = AABB(Vector3(-2600, -5, -2600), Vector3(5200, 40, 5200))
+		_pillars.multimesh = mm
+		add_child(_pillars)
+	var spacing := GameData.num("roads/overpass/pillar_spacing_m")
+	var transforms: Array[Transform3D] = []
+	for seg: RoadGraph.RoadSegment in graph.segments.values():
+		if not graph.elevated_types.has(seg.type):
+			continue
+		var s := spacing * 0.5
+		while s < seg.length:
+			var tt := s / seg.length
+			var h := graph.lift_at(seg.id, tt) - 0.5
+			if h > 2.5:
+				var p := graph.point_on(seg.id, tt)
+				var below := graph.find_segment_near(p, 9.0)
+				if below.is_empty() or int(below["segment"]) == seg.id:
+					var d := graph.tangent_on(seg.id, tt)
+					var z := Vector3(d.x, 0, d.y)
+					transforms.append(Transform3D(Basis(Vector3.UP.cross(z) * 1.6, Vector3.UP * h, z * 1.2), Vector3(p.x, 0, p.y)))
+			s += spacing
+	_fill(_pillars.multimesh, transforms)
 
 
 func _fill(mm: MultiMesh, transforms: Array[Transform3D]) -> void:

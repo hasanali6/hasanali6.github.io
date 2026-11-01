@@ -40,6 +40,29 @@ var min_angle: float
 
 var _next_node: int = 1
 var _next_segment: int = 1
+# Overpasses: road types that rise over the roads they cross (no junction),
+# on ramps at both ends.
+var elevated_types: Dictionary = {}
+var overpass_height: float = 7.0
+var overpass_ramp: float = 55.0
+
+
+func is_elevated(seg_id: int) -> bool:
+	var seg: RoadSegment = segments.get(seg_id)
+	return seg != null and elevated_types.has(seg.type)
+
+
+## Height of the deck s metres along a road of `length` (0 at both ends).
+static func ramp_lift(s: float, length: float, height: float, ramp: float) -> float:
+	return height * smoothstep(0.0, ramp, s) * smoothstep(0.0, ramp, length - s)
+
+
+## Deck height of a segment at curve parameter t (0 unless it is elevated).
+func lift_at(seg_id: int, t: float) -> float:
+	if not is_elevated(seg_id):
+		return 0.0
+	var seg: RoadSegment = segments[seg_id]
+	return ramp_lift(t * seg.length, seg.length, overpass_height, overpass_ramp)
 
 
 func _init(config: Dictionary) -> void:
@@ -251,7 +274,7 @@ func _restore_node(id: int, pos: Vector2) -> RoadNode:
 ## Validates a road from start to end (control = null for a straight road)
 ## without touching the graph. Result has "ok"; on failure "error" holds a
 ## translation key; on success it carries what commit_road() needs.
-func plan_road(start: Vector2, end: Vector2, control: Variant) -> Dictionary:
+func plan_road(start: Vector2, end: Vector2, control: Variant, elevated: bool = false) -> Dictionary:
 	var a_ref := _endpoint_ref(start)
 	var b_ref := _endpoint_ref(end)
 	var a: Vector2 = a_ref["point"]
@@ -269,6 +292,12 @@ func plan_road(start: Vector2, end: Vector2, control: Variant) -> Dictionary:
 			return _fail("ROAD_ERR_EXISTS")
 	if a_ref["kind"] == "segment" and b_ref["kind"] == "segment" and a_ref["id"] == b_ref["id"]:
 		return _fail("ROAD_ERR_OVERLAP")
+	# Nothing joins an overpass in the middle; overpasses need room for ramps.
+	for ref: Dictionary in [a_ref, b_ref]:
+		if ref["kind"] == "segment" and is_elevated(int(ref["id"])):
+			return _fail("ROAD_ERR_OVERPASS_JOIN")
+	if elevated and length < overpass_ramp * 2.0 + 10.0:
+		return _fail("ROAD_ERR_OVERPASS_SHORT")
 
 	if not _angle_ok(a_ref, bezier_tangent(a, ctrl, b, 0.0).normalized()):
 		return _fail("ROAD_ERR_ANGLE")
@@ -281,6 +310,17 @@ func plan_road(start: Vector2, end: Vector2, control: Variant) -> Dictionary:
 		for hit in _curve_intersections(a, ctrl, b, c[0], c[1], c[2]):
 			var p: Vector2 = hit["point"]
 			if p.distance_to(a) < merge_radius or p.distance_to(b) < merge_radius:
+				continue
+			# Crossing over or under an overpass: no junction, but only where
+			# the deck is up (not on its ramps); two overpasses never cross.
+			var old_up := elevated_types.has(seg.type)
+			if elevated or old_up:
+				if elevated and old_up:
+					return _fail("ROAD_ERR_OVERLAP")
+				var s_up := float(hit["t"]) * length if elevated else float(hit["t_other"]) * seg.length
+				var l_up := length if elevated else seg.length
+				if s_up < overpass_ramp * 0.9 or s_up > l_up - overpass_ramp * 0.9:
+					return _fail("ROAD_ERR_OVERPASS_RAMP")
 				continue
 			var d_new := bezier_tangent(a, ctrl, b, hit["t"]).normalized()
 			var d_old := bezier_tangent(c[0], c[1], c[2], hit["t_other"]).normalized()

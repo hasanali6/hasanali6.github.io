@@ -5,7 +5,8 @@
     "avenue",
     "avenue_oneway",
     "boulevard",
-    "highway"
+    "highway",
+    "overpass"
   ],
   "types": {
     "street": {
@@ -86,6 +87,21 @@
       "lamps_both_sides": true,
       "street_trees": false,
       "zoning": false
+    },
+    "overpass": {
+      "name_key": "ROAD_OVERPASS",
+      "lanes_per_dir": 2,
+      "oneway": false,
+      "lane_width_m": 3.25,
+      "median_width_m": 1.0,
+      "sidewalk_width_m": 0.6,
+      "speed_kmh": 70,
+      "cost_per_m": 95,
+      "lamp_spacing_m": 36,
+      "lamps_both_sides": true,
+      "street_trees": false,
+      "zoning": false,
+      "elevated": true
     }
   },
   "graph": {
@@ -173,5 +189,10 @@
   "bridge": {
     "cost_factor": 4.0,
     "land_clearance_m": 4.0
+  },
+  "overpass": {
+    "height_m": 7.0,
+    "ramp_m": 55.0,
+    "pillar_spacing_m": 30.0
   }
 }

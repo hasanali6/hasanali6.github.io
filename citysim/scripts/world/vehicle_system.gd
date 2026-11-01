@@ -45,6 +45,7 @@ var _time: float = 0.0
 var _cap: int = 0
 var _material: ShaderMaterial
 var _lane_tex: ImageTexture
+var _height_tex: ImageTexture
 var _models: Array[String] = VehicleModels.NAMES
 var _model_index: Dictionary = {}
 var _mm: Array = []                # per model: MultiMeshInstance3D
@@ -245,6 +246,12 @@ func _on_lanes_rebuilt() -> void:
 		_material.set_shader_parameter("lanes", _lane_tex)
 	else:
 		_lane_tex.update(img)
+	var himg := lg.height_image()
+	if _height_tex == null or _height_tex.get_height() != himg.get_height():
+		_height_tex = ImageTexture.create_from_image(himg)
+		_material.set_shader_parameter("lane_heights", _height_tex)
+	else:
+		_height_tex.update(himg)
 	_seg_lanes.clear()
 	_seg_end.clear()
 	var rg: RoadGraph = _traffic.get_node(_traffic.road_network_path).graph

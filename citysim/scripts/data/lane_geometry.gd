@@ -25,6 +25,8 @@ var piece_key: Array = []                  # lane key (int) or connector key (Ve
 var lane_pieces: Dictionary = {}           # lane key -> piece id
 var conn_pieces: Dictionary = {}           # Vector3i(node id, in lane key, out lane key) -> piece id
 var buffer := PackedFloat32Array()
+var heights := PackedFloat32Array()        # deck height per texel (overpasses)
+var _graph: RoadGraph
 var rows: int = 1
 
 var _seg_cache: Dictionary = {}    # segment id -> [signature, {lane key: [points, length]}]
@@ -52,6 +54,7 @@ func piece_total() -> int:
 
 
 func rebuild(graph: RoadGraph, types: Dictionary, mesh_cfg: Dictionary) -> void:
+	_graph = graph
 	var trims := {}
 	for nid: int in graph.nodes:
 		trims[nid] = RoadMeshBuilder.junction_radius(graph, nid, types, mesh_cfg)
@@ -126,6 +129,11 @@ func project(pid: int, p: Vector2) -> float:
 ## The packed buffer as an RGF image for the vehicle shader.
 func image() -> Image:
 	return Image.create_from_data(TEX_WIDTH, rows, false, Image.FORMAT_RGF, buffer.to_byte_array())
+
+
+## Deck height per texel, same layout as image() (one float).
+func height_image() -> Image:
+	return Image.create_from_data(TEX_WIDTH, rows, false, Image.FORMAT_RF, heights.to_byte_array())
 
 
 func _segment_lanes(graph: RoadGraph, seg: RoadGraph.RoadSegment, t: Dictionary, trims: Dictionary) -> Dictionary:
@@ -245,6 +253,7 @@ func _pack(lanes: Dictionary, conns: Dictionary) -> void:
 	lane_pieces = {}
 	conn_pieces = {}
 	buffer = PackedFloat32Array()
+	heights = PackedFloat32Array()
 	for key: int in lanes:
 		lane_pieces[key] = _add_piece(key, lanes[key])
 	for key: Vector3i in conns:
@@ -252,6 +261,7 @@ func _pack(lanes: Dictionary, conns: Dictionary) -> void:
 	var texels := buffer.size() / 2
 	rows = maxi(ceili(float(texels) / TEX_WIDTH), 1)
 	buffer.resize(rows * TEX_WIDTH * 2)
+	heights.resize(rows * TEX_WIDTH)
 
 
 func _add_piece(key: Variant, entry: Array) -> int:
@@ -267,4 +277,15 @@ func _add_piece(key: Variant, entry: Array) -> int:
 	piece_dir_out.append(d_out)
 	piece_key.append(key)
 	buffer.append_array(pts)
+	# Lanes on an overpass follow its deck; everything else is on the ground.
+	var seg_id := key_segment(key) if key is int else -1
+	if seg_id >= 0 and _graph != null and _graph.is_elevated(seg_id):
+		var seg: RoadGraph.RoadSegment = _graph.segments[seg_id]
+		var c := _graph.curve_of(seg)
+		for i in n:
+			var t := _graph.closest_t(c[0], c[1], c[2], Vector2(pts[i * 2], pts[i * 2 + 1]))
+			heights.append(_graph.lift_at(seg_id, t))
+	else:
+		for i in n:
+			heights.append(0.0)
 	return pid

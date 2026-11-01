@@ -37,6 +37,7 @@ func _initialize() -> void:
 	_test_lane_geometry()
 	_test_transit_rules()
 	_test_products()
+	_test_overpass()
 	_test_progression()
 	_test_weather_traffic()
 	_test_highway_bridge()
@@ -642,6 +643,27 @@ func _test_lane_geometry() -> void:
 	var before := lg.piece_total()
 	lg.rebuild(g, roads["types"], roads["mesh"])
 	_check(lg.piece_total() == before, "rebuilding reuses unchanged pieces")
+
+
+func _test_overpass() -> void:
+	var g := _graph()
+	g.elevated_types = {"overpass": true}
+	g.overpass_height = 7.0
+	g.overpass_ramp = 55.0
+	g.commit_road(g.plan_road(Vector2(-200, 9000), Vector2(200, 9000), null), "street")
+	var over := g.plan_road(Vector2(0, 8800), Vector2(0, 9200), null, true)
+	_check(over["ok"] and (over["hits"] as Array).is_empty(), "an overpass crosses a road without a junction")
+	var ramp := g.plan_road(Vector2(150, 8990), Vector2(150, 9300), null, true)
+	_check(not ramp["ok"] and ramp["error"] == "ROAD_ERR_OVERPASS_RAMP", "no crossing on an overpass ramp")
+	_check(str(g.plan_road(Vector2(0, 8950), Vector2(0, 9050), null, true).get("error", "")) == "ROAD_ERR_OVERPASS_SHORT", "overpasses need room for their ramps")
+	var ids := g.commit_road(over, "overpass")
+	var seg_id: int = ids[0]
+	_check(ids.size() == 1 and g.is_elevated(seg_id) and is_equal_approx(g.lift_at(seg_id, 0.0), 0.0)
+		and is_equal_approx(g.lift_at(seg_id, 0.5), 7.0), "the deck rises from the ground to 7 m (%.1f)" % g.lift_at(seg_id, 0.5))
+	var join := g.plan_road(Vector2(-150, 9100), Vector2(0, 9100), null)
+	_check(not join["ok"] and join["error"] == "ROAD_ERR_OVERPASS_JOIN", "no road joins an overpass in the middle")
+	var under := g.plan_road(Vector2(-150, 9060), Vector2(150, 9060), null)
+	_check(under["ok"] and (under["hits"] as Array).is_empty(), "a new road passes under an overpass")
 
 
 func _test_products() -> void:

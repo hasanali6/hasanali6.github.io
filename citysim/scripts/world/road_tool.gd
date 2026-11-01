@@ -235,7 +235,7 @@ func _evaluate(a: Vector2, b: Vector2, control: Variant) -> Dictionary:
 			return {"valid": false, "error": "ROAD_ERR_OUTSIDE", "cost": 0, "length": 0.0}
 		if not MapGrid.is_inside(Vector3(p.x, 0, p.y), open_half):
 			return {"valid": false, "error": "ROAD_ERR_LOCKED_AREA", "cost": 0, "length": 0.0}
-	var plan: Dictionary = (_net.graph as RoadGraph).plan_road(a, b, control)
+	var plan: Dictionary = (_net.graph as RoadGraph).plan_road(a, b, control, (_net.graph as RoadGraph).elevated_types.has(_type))
 	if not plan["ok"]:
 		return {"valid": false, "error": plan["error"], "cost": 0, "length": 0.0}
 	# Over water the road becomes a bridge; its ends must stand on land.
