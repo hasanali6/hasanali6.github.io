@@ -100,5 +100,27 @@
   "min_richness": 0.2,
   "local_raw_price": 22,
   "raw_export_price": 18,
-  "raw_per_good": 1.0
+  "raw_per_good": 1.0,
+  "products": {
+    "food": {
+      "name_key": "PRODUCT_FOOD",
+      "raw": "farm",
+      "price_factor": 1.0
+    },
+    "wood": {
+      "name_key": "PRODUCT_WOOD",
+      "raw": "forest",
+      "price_factor": 0.95
+    },
+    "metal": {
+      "name_key": "PRODUCT_METAL",
+      "raw": "ore",
+      "price_factor": 1.15
+    },
+    "fuel": {
+      "name_key": "PRODUCT_FUEL",
+      "raw": "oil",
+      "price_factor": 1.25
+    }
+  }
 }

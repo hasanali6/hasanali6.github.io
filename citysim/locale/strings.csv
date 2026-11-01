@@ -376,3 +376,9 @@ ECON_OUT_PARKS,Park bakımı,Park upkeep
 CAT_PORT,Liman (deniz ticareti),Port (sea trade)
 CAT_AIRPORT,Havalimanı,Airport
 BUILD_ERR_RUNWAY,Arkada pist için 45 × 320 m boş alan gerekli (yol/bina/su olmasın),Needs a clear 45 × 320 m strip behind for the runway
+PRODUCT_FOOD,Gıda,Food
+PRODUCT_WOOD,Kereste ürünleri,Wood products
+PRODUCT_METAL,Metal eşya,Metal goods
+PRODUCT_FUEL,Yakıt,Fuel
+PROD_PRODUCTS,Ürünler: %s,Products: %s
+PROD_PRODUCT_ITEM,%s %s (%%%d yerel hammadde),%s %s (%d%% local raw)

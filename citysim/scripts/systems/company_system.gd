@@ -236,14 +236,30 @@ func _on_month(_m: int) -> void:
 			units *= _output_factor(bid)
 			c["units"] = units
 			production_total += units
+	# Each factory makes one product from its own raw material.
+	var products: Dictionary = GameData.section("resources/products")
+	var raw_per_good := GameData.num("resources/raw_per_good")
+	var factory_units := {}
+	var current := {}
+	for bid: int in companies:
+		var cc: Dictionary = companies[bid]
+		if cc["kind"] == "industrial":
+			factory_units[bid] = float(cc.get("units", 0.0))
+			current[bid] = str(cc.get("product", ""))
+	var chosen := ProductRules.assign(factory_units, current, raw_by_type, products, raw_per_good)
+	var made := {}
+	for bid: int in chosen:
+		companies[bid]["product"] = chosen[bid]
+		made[chosen[bid]] = float(made.get(chosen[bid], 0.0)) + float(factory_units[bid])
+	var balance := ProductRules.balance(made, raw_by_type, products, raw_per_good)
 	var local := minf(sales_total, production_total)
 	var local_share_sales := 0.0 if sales_total <= 0.0 else local / sales_total
 	var local_share_prod := 0.0 if production_total <= 0.0 else local / production_total
 	# Raw material: the city's own first, the rest imported / exported.
 	var raw_needed := production_total * GameData.num("resources/raw_per_good")
-	var raw_local := minf(raw_produced, raw_needed)
-	var raw_share_need := 0.0 if raw_needed <= 0.0 else raw_local / raw_needed
-	var raw_share_prod := 0.0 if raw_produced <= 0.0 else raw_local / raw_produced
+	var raw_local := 0.0
+	for p: String in balance["products"]:
+		raw_local += float(balance["products"][p]["local"])
 	var local_raw_price := GameData.num("resources/local_raw_price")
 	var raw_export_price := GameData.num("resources/raw_export_price")
 
@@ -253,6 +269,7 @@ func _on_month(_m: int) -> void:
 		"imports": sales_total - local, "exports": production_total - local, "bankrupt": 0, "overflow": 0.0,
 		"raw": {"produced": raw_produced, "needed": raw_needed, "local": raw_local, "imported": raw_needed - raw_local,
 			"exported": raw_produced - raw_local, "by_type": raw_by_type},
+		"products": balance["products"],
 	}
 	var records: Dictionary = _buildings.buildings
 	for bid: int in companies.keys():
@@ -275,12 +292,17 @@ func _on_month(_m: int) -> void:
 				costs += units * (local_share_sales * float(_cfg["wholesale_price"]) + (1.0 - local_share_sales) * import_price)
 			"industrial":
 				var units: float = c.get("units", 0.0)
-				var export_price := float(_cfg["export_price"]) * (1.0 if _linked(bid) else float(_cfg["isolated_export_factor"])) * (1.0 + port_bonus)
+				var product := str(c.get("product", "food"))
+				var pinfo: Dictionary = (balance["products"] as Dictionary).get(product, {"share": 0.0})
+				var export_price := float(_cfg["export_price"]) * (1.0 if _linked(bid) else float(_cfg["isolated_export_factor"])) * (1.0 + port_bonus) \
+					* float((products.get(product, {}) as Dictionary).get("price_factor", 1.0))
 				revenue = units * (local_share_prod * float(_cfg["wholesale_price"]) + (1.0 - local_share_prod) * export_price)
 				var raw_import := float(_cfg["industry_raw_cost_per_unit"]) * (1.0 if _linked(bid) else float(_cfg["isolated_import_factor"])) * (1.0 - port_bonus)
-				costs += units * GameData.num("resources/raw_per_good") * (raw_share_need * local_raw_price + (1.0 - raw_share_need) * raw_import)
+				var share := float(pinfo["share"])
+				costs += units * raw_per_good * (share * local_raw_price + (1.0 - share) * raw_import)
 			"extractor":
 				var raw: float = c.get("units", 0.0)
+				var raw_share_prod := float((balance["raw_share"] as Dictionary).get(str(records.get(bid, {}).get("extractor", "")), 0.0))
 				var away := raw_export_price * (1.0 if _linked(bid) else float(_cfg["isolated_export_factor"])) * (1.0 + port_bonus)
 				revenue = raw * (raw_share_prod * local_raw_price + (1.0 - raw_share_prod) * away)
 			"office":
@@ -346,7 +368,7 @@ func save_state() -> Dictionary:
 	for bid: int in companies:
 		var c: Dictionary = companies[bid]
 		out[str(bid)] = {"target": c["target"], "money": c["money"], "profit": c["profit"],
-			"loss_months": c["loss_months"], "profit_months": c["profit_months"]}
+			"loss_months": c["loss_months"], "profit_months": c["profit_months"], "product": c.get("product", "")}
 	return {"companies": out}
 
 

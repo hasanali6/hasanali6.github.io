@@ -191,6 +191,22 @@ olur ve daha çok tercih edilir. Sahil yapıları ancak kıyıya kurulur:
 Ekonomi → Bütçe'de **Turizm** geliri ve **Park bakımı** gideri ayrı satır
 olarak görünür.
 
+### Ürün çeşitleri
+Her fabrika tek bir ürün yapar ve kendi hammaddesini kullanır:
+
+| Ürün | Hammadde | İhracat fiyatı |
+|---|---|---|
+| Gıda | Çiftlik (verimli toprak) | ×1,00 |
+| Kereste ürünleri | Kereste kampı (orman) | ×0,95 |
+| Metal eşya | Maden | ×1,15 |
+| Yakıt | Petrol kuyusu | ×1,25 |
+
+Yeni fabrika, şehirde en çok artan hammaddeye göre ürününü seçer: tarım
+kasabasında gıda fabrikaları, maden kasabasında metal atölyeleri açılır.
+Kendi hammaddesi şehirde yoksa ithal eder (daha pahalı). Ekonomi → Üretim
+sekmesinde her ürünün miktarı ve hammaddesinin yüzde kaçının yerelden
+geldiği görünür.
+
 ### Hizmetler ve Altyapı
 Yerleştirirken kapsama haritası açılır. Hizmet binalarının yol kenarında kendi
 renginde bir tabelası var (elektrik sarı, su mavi, sağlık kırmızı, eğitim mor,
@@ -414,7 +430,7 @@ araba durur.
   araçlar çizilir, uzaktakiler veri olarak, geri kalanı istatistik olarak
   hesaplanır (simülasyon LOD).
 - **Testler:** `godot --headless --path citysim -s res://tests/run_tests.gd`
-  (174 kontrol).
+  (177 kontrol).
 - **APK:** her push'ta GitHub Actions derler, Releases → `citysim-latest`.
 - Ayrıntılı faz notları, kabul kriterleri ve bilinen eksikler: `README.md`.
 
@@ -422,8 +438,6 @@ araba durur.
 
 - Karayolu tüneli, otoyol rampaları, banliyö treni ve liman yok. Metro trenleri
   yerin altında olduğu için çizilmiyor.
-- Hammaddeler tek havuzda: fabrikalar hangi türün geldiğine bakmaz; ürün
-  çeşitleri (gıda, kereste, metal…) ayrı ayrı izlenmiyor.
 - Yayalar süs amaçlı: yürüyüş yolları gerçek yolculuklardan değil sokağın
   nüfusundan gelir. Bisiklet yok.
 - Doku ve sesler sentetik. Geliştirme ortamı ücretsiz asset sitelerine

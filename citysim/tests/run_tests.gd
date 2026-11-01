@@ -36,6 +36,7 @@ func _initialize() -> void:
 	_test_traffic_assignment()
 	_test_lane_geometry()
 	_test_transit_rules()
+	_test_products()
 	_test_progression()
 	_test_weather_traffic()
 	_test_highway_bridge()
@@ -641,6 +642,23 @@ func _test_lane_geometry() -> void:
 	var before := lg.piece_total()
 	lg.rebuild(g, roads["types"], roads["mesh"])
 	_check(lg.piece_total() == before, "rebuilding reuses unchanged pieces")
+
+
+func _test_products() -> void:
+	var products: Dictionary = DataLoader.load_json("res://data/resources.json")["products"]
+	# A farming town: factories pick food first, then the next best raw material.
+	var raw := {"farm": 1000.0, "ore": 300.0}
+	var units := {1: 600.0, 2: 600.0, 3: 200.0}
+	var a := ProductRules.assign(units, {}, raw, products, 1.0)
+	_check(a[1] == "food" and a[2] == "food" and a[3] == "metal", "new factories make what the city's raw material allows %s" % [a])
+	var kept := ProductRules.assign(units, {1: "fuel"}, raw, products, 1.0)
+	_check(kept[1] == "fuel", "a factory keeps its product")
+	var bal := ProductRules.balance({"food": 800.0, "metal": 600.0}, raw, products, 1.0)
+	var food: Dictionary = bal["products"]["food"]
+	var metal: Dictionary = bal["products"]["metal"]
+	_check(is_equal_approx(float(food["share"]), 1.0) and is_equal_approx(float(metal["share"]), 0.5)
+		and is_equal_approx(float(bal["raw_share"]["farm"]), 0.8) and is_equal_approx(float(bal["raw_share"]["ore"]), 1.0),
+		"each product uses its own raw material first (food %.2f, metal %.2f)" % [food["share"], metal["share"]])
 
 
 func _test_transit_rules() -> void:

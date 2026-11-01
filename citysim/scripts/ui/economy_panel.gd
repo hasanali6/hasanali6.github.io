@@ -420,6 +420,20 @@ func _build_production() -> VBoxContainer:
 	return col
 
 
+## "Ürünler: Gıda 1.200 (%80 yerel hammadde) · ..." for the products made.
+func _products_line(rep: Dictionary) -> String:
+	var per: Dictionary = rep.get("products", {})
+	var products: Dictionary = GameData.section("resources/products")
+	var parts := PackedStringArray()
+	for key: String in products:
+		var info: Dictionary = per.get(key, {})
+		if float(info.get("units", 0.0)) <= 0.0:
+			continue
+		parts.append(tr("PROD_PRODUCT_ITEM") % [tr(products[key]["name_key"]), UiStyle.format_int(roundi(float(info["units"]))),
+			roundi(float(info.get("share", 0.0)) * 100.0)])
+	return tr("PROD_PRODUCTS") % (" · ".join(parts) if not parts.is_empty() else "–")
+
+
 func _refresh_production() -> void:
 	var companies := (Engine.get_main_loop() as SceneTree).current_scene.get_node_or_null("CompanySystem")
 	if companies == null:
@@ -442,6 +456,7 @@ func _refresh_production() -> void:
 		tr("PROD_RAW_USE") % [f.call(raw.get("needed", 0.0)), f.call(raw.get("local", 0.0)), f.call(raw.get("imported", 0.0))],
 		tr("PROD_RAW_EXPORT") % f.call(raw.get("exported", 0.0)),
 		tr("PROD_GOODS") % [f.call(rep.get("goods_produced", 0.0)), f.call(rep.get("goods_sold", 0.0))],
+		_products_line(rep),
 		tr("PROD_TRADE") % [f.call(rep.get("exports", 0.0)), f.call(rep.get("imports", 0.0))],
 		tr("PROD_HINT"),
 	]))
