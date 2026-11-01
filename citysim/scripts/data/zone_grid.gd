@@ -33,6 +33,17 @@ var building := PackedInt32Array()
 var _water: MapWater
 var _lookup: Dictionary = {}   # Vector4i(segment, side, along, depth) -> cell index
 var _buckets: Dictionary = {}  # Vector2i -> PackedInt32Array of cell indices
+# Incremental rebuilds: each segment's rows from the last rebuild, reused when
+# neither the segment nor anything near it changed (big cities re-zone only
+# around the edited roads instead of everywhere).
+const _DIRTY_PAD := 150.0
+var _old_lookup: Dictionary = {}
+var _old_zone := PackedInt32Array()
+var _old_building := PackedInt32Array()
+var _restored := PackedByteArray()   # cells that kept their old zone and building
+var _rows: Dictionary = {}     # segment id -> {"sig": String, "box": Rect2, "cells": Array}
+var _rows_env: String = ""
+var last_rebuilt_segments: int = 0
 
 
 func _init(config: Dictionary) -> void:
@@ -60,15 +71,65 @@ func rebuild(graph: RoadGraph, types: Dictionary, mesh_cfg: Dictionary, playable
 	var old_zone := zone
 	var old_building := building
 	var old_buckets := _buckets
+	_old_lookup = _lookup
+	_old_zone = old_zone
+	_old_building = old_building
+	_restored = PackedByteArray()
 	_clear()
 
 	var seg_index := _segment_buckets(graph)
 	var ids := graph.segments.keys()
 	ids.sort()  # older roads claim space first
+	# Which segments changed (new, moved, retyped, other trims) or vanished;
+	# everything within _DIRTY_PAD of them is laid out again.
+	var env := "%.1f|%s" % [playable_half, "w" if water != null else "-"]
+	if env != _rows_env:
+		_rows = {}
+		_rows_env = env
+	var sigs := {}
+	var boxes := {}
+	var dirty: Array[Rect2] = []
 	for sid: int in ids:
+		var seg: RoadGraph.RoadSegment = graph.segments[sid]
+		var ta := RoadMeshBuilder.junction_radius(graph, seg.a, types, mesh_cfg)
+		var tb := RoadMeshBuilder.junction_radius(graph, seg.b, types, mesh_cfg)
+		var c := graph.curve_of(seg)
+		sigs[sid] = "%.2f,%.2f|%.2f,%.2f|%.2f,%.2f|%s|%.2f|%.2f" % [c[0].x, c[0].y, c[1].x, c[1].y, c[2].x, c[2].y, seg.type, ta, tb]
+		var box := Rect2(c[0], Vector2.ZERO).expand(c[1]).expand(c[2])
+		boxes[sid] = box
+		var old: Dictionary = _rows.get(sid, {})
+		if old.is_empty() or old["sig"] != sigs[sid]:
+			dirty.append(box.grow(_DIRTY_PAD))
+			if not old.is_empty():
+				dirty.append((old["box"] as Rect2).grow(_DIRTY_PAD))
+	for sid: int in _rows:
+		if not graph.segments.has(sid):
+			dirty.append((_rows[sid]["box"] as Rect2).grow(_DIRTY_PAD))
+	var rows := {}
+	last_rebuilt_segments = 0
+	for sid: int in ids:
+		var old: Dictionary = _rows.get(sid, {})
+		var reuse: bool = not old.is_empty() and old["sig"] == sigs[sid]
+		if reuse:
+			for r: Rect2 in dirty:
+				if r.intersects(boxes[sid]):
+					reuse = false
+					break
+		if reuse:
+			_append_rows(sid, old)
+			rows[sid] = old
+			continue
+		var first := size()
 		_add_rows(graph, sid, types, mesh_cfg, playable_half, seg_index)
+		rows[sid] = {"sig": sigs[sid], "box": boxes[sid], "c": centers.slice(first), "d": dirs.slice(first),
+			"f": fronts.slice(first), "side": side.slice(first), "k": along.slice(first), "dep": depth.slice(first)}
+		last_rebuilt_segments += 1
+	_rows = rows
 
+	_restored.resize(size())
 	for i in size():
+		if _restored[i] == 1:
+			continue
 		var best := -1
 		var best_d := restore_radius
 		for j in _near(old_buckets, centers[i], restore_radius):
@@ -146,6 +207,46 @@ func _cell_ok(centre: Vector2, graph: RoadGraph, types: Dictionary, playable_hal
 				if p.distance_to(centre) - RoadTypes.half_width(types[seg.type]) < road_clearance:
 					return false
 	return true
+
+
+## Re-adds a segment's cells from the last rebuild in bulk.
+func _append_rows(sid: int, rows: Dictionary) -> void:
+	var c: PackedVector2Array = rows["c"]
+	var n := c.size()
+	if n == 0:
+		return
+	var base := size()
+	var sides: PackedInt32Array = rows["side"]
+	var ks: PackedInt32Array = rows["k"]
+	var deps: PackedInt32Array = rows["dep"]
+	centers.append_array(c)
+	dirs.append_array(rows["d"])
+	fronts.append_array(rows["f"])
+	side.append_array(sides)
+	along.append_array(ks)
+	depth.append_array(deps)
+	segment.resize(base + n)
+	zone.resize(base + n)
+	building.resize(base + n)
+	for i in n:
+		var idx := base + i
+		segment[idx] = sid
+		var key4 := Vector4i(sid, sides[i], ks[i], deps[i])
+		var oi: int = _old_lookup.get(key4, -1)
+		if oi >= 0:
+			zone[idx] = _old_zone[oi]
+			building[idx] = _old_building[oi]
+			_restored.resize(idx + 1)
+			_restored[idx] = 1
+		else:
+			zone[idx] = UNZONED
+			building[idx] = FREE
+		_lookup[key4] = idx
+		var key := _bucket_of(c[i], cell_size)
+		# Packed arrays are values: read, append, store back.
+		var list: PackedInt32Array = _buckets.get(key, PackedInt32Array())
+		list.append(idx)
+		_buckets[key] = list
 
 
 func _append(centre: Vector2, dir: Vector2, front: Vector2, sid: int, row_side: int, k: int, dep: int) -> void:

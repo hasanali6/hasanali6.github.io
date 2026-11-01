@@ -38,6 +38,7 @@ func _initialize() -> void:
 	_test_transit_rules()
 	_test_products()
 	_test_overpass()
+	_test_incremental_zoning()
 	_test_progression()
 	_test_weather_traffic()
 	_test_highway_bridge()
@@ -643,6 +644,36 @@ func _test_lane_geometry() -> void:
 	var before := lg.piece_total()
 	lg.rebuild(g, roads["types"], roads["mesh"])
 	_check(lg.piece_total() == before, "rebuilding reuses unchanged pieces")
+
+
+func _test_incremental_zoning() -> void:
+	var g := _graph()
+	for k in 6:
+		g.commit_road(g.plan_road(Vector2(-600 + k * 240, 12000), Vector2(-600 + k * 240, 12400), null), "street")
+	for k in 3:
+		g.commit_road(g.plan_road(Vector2(-700 + k * 480, 12200), Vector2(-220 + k * 480, 12200), null), "street")
+	var grid := ZoneGrid.new(_zones()["cells"])
+	grid.rebuild(g, _roads()["types"], _roads()["mesh"], 20000.0)
+	var total := g.segments.size()
+	for i in grid.size():
+		grid.zone[i] = 2
+	# A new road at the far end: only the roads near it are laid out again.
+	g.commit_road(g.plan_road(Vector2(860, 12000), Vector2(860, 12400), null), "street")
+	grid.rebuild(g, _roads()["types"], _roads()["mesh"], 20000.0)
+	var fresh := ZoneGrid.new(_zones()["cells"])
+	fresh.rebuild(g, _roads()["types"], _roads()["mesh"], 20000.0)
+	var same := grid.size() == fresh.size()
+	if same:
+		for i in grid.size():
+			if grid.centers[i].distance_to(fresh.centers[i]) > 0.01 or grid.segment[i] != fresh.segment[i]:
+				same = false
+				break
+	var kept := true
+	for i in grid.size():
+		if grid.segment[i] <= total and grid.zone[i] != 2:
+			kept = false
+	_check(kept, "zoning survives a rebuild on reused and redone roads")
+	_check(same and grid.last_rebuilt_segments < total, "re-zoning after an edit only redoes nearby roads and matches a full rebuild (%d of %d)" % [grid.last_rebuilt_segments, g.segments.size()])
 
 
 func _test_overpass() -> void:
