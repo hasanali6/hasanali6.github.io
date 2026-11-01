@@ -82,6 +82,8 @@ signal transit_draft_changed(info: Dictionary)
 signal transit_reported(report: Dictionary)
 ## Parks and sea front: {"upkeep": monthly cost, "tourism": monthly visitor income}.
 signal leisure_reported(report: Dictionary)
+## Bulldozer actions that can be undone (count).
+signal undo_changed(count: int)
 signal districts_changed()
 ## District being drawn: {points, error}.
 signal district_draft_changed(info: Dictionary)

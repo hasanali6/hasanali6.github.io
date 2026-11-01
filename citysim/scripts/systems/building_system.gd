@@ -603,23 +603,29 @@ func _on_long_press(world_pos: Vector3) -> void:
 # --- Save / load -------------------------------------------------------------------------------
 
 func save_state() -> Dictionary:
-	var grid: ZoneGrid = _zones.grid
 	var list := []
 	for b: Dictionary in buildings.values():
-		var keys := []
-		for c: int in b["cells"]:
-			keys.append([grid.segment[c], grid.side[c], grid.along[c], grid.depth[c]])
-		var front_cell: int = b["cells"][0]
-		list.append({
-			"id": b["id"], "zone_key": b["zone_key"], "level": b["level"], "style": b["style"], "floors": b["floors"],
-			"manual": b["manual"], "seed": b["seed"], "palette": b["palette"], "lot": [b["lot"].x, b["lot"].y],
-			"abandoned": b["abandoned"], "empty_months": b["empty_months"], "abandoned_months": b["abandoned_months"],
-			"service": b.get("service", ""), "no_utility_months": b.get("no_utility_months", 0), "burned": b.get("burned", false),
-			"extractor": b.get("extractor", ""), "richness": b.get("richness", 0.0), "deposit": b.get("deposit", -1.0),
-			"deposit_max": b.get("deposit_max", -1.0),
-			"cells": keys, "front": [grid.segment[front_cell], grid.side[front_cell], grid.along[front_cell], grid.depth[front_cell]],
-		})
+		list.append(record_of(b["id"]))
 	return {"buildings": list, "next_id": _next_id}
+
+
+## Everything needed to put a building back exactly (saves and undo).
+func record_of(id: int) -> Dictionary:
+	var grid: ZoneGrid = _zones.grid
+	var b: Dictionary = buildings[id]
+	var keys := []
+	for c: int in b["cells"]:
+		keys.append([grid.segment[c], grid.side[c], grid.along[c], grid.depth[c]])
+	var front_cell: int = b["cells"][0]
+	return {
+		"id": b["id"], "zone_key": b["zone_key"], "level": b["level"], "style": b["style"], "floors": b["floors"],
+		"manual": b["manual"], "seed": b["seed"], "palette": b["palette"], "lot": [b["lot"].x, b["lot"].y],
+		"abandoned": b["abandoned"], "empty_months": b["empty_months"], "abandoned_months": b["abandoned_months"],
+		"service": b.get("service", ""), "no_utility_months": b.get("no_utility_months", 0), "burned": b.get("burned", false),
+		"extractor": b.get("extractor", ""), "richness": b.get("richness", 0.0), "deposit": b.get("deposit", -1.0),
+		"deposit_max": b.get("deposit_max", -1.0),
+		"cells": keys, "front": [grid.segment[front_cell], grid.side[front_cell], grid.along[front_cell], grid.depth[front_cell]],
+	}
 
 
 func load_state(state: Dictionary) -> void:
@@ -628,41 +634,65 @@ func load_state(state: Dictionary) -> void:
 	for i in grid.size():
 		grid.building[i] = ZoneGrid.FREE
 	for rec: Dictionary in state.get("buildings", []):
-		var lot := PackedInt32Array()
-		var ok := true
-		for k: Array in rec["cells"]:
-			var idx := grid.index_of(int(k[0]), int(k[1]), int(k[2]), int(k[3]))
-			if idx < 0 or grid.building[idx] != ZoneGrid.FREE:
-				ok = false
-				break
-			lot.append(idx)
-		if not ok or lot.is_empty():
-			continue
-		var f: Array = rec["front"]
-		var front := grid.index_of(int(f[0]), int(f[1]), int(f[2]), int(f[3]))
-		if front < 0:
-			front = lot[0]
-		var key := str(rec["zone_key"])
-		var zid: int = _zones.zone_id(key) if key != "" else ZoneGrid.UNZONED
-		_next_id = int(rec["id"])
-		var id := _create(zid, lot, front, int(rec["lot"][0]), int(rec["lot"][1]), str(rec["style"]), int(rec["floors"]), bool(rec["manual"]))
-		var b: Dictionary = buildings[id]
-		for field: String in ["level", "seed", "palette", "abandoned", "empty_months", "abandoned_months"]:
-			b[field] = rec[field]
-		for field: String in ["service", "no_utility_months", "burned"]:
-			if rec.has(field):
-				b[field] = rec[field]
-		if str(rec.get("extractor", "")) != "":
-			b["extractor"] = str(rec["extractor"])
-			b["richness"] = float(rec.get("richness", 0.5))
-			if float(rec.get("deposit", -1.0)) >= 0.0:
-				b["deposit"] = float(rec["deposit"])
-				b["deposit_max"] = float(rec.get("deposit_max", rec["deposit"]))
-		_apply_capacity(b)
-		_rising.erase(id)
+		var id := _restore_record(rec)
+		if id >= 0:
+			_rising.erase(id)
 	_next_id = maxi(int(state.get("next_id", 1)), _next_id + 1)
 	_render_all()
 	EventBus.buildings_changed.emit()
+
+
+## Puts a demolished building back (undo): same lot, look and level, its
+## zoning restored. False when its lot is no longer free.
+func undo_demolish(rec: Dictionary) -> bool:
+	var keep_next := _next_id
+	var id := _restore_record(rec)
+	_next_id = maxi(keep_next, _next_id)
+	if id < 0:
+		return false
+	_rising.erase(id)
+	var grid: ZoneGrid = _zones.grid
+	var key := str(rec["zone_key"])
+	for c: int in buildings[id]["cells"]:
+		grid.zone[c] = _zones.zone_id(key) if key != "" else ZoneGrid.UNZONED
+	_render_all()
+	EventBus.zones_changed.emit()
+	EventBus.buildings_changed.emit()
+	return true
+
+
+func _restore_record(rec: Dictionary) -> int:
+	var grid: ZoneGrid = _zones.grid
+	var lot := PackedInt32Array()
+	for k: Array in rec["cells"]:
+		var idx := grid.index_of(int(k[0]), int(k[1]), int(k[2]), int(k[3]))
+		if idx < 0 or grid.building[idx] != ZoneGrid.FREE:
+			return -1
+		lot.append(idx)
+	if lot.is_empty():
+		return -1
+	var f: Array = rec["front"]
+	var front := grid.index_of(int(f[0]), int(f[1]), int(f[2]), int(f[3]))
+	if front < 0:
+		front = lot[0]
+	var key := str(rec["zone_key"])
+	var zid: int = _zones.zone_id(key) if key != "" else ZoneGrid.UNZONED
+	_next_id = int(rec["id"])
+	var id := _create(zid, lot, front, int(rec["lot"][0]), int(rec["lot"][1]), str(rec["style"]), int(rec["floors"]), bool(rec["manual"]))
+	var b: Dictionary = buildings[id]
+	for field: String in ["level", "seed", "palette", "abandoned", "empty_months", "abandoned_months"]:
+		b[field] = rec[field]
+	for field: String in ["service", "no_utility_months", "burned"]:
+		if rec.has(field):
+			b[field] = rec[field]
+	if str(rec.get("extractor", "")) != "":
+		b["extractor"] = str(rec["extractor"])
+		b["richness"] = float(rec.get("richness", 0.5))
+		if float(rec.get("deposit", -1.0)) >= 0.0:
+			b["deposit"] = float(rec["deposit"])
+			b["deposit_max"] = float(rec.get("deposit_max", rec["deposit"]))
+	_apply_capacity(b)
+	return id
 
 
 # --- Rendering -------------------------------------------------------------------

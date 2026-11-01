@@ -68,6 +68,7 @@ var _grid_check: CheckButton
 var _road_panel: PanelContainer
 var _road_type_buttons: Dictionary = {}
 var _road_mode_buttons: Dictionary = {}
+var _undo_button: Button
 var _road_type: String = ""
 var _road_mode: String = "straight"
 var _zone_panel: PanelContainer
@@ -669,6 +670,16 @@ func _build_road_panel() -> PanelContainer:
 		top.add_child(b)
 		var caption := _label(entry[2], FONT_SIZE - 4)
 		top.add_child(caption)
+		if mode == "bulldoze":
+			# Undo the last demolition, right next to the bulldozer.
+			var undo := UiStyle.round_button("rotate-ccw", UiStyle.ORANGE, MIN_TOUCH)
+			undo.pressed.connect(func() -> void: get_tree().current_scene.get_node("RoadTool").undo_last())
+			top.add_child(undo)
+			var undo_caption := _label("UNDO", FONT_SIZE - 4)
+			top.add_child(undo_caption)
+			_undo_button = undo
+			EventBus.undo_changed.connect(func(n: int) -> void: undo.modulate.a = 1.0 if n > 0 else 0.45)
+			undo.modulate.a = 0.45
 	var fill := Control.new()
 	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(fill)

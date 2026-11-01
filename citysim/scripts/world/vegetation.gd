@@ -34,6 +34,7 @@ var _scale := PackedFloat32Array()
 var _color := PackedColorArray()
 var _road_block := PackedByteArray()
 var _lot_block := PackedByteArray()
+var _cut_block := PackedByteArray()   # trees the player bulldozed (saved)
 var _hash: Dictionary = {}          # bucket -> PackedInt32Array of tree indices
 var _chunk_trees: Dictionary = {}   # chunk -> PackedInt32Array of tree indices
 
@@ -109,6 +110,7 @@ func _add_tree(p: Vector2, kind: int, s: float) -> void:
 	_color.append(_random_color(kind))
 	_road_block.append(0)
 	_lot_block.append(0)
+	_cut_block.append(0)
 	var key := _bucket_of(p)
 	var list: PackedInt32Array = _hash.get(key, PackedInt32Array())
 	list.append(i)
@@ -143,6 +145,51 @@ func _trees_near(p: Vector2, radius: float) -> PackedInt32Array:
 				if _pos[i].distance_to(p) <= radius:
 					out.append(i)
 	return out
+
+
+# --- Bulldozing trees -------------------------------------------------------------------
+
+## Removes the standing forest trees within `radius` of p; returns their ids
+## (for undo). Street and yard trees belong to roads and lots and stay.
+func cut_trees(p: Vector2, radius: float) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for i in _trees_near(p, radius):
+		if _cut_block[i] == 0 and _road_block[i] == 0 and _lot_block[i] == 0:
+			_cut_block[i] = 1
+			_dirty[_chunk_of(_pos[i])] = true
+			out.append(i)
+	if not out.is_empty():
+		_queue_rebuild()
+	return out
+
+
+func restore_trees(ids: PackedInt32Array) -> void:
+	for i in ids:
+		if i >= 0 and i < _cut_block.size() and _cut_block[i] == 1:
+			_cut_block[i] = 0
+			_dirty[_chunk_of(_pos[i])] = true
+	_queue_rebuild()
+
+
+func save_state() -> Dictionary:
+	var cut := PackedInt32Array()
+	for i in _cut_block.size():
+		if _cut_block[i] == 1:
+			cut.append(i)
+	return {"cut": Array(cut)}
+
+
+func load_state(state: Dictionary) -> void:
+	for i in _cut_block.size():
+		if _cut_block[i] == 1:
+			_cut_block[i] = 0
+			_dirty[_chunk_of(_pos[i])] = true
+	for v in state.get("cut", []):
+		var i := int(v)
+		if i >= 0 and i < _cut_block.size():
+			_cut_block[i] = 1
+			_dirty[_chunk_of(_pos[i])] = true
+	_queue_rebuild()
 
 
 # --- Reacting to roads and buildings ---------------------------------------------------
@@ -312,7 +359,7 @@ func _rebuild_dirty() -> void:
 func _rebuild_chunk(chunk: Vector2i) -> void:
 	var lists := {0: [], 1: []}
 	for i in _chunk_trees.get(chunk, PackedInt32Array()):
-		if _road_block[i] == 0 and _lot_block[i] == 0:
+		if _road_block[i] == 0 and _lot_block[i] == 0 and _cut_block[i] == 0:
 			(lists[_kind[i]] as Array).append([_pos[i], _scale[i], _color[i]])
 	for store: Dictionary in [_extras_roads, _extras_lots]:
 		for t: Array in store.get(chunk, []):

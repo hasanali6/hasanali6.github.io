@@ -74,6 +74,9 @@ func save_game(path: String = AUTOSAVE) -> bool:
 		state["transit"] = get_node(transit_system_path).save_state()
 	if not district_system_path.is_empty():
 		state["districts"] = get_node(district_system_path).save_state()
+	var veg: Node = get_parent().get_node_or_null("Vegetation")
+	if veg != null:
+		state["vegetation"] = veg.save_state()
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		push_error("SaveSystem: cannot write %s" % path)
@@ -120,6 +123,9 @@ func load_game(path: String = AUTOSAVE) -> bool:
 	# Saves from before milestones start at the one their population reached.
 	ProgressionSystem.load_state(state.get("progression", {}), int(get_node(citizen_system_path).population))
 	WeatherSystem.load_state(state.get("weather", {}))
+	var veg: Node = get_parent().get_node_or_null("Vegetation")
+	if veg != null:
+		veg.load_state(state.get("vegetation", {}))
 	_loading = false
 	EventBus.notification_posted.emit("save", tr("NOTIFY_LOADED"))
 	return true

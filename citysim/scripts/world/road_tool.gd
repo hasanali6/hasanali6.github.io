@@ -17,6 +17,11 @@ extends Node3D
 var _net: Node
 var _buildings: Node
 var _target_building: int = -1
+# Bulldozer history for undo (newest last): {"kind": "building"|"road"|"trees", ...}.
+const UNDO_DEPTH := 20
+var _history: Array = []
+var _cutting: bool = false
+var _cut_ids := PackedInt32Array()
 var _ref_angle: float = 0.0
 var _max_turn: float
 var _active: bool = false
@@ -115,6 +120,11 @@ func _on_down(screen_pos: Vector2) -> void:
 	match _mode:
 		"bulldoze":
 			_pick_target(screen_pos)
+			# Nothing built here: the bulldozer clears trees like a brush.
+			_cutting = _target_building < 0 and _highlight < 0
+			_cut_ids = PackedInt32Array()
+			if _cutting:
+				_cut_at(screen_pos)
 		"upgrade":
 			_highlight = _segment_at(screen_pos)
 		"curve":
@@ -134,6 +144,9 @@ func _on_down(screen_pos: Vector2) -> void:
 func _on_move(screen_pos: Vector2) -> void:
 	match _mode:
 		"bulldoze":
+			if _cutting:
+				_cut_at(screen_pos)
+				return
 			_pick_target(screen_pos)
 		"upgrade":
 			_highlight = _segment_at(screen_pos)
@@ -162,9 +175,19 @@ func _on_up(screen_pos: Vector2) -> void:
 					EventBus.notification_posted.emit("roads", tr(res["error"]))
 			_reset()
 		"bulldoze":
+			if _cutting:
+				_cutting = false
+				if not _cut_ids.is_empty():
+					_remember({"kind": "trees", "ids": _cut_ids})
+					EventBus.sfx_requested.emit("bulldoze")
+					EventBus.notification_posted.emit("roads", tr("TREES_CLEARED") % _cut_ids.size())
+				_cut_ids = PackedInt32Array()
+				_reset()
+				return
 			_pick_target(screen_pos)
 			if _target_building >= 0:
 				var back: int = _buildings.refund_of(_target_building)
+				_remember({"kind": "building", "rec": _buildings.record_of(_target_building), "refund": back})
 				_buildings.demolish(_target_building, true)
 				EventBus.zones_changed.emit()
 				if back > 0:
@@ -175,7 +198,10 @@ func _on_up(screen_pos: Vector2) -> void:
 				EventBus.sfx_requested.emit("error")
 				EventBus.notification_posted.emit("roads", tr("ROAD_ERR_OUTSIDE_LINK"))
 			elif _highlight >= 0:
+				var entry := {"kind": "road", "rec": _net.record_of(_highlight), "zones": _zones_along(_highlight)}
 				var refund: int = _net.demolish(_highlight)
+				entry["refund"] = refund
+				_remember(entry)
 				EventBus.sfx_requested.emit("bulldoze")
 				EventBus.notification_posted.emit("roads", tr("ROAD_REFUND") % UiStyle.format_int(refund))
 			_reset()
@@ -194,6 +220,102 @@ func _on_up(screen_pos: Vector2) -> void:
 			if _start != null:
 				_end = _snap(screen_pos, _start)
 				_try_build(_start, _end, null)
+
+
+func _cut_at(screen_pos: Vector2) -> void:
+	var g: Variant = _ground(screen_pos)
+	var veg: Node = get_parent().get_node_or_null("Vegetation")
+	if g == null or veg == null:
+		return
+	var radius := maxf(6.0, 26.0 * _metres_per_pixel(g))
+	_cut_ids.append_array(veg.cut_trees(g, radius))
+
+
+func _remember(entry: Dictionary) -> void:
+	_history.append(entry)
+	if _history.size() > UNDO_DEPTH:
+		_history.pop_front()
+	EventBus.undo_changed.emit(_history.size())
+
+
+func can_undo() -> bool:
+	return not _history.is_empty()
+
+
+## Zoned cells along a road (centre, zone) so undo can paint them again.
+func _zones_along(seg_id: int) -> Array:
+	var zsys: Node = get_parent().get_node_or_null("ZoneSystem")
+	var out: Array = []
+	if zsys == null:
+		return out
+	var grid: ZoneGrid = zsys.grid
+	for c in grid.size():
+		if grid.segment[c] == seg_id and grid.zone[c] != ZoneGrid.UNZONED:
+			out.append([grid.centers[c], grid.zone[c]])
+	return out
+
+
+## Takes back the last bulldozer action: trees grow back, a building or road
+## returns (its refund is paid back; the zoning along a road is repainted).
+func undo_last() -> void:
+	if _history.is_empty():
+		EventBus.notification_posted.emit("roads", tr("UNDO_EMPTY"))
+		EventBus.sfx_requested.emit("error")
+		return
+	var entry: Dictionary = _history.back()
+	var refund := int(entry.get("refund", 0))
+	if refund > 0 and not EconomySystem.can_afford(refund):
+		EventBus.notification_posted.emit("roads", tr("ROAD_ERR_MONEY"))
+		EventBus.sfx_requested.emit("error")
+		return
+	var ok := true
+	match str(entry["kind"]):
+		"trees":
+			var veg: Node = get_parent().get_node_or_null("Vegetation")
+			if veg != null:
+				veg.restore_trees(entry["ids"])
+		"building":
+			ok = _buildings.undo_demolish(entry["rec"])
+		"road":
+			ok = _net.restore_road(entry["rec"])
+			if ok:
+				_rezone(entry["zones"])
+	if not ok:
+		_history.pop_back()
+		EventBus.undo_changed.emit(_history.size())
+		EventBus.notification_posted.emit("roads", tr("UNDO_BLOCKED"))
+		EventBus.sfx_requested.emit("error")
+		return
+	if refund > 0:
+		EconomySystem.try_spend(refund)
+	_history.pop_back()
+	EventBus.undo_changed.emit(_history.size())
+	EventBus.sfx_requested.emit("build_place")
+	EventBus.notification_posted.emit("roads", tr("UNDO_DONE"))
+
+
+func _rezone(zones: Array) -> void:
+	var zsys: Node = get_parent().get_node_or_null("ZoneSystem")
+	if zsys == null or zones.is_empty():
+		return
+	var grid: ZoneGrid = zsys.grid
+	var by_zone := {}
+	# The road comes back with a new id, so neighbouring rows may now hold
+	# part of the block: paint the nearest free cell to each old spot.
+	for z: Array in zones:
+		var best := -1
+		var best_d := grid.cell_size * 0.75
+		for c in grid.cells_near(z[0], grid.cell_size * 0.75):
+			var d := grid.centers[c].distance_to(z[0])
+			if grid.building[c] == ZoneGrid.FREE and d < best_d:
+				best_d = d
+				best = c
+		if best >= 0:
+			var list: PackedInt32Array = by_zone.get(z[1], PackedInt32Array())
+			list.append(best)
+			by_zone[z[1]] = list
+	for zid: int in by_zone:
+		zsys.set_zone(by_zone[zid], zid)
 
 
 func _try_build(a: Vector2, b: Vector2, control: Variant) -> void:

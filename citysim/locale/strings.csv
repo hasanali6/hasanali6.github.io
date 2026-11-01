@@ -387,3 +387,8 @@ ROAD_ERR_OVERPASS_JOIN,Üst geçidin ortasına yol bağlanamaz (uçlarına bağl
 ROAD_ERR_OVERPASS_SHORT,Üst geçit en az 120 m olmalı (rampalar için),An overpass must be at least 120 m long (for its ramps)
 ROAD_ERR_OVERPASS_RAMP,Kesişme rampaya denk geliyor: yolu üst geçidin ortasından geçir,The crossing falls on a ramp: cross near the middle of the overpass
 ROAD_ERR_OVERPASS_UPGRADE,Üst geçit başka yola dönüştürülemez (yıkıp yeniden yap),An overpass cannot be converted (demolish and rebuild)
+UNDO,Geri al,Undo
+UNDO_DONE,Son yıkım geri alındı,Last demolition undone
+UNDO_EMPTY,Geri alınacak yıkım yok,Nothing to undo
+UNDO_BLOCKED,"Geri alınamadı: yerinde artık başka bir şey var","Cannot undo: something else stands there now"
+TREES_CLEARED,%d ağaç kesildi,%d trees cleared

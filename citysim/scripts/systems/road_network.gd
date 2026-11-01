@@ -246,6 +246,25 @@ func _on_month(_m: int) -> void:
 		EventBus.notification_posted.emit("roads", tr("NOTIFY_NO_CONNECTION"))
 
 
+## Shape and type of a road, enough to build it again (undo).
+func record_of(seg_id: int) -> Dictionary:
+	var seg: RoadGraph.RoadSegment = graph.segments[seg_id]
+	var c := graph.curve_of(seg)
+	return {"a": c[0], "control": c[1], "b": c[2], "type": seg.type}
+
+
+## Builds a demolished road again at no cost (the caller takes the refund
+## back). False if something now stands in the way.
+func restore_road(rec: Dictionary) -> bool:
+	var plan := graph.plan_road(rec["a"], rec["b"], rec["control"], graph.elevated_types.has(str(rec["type"])))
+	if not plan["ok"]:
+		return false
+	var before := _snapshot()
+	graph.commit_road(plan, str(rec["type"]))
+	_refresh_after_edit(before)
+	return true
+
+
 func demolish(seg_id: int) -> int:
 	if not graph.segments.has(seg_id):
 		return 0

@@ -118,6 +118,18 @@ Cadde ve bulvar kavşaklarında trafik ışığı vardır.
     göçmenler gelir, otoyolda kamyon ve transit trafik akar.
   - Bağlı değilsen ihracat çok az olur, ithalat pahalıdır, nüfus yavaş artar.
 
+**Ağaç kesme:** yık modunda bina ya da yol olmayan bir yere dokunup
+parmağını sürükle; geçtiğin yerdeki ağaçlar kesilir (fırça gibi, ücretsiz).
+Kesilen ağaçlar kayıtla birlikte saklanır. Sokak ağaçları ve bahçe ağaçları
+yola ve parsele aittir, onlar kesilmez.
+
+**Geri al (↺):** yık düğmesinin hemen yanında. Son yıkımı geri alır: kesilen
+ağaçlar geri gelir, yıkılan bina aynı yerine aynı seviyede döner, yıkılan
+yol geri yapılır ve kenarındaki imar yeniden boyanır. Aldığın iade parası
+geri ödenir. Art arda 20 işleme kadar geri gidebilirsin. Yerinde artık başka
+bir şey varsa geri alınamaz. Yolla birlikte giden binalar geri gelmez ama
+imarları geri boyandığı için yeniden büyürler.
+
 ### İmar
 Fırça, blok doldurma ve silgi. İmar ücretsizdir. Binalar ancak yola bakan
 hücrelerde, talep varsa büyür.
