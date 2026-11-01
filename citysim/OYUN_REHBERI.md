@@ -152,7 +152,7 @@ verimli toprak, yeşil orman, kahverengi maden, mor petrol.
   orman kirlilikten etkilenir; sanayiyi onlardan uzak tut.
 - Ekonomi → **Üretim** sekmesinde hammadde ve mamul ürün dengesi görünür.
 
-### Park ve sahil (yeni)
+### Park, sahil, liman (yeni)
 Tepsideki **çiçek** simgeli düğme. Parklar çevresindeki evlerin mutluluğunu
 artırır; büyük parkların etki alanı daha geniştir. Turistik olanlar her ay
 **turizm geliri** getirir ama bakım gideri de vardır. Şehir otoyola bağlı
@@ -180,6 +180,13 @@ olur ve daha çok tercih edilir. Sahil yapıları ancak kıyıya kurulur:
 | Deniz feneri | Kırmızı-beyaz kule, gece yanıp sönen ışık | 700 | Köy |
 | Marina | Kulüp binası, denize uzanan iskeleler ve tekneler | 2.400 | Kasaba |
 | Sahil oteli | Balkonlu yüksek otel, havuz; ticari bina | 1.500 | Kasaba |
+
+**Liman ve havalimanı** (aynı menüde):
+
+| Yapı | Ne yapar | Turizm/ay | Bakım/ay | Açılış |
+|---|---|---|---|---|
+| Liman | Kıyıya kurulur: rıhtım, 2 konteyner vinci, yanaşmış gemi. **Deniz ticareti:** otoyola bağlı olmasan da ticaret tam çalışır, ihracat fiyatı %15 artar, ithalat %15 ucuzlar | 600 | 1.500 | İlçe |
+| Havalimanı | Terminal, kule, uçaklar. Arkasında 45 × 320 m boş alan ister (yol, bina, su olmasın); pist buraya çizilir. **Göç %25 artar**, otoyolsuz da turist gelir | 4.000 | 3.000 | Büyük Şehir |
 
 Ekonomi → Bütçe'de **Turizm** geliri ve **Park bakımı** gideri ayrı satır
 olarak görünür.
@@ -285,7 +292,7 @@ Muhasebe mantığı: kasa = aylık gelirler − aylık giderler.
 | Kasaba | 1.000 | 15.000 | Ofis, hastane, arıtma, çöp yakma, meydan, **bölgeler**; alan 3,2 km |
 | İlçe | 2.500 | 25.000 | **Bulvar**, yüksek ticari, AVM, krematoryum, **tramvay** |
 | Şehir | 5.000 | 40.000 | Yüksek konut, kule, üniversite, tren; **tüm harita (4 km)** |
-| Büyük Şehir | 10.000 | 60.000 | Metro, daha yüksek kredi limiti |
+| Büyük Şehir | 10.000 | 60.000 | Metro, havalimanı, daha yüksek kredi limiti |
 | Metropol | 25.000 | 100.000 | Daha yüksek kredi limiti |
 | Megakent | 50.000 | 200.000 | En yüksek kredi limiti |
 

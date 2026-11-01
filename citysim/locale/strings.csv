@@ -356,8 +356,8 @@ CHEATS_DENSIFY,Kendiliğinden yoğunlaşma (ev → apartman → gökdelen),Autom
 CHEATS_HINT,Para düğmeleri kasaya doğrudan ekler (bütçede görünmez). Yoğunlaşma normal oyunun parçasıdır ve açık başlar; yüksek bina yasağı olan bölgelerde çalışmaz.,Money buttons add straight to the treasury (not in the books). Densification is part of normal play and starts on; it skips districts with a high-rise ban.
 NOTIFY_UNLOCKED_ALL,"Her şey açıldı: bütün yollar, binalar ve harita","Everything unlocked: all roads, buildings and the map"
 NOTIFY_DENSIFIED,%d bina daha yoğun olarak yeniden yapıldı,%d buildings were rebuilt at a higher density
-TOOL_LEISURE,Park ve sahil,Parks & seafront
-BUILD_LEISURE,"Parklar, eğlence ve sahil","Parks, fun and seafront"
+TOOL_LEISURE,"Park, sahil, liman","Parks, sea, port"
+BUILD_LEISURE,"Parklar, sahil, liman ve havalimanı","Parks, seafront, port and airport"
 BUILD_ERR_COAST,Deniz kıyısına kur (plaja yakın),Build it on the sea shore
 CAT_PLAYGROUND,Oyun parkı,Playground
 CAT_STATUE_PARK,Heykelli park,Statue park
@@ -373,3 +373,6 @@ CAT_BEACH_CAFE,Sahil kafesi,Beach café
 CAT_SEA_HOTEL,Sahil oteli,Seafront hotel
 ECON_IN_TOURISM,Turizm,Tourism
 ECON_OUT_PARKS,Park bakımı,Park upkeep
+CAT_PORT,Liman (deniz ticareti),Port (sea trade)
+CAT_AIRPORT,Havalimanı,Airport
+BUILD_ERR_RUNWAY,Arkada pist için 45 × 320 m boş alan gerekli (yol/bina/su olmasın),Needs a clear 45 × 320 m strip behind for the runway

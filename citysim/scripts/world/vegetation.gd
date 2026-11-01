@@ -185,6 +185,17 @@ func _refresh_lots() -> void:
 			if c < grid.size():
 				for i in _trees_near(grid.centers[c], clearance):
 					blocked[i] = 1
+		# An airport's runway strip behind its lot stays clear too.
+		if b["style"] == "airport":
+			var f: Vector2 = b["front"]
+			var side := Vector2(-f.y, f.x)
+			var back: Vector2 = (b["centre"] as Vector2) - f * (float(b["depth"]) * 0.5 + 6.0)
+			var v := 0.0
+			while v <= 330.0:
+				for u in [-18.0, 0.0, 18.0]:
+					for i in _trees_near(back - f * v + side * u, 16.0):
+						blocked[i] = 1
+				v += 12.0
 	_apply_block(_lot_block, blocked)
 	_lot_block = blocked
 	_set_extras(_extras_lots, _yard_trees())

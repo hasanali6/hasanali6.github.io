@@ -81,6 +81,28 @@ func _coast_ok(centre: Vector2, w: float, d: float) -> bool:
 	return cd <= maxf(w, d) * 0.5 + float(GameData.value("catalog/coast_reach_m"))
 
 
+## An airport needs a clear strip behind its lot for the runway: no roads,
+## buildings or water, inside the open map.
+func _runway_ok(centre: Vector2, f: Vector2, d: float) -> bool:
+	if not _item.has("runway"):
+		return true
+	var rw := float(_item["runway"][0])
+	var rl := float(_item["runway"][1])
+	var side := Vector2(-f.y, f.x)
+	var rg: RoadGraph = get_parent().get_node("RoadNetwork").graph
+	var half: float = ProgressionSystem.area_half()
+	var v := d * 0.5 + 6.0
+	while v <= d * 0.5 + 6.0 + rl:
+		for u in [-rw * 0.5, 0.0, rw * 0.5]:
+			var p: Vector2 = centre - f * v + side * u
+			if maxf(absf(p.x), absf(p.y)) > half or MapWater.shared().is_water(p, 2.0):
+				return false
+			if not rg.find_segment_near(p, 10.0).is_empty() or int(_buildings.building_at(p)) >= 0:
+				return false
+		v += 12.0
+	return true
+
+
 func _preview_at(screen_pos: Vector2) -> void:
 	var g: Variant = _ground(screen_pos)
 	_cell = -1
@@ -107,13 +129,14 @@ func _preview_at(screen_pos: Vector2) -> void:
 	var cost := int(_item["cost"])
 	var water_ok := _water_ok(centre, w, d)
 	var coast_ok := _coast_ok(centre, w, d)
+	var runway_ok := _runway_ok(centre, f, d)
 	# Farms, camps, mines and wells need their resource under the lot.
 	var richness := 1.0
 	if _item.has("extractor"):
 		var field := str(GameData.value("resources/types/%s/field" % _item["extractor"]))
 		richness = ResourceMap.shared().lot_richness(field, centre, w, d)
 	var rich_ok := richness >= GameData.num("resources/min_richness")
-	var valid: bool = not lot.is_empty() and EconomySystem.can_afford(cost) and water_ok and rich_ok and coast_ok
+	var valid: bool = not lot.is_empty() and EconomySystem.can_afford(cost) and water_ok and rich_ok and coast_ok and runway_ok
 	_valid = valid
 	_preview.material_override = _ok_mat if valid else _bad_mat
 	_preview.visible = true
@@ -124,6 +147,8 @@ func _preview_at(screen_pos: Vector2) -> void:
 		error = "BUILD_ERR_WATER"
 	elif not coast_ok:
 		error = "BUILD_ERR_COAST"
+	elif not runway_ok:
+		error = "BUILD_ERR_RUNWAY"
 	elif not rich_ok:
 		error = "BUILD_ERR_RESOURCE"
 	elif not EconomySystem.can_afford(cost):

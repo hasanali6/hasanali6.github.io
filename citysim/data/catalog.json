@@ -393,7 +393,42 @@
       "cost": 16000,
       "near_coast": true,
       "tourism": 1500
+    },
+    {
+      "id": "port",
+      "name_key": "CAT_PORT",
+      "style": "port",
+      "zone": "",
+      "lot": [
+        6,
+        6
+      ],
+      "floors": 1,
+      "cost": 60000,
+      "upkeep": 1500,
+      "tourism": 600,
+      "near_coast": true
+    },
+    {
+      "id": "airport",
+      "name_key": "CAT_AIRPORT",
+      "style": "airport",
+      "zone": "",
+      "lot": [
+        6,
+        6
+      ],
+      "floors": 1,
+      "cost": 90000,
+      "upkeep": 3000,
+      "tourism": 4000,
+      "runway": [
+        45.0,
+        320.0
+      ]
     }
   ],
-  "coast_reach_m": 40.0
+  "coast_reach_m": 40.0,
+  "port_trade_bonus": 0.15,
+  "airport_migration_bonus": 0.25
 }

@@ -18,6 +18,7 @@ extends Node
 @export var building_system_path: NodePath
 @export var road_network_path: NodePath
 
+var _port: bool = false   # a working port: sea trade, better prices
 var companies: Dictionary = {}   # building id -> record
 var last_report: Dictionary = {}
 
@@ -180,8 +181,8 @@ func nearest_shop(pos: Vector2) -> int:
 ## 1 with electricity and water, a fraction without.
 ## Whether a company's road reaches an outside connection (trade by highway).
 func _linked(bid: int) -> bool:
-	if road_network_path.is_empty():
-		return true
+	if road_network_path.is_empty() or _port:
+		return true   # a port trades by sea
 	var b: Dictionary = _buildings.buildings.get(bid, {})
 	return get_node(road_network_path).is_reachable(int(b.get("segment", -1)))
 
@@ -192,6 +193,8 @@ func _output_factor(bid: int) -> float:
 
 
 func _on_month(_m: int) -> void:
+	_port = _buildings.count_style("port") > 0
+	var port_bonus := GameData.num("catalog/port_trade_bonus") if _port else 0.0
 	var wages: Array = _money["wage_by_education"]
 	var units_per: Array = _cfg["industry_units_per_worker"]
 	var office_value: Array = _cfg["office_value_per_worker"]
@@ -263,7 +266,7 @@ func _on_month(_m: int) -> void:
 		var output := _output_factor(bid)
 		match c["kind"]:
 			"commercial":
-				var import_price := float(_cfg["import_price"]) * (1.0 if _linked(bid) else float(_cfg["isolated_import_factor"]))
+				var import_price := float(_cfg["import_price"]) * (1.0 if _linked(bid) else float(_cfg["isolated_import_factor"])) * (1.0 - port_bonus)
 				# A shop can only serve so much per worker; the rest shop elsewhere.
 				var capacity := float(employees[0] + employees[1] + employees[2]) * float(_cfg["shop_units_per_worker"]) * output
 				var units := minf(float(c["sales"]), capacity)
@@ -272,13 +275,13 @@ func _on_month(_m: int) -> void:
 				costs += units * (local_share_sales * float(_cfg["wholesale_price"]) + (1.0 - local_share_sales) * import_price)
 			"industrial":
 				var units: float = c.get("units", 0.0)
-				var export_price := float(_cfg["export_price"]) * (1.0 if _linked(bid) else float(_cfg["isolated_export_factor"]))
+				var export_price := float(_cfg["export_price"]) * (1.0 if _linked(bid) else float(_cfg["isolated_export_factor"])) * (1.0 + port_bonus)
 				revenue = units * (local_share_prod * float(_cfg["wholesale_price"]) + (1.0 - local_share_prod) * export_price)
-				var raw_import := float(_cfg["industry_raw_cost_per_unit"]) * (1.0 if _linked(bid) else float(_cfg["isolated_import_factor"]))
+				var raw_import := float(_cfg["industry_raw_cost_per_unit"]) * (1.0 if _linked(bid) else float(_cfg["isolated_import_factor"])) * (1.0 - port_bonus)
 				costs += units * GameData.num("resources/raw_per_good") * (raw_share_need * local_raw_price + (1.0 - raw_share_need) * raw_import)
 			"extractor":
 				var raw: float = c.get("units", 0.0)
-				var away := raw_export_price * (1.0 if _linked(bid) else float(_cfg["isolated_export_factor"]))
+				var away := raw_export_price * (1.0 if _linked(bid) else float(_cfg["isolated_export_factor"])) * (1.0 + port_bonus)
 				revenue = raw * (raw_share_prod * local_raw_price + (1.0 - raw_share_prod) * away)
 			"office":
 				for level in 3:

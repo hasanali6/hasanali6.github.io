@@ -70,6 +70,8 @@ var _overlay_tint: Dictionary = {}   # building id -> Color while an info overla
 var _utility_abandon_months: int
 var _leisure: Dictionary = {}          # style -> catalog leisure item
 var last_leisure: Dictionary = {"upkeep": 0.0, "tourism": 0.0}
+var _style_counts: Dictionary = {}     # style -> working buildings (rebuilt when dirty)
+var _counts_dirty: bool = true
 var _service_names: Dictionary = {}  # service id -> name key
 
 
@@ -229,6 +231,17 @@ func _floors_for(cfg: Dictionary, level: int) -> int:
 
 # --- Monthly life of buildings ---------------------------------------------------------
 
+## How many working (not abandoned) buildings of a style stand, e.g. "port".
+func count_style(style: String) -> int:
+	if _counts_dirty:
+		_style_counts = {}
+		for b: Dictionary in buildings.values():
+			if not b["abandoned"]:
+				_style_counts[b["style"]] = int(_style_counts.get(b["style"], 0)) + 1
+		_counts_dirty = false
+	return int(_style_counts.get(style, 0))
+
+
 ## Monthly upkeep and visitor income of parks and the sea front (catalog
 ## "leisure" items, by style). Visitors come by the highway: an unlinked
 ## city earns a part of it.
@@ -247,7 +260,7 @@ func _report_leisure() -> void:
 	var net: Node = get_tree().current_scene.get_node_or_null("RoadNetwork") if get_tree().current_scene != null else null
 	var transit: Node = get_parent().get_node_or_null("TransitSystem")
 	var by_rail: bool = transit != null and transit.has_intercity()
-	if net != null and net.has_method("city_connected") and not net.city_connected() and not by_rail:
+	if net != null and net.has_method("city_connected") and not net.city_connected() and not by_rail and count_style("airport") == 0:
 		tourism *= float(GameData.value("economy/tourism_isolated_factor"))
 	last_leisure = {"upkeep": upkeep, "tourism": tourism}
 	EventBus.leisure_reported.emit(last_leisure.duplicate())
@@ -1149,6 +1162,7 @@ const UNTINTED := ["lot", "contact", "smoke", "solar", "basin", "beacon"]
 
 ## Redraws every building once this frame (calls in between are merged).
 func _render_all() -> void:
+	_counts_dirty = true
 	if not _render_queued:
 		_render_queued = true
 		_render_now.call_deferred()

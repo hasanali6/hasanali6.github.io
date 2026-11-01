@@ -26,13 +26,13 @@
     },
     {
       "name_key": "MILESTONE_3", "population": 2500, "reward": 25000, "loan_limit": 120000,
-      "unlocks": ["road:boulevard", "road:highway", "zone:com_high", "item:mall", "svc:crematorium", "transit:tram", "item:zoo", "item:amusement_park"]
+      "unlocks": ["road:boulevard", "road:highway", "zone:com_high", "item:mall", "svc:crematorium", "transit:tram", "item:zoo", "item:amusement_park", "item:port"]
     },
     {
       "name_key": "MILESTONE_4", "population": 5000, "reward": 40000, "loan_limit": 200000, "area_half_m": 2000,
       "unlocks": ["zone:res_high", "item:tower", "svc:university", "transit:train"]
     },
-    {"name_key": "MILESTONE_5", "population": 10000, "reward": 60000, "loan_limit": 300000, "unlocks": ["transit:metro"]},
+    {"name_key": "MILESTONE_5", "population": 10000, "reward": 60000, "loan_limit": 300000, "unlocks": ["transit:metro", "item:airport"]},
     {"name_key": "MILESTONE_6", "population": 25000, "reward": 100000, "loan_limit": 600000, "unlocks": []},
     {"name_key": "MILESTONE_7", "population": 50000, "reward": 200000, "loan_limit": 1000000, "unlocks": []}
   ]

@@ -316,7 +316,11 @@ func _on_tick(_t: int) -> void:
 	# Newcomers arrive by highway: a town not linked to one grows slower.
 	var transit: Node = get_parent().get_node_or_null("TransitSystem")
 	var by_rail: bool = transit != null and transit.has_intercity()
-	if not by_rail and not road_network_path.is_empty() and not get_node(road_network_path).city_connected():
+	# An airport brings more newcomers and links the city like a highway.
+	var by_air: bool = _buildings.count_style("airport") > 0
+	if by_air:
+		per_month *= 1.0 + GameData.num("catalog/airport_migration_bonus")
+	if not by_rail and not by_air and not road_network_path.is_empty() and not get_node(road_network_path).city_connected():
 		per_month *= float(_mig.get("isolated_factor", 0.5))
 	if _demand_res > -0.2 and not _vacant.is_empty():
 		_immigration += per_month / _ticks_per_month

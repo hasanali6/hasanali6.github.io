@@ -1,6 +1,6 @@
 class_name LeisureModels
 extends RefCounted
-## Procedural models of the leisure catalogue (data/catalog.json "leisure"):
+## Procedural models of the leisure catalogue (also the port and the airport) (data/catalog.json "leisure"):
 ## parks (playground, statue park, football pitch, botanical garden, zoo,
 ## amusement park) and the sea front (beach, pier, lighthouse, marina, beach
 ## café, seafront hotel). Same lot coordinates as ServiceModels: u across the
@@ -11,7 +11,7 @@ extends RefCounted
 const LOT_KINDS := {
 	"park_playground": 8, "park_statue": 1, "park_sports": 4, "park_garden": 0, "park_zoo": 8,
 	"park_amusement": 1, "park_beach": 9, "park_pier": 1, "park_lighthouse": 7, "park_marina": 3,
-	"beach_cafe": 1, "sea_hotel": 1,
+	"beach_cafe": 1, "sea_hotel": 1, "port": 3, "airport": 3,
 }
 
 const WHITE := Color(0.94, 0.95, 0.96)
@@ -395,3 +395,76 @@ static func parts(b: Dictionary, ctx: Dictionary, out: Array[Dictionary]) -> voi
 			_put(out, ctx, "basin", -w * 0.2, d * 0.34, w * 0.4, 0.2, d * 0.18, Color(0.3, 0.7, 0.85), 0.08)
 			_umbrella(out, ctx, w * 0.25, d * 0.34, FUN[2], 1.3)
 			_umbrella(out, ctx, w * 0.38, d * 0.3, FUN[1], 1.3)
+		"port":
+			_put(out, ctx, "factory", -w * 0.22, d * 0.18, w * 0.4, 9.0, d * 0.45, Color(0.62, 0.66, 0.7), 0, ServiceModels._facade(s, 0.2, 6.0))
+			for k in 12:
+				var cu := w * 0.08 + (k % 4) * 3.4
+				var cv := d * 0.3 - int(k / 4) * 7.0
+				for lvl in rng.randi_range(1, 3):
+					_put(out, ctx, "roof_box", cu, cv, 2.5, 2.6, 6.1, FUN[(k + lvl) % FUN.size()].darkened(0.15), lvl * 2.6 - 2.6)
+			_quay(out, ctx, w, s)
+		"airport":
+			var runway: Array = b.get("runway", [45.0, 320.0])
+			var rw := float(runway[0])
+			var rl := float(runway[1])
+			var rv := -d * 0.5 - 6.0 - rl * 0.5
+			_put(out, ctx, "roof_box", 0, rv, rw, 0.1, rl, Color(0.22, 0.23, 0.25), -0.02)
+			var k2 := -rl * 0.5 + 12.0
+			while k2 < rl * 0.5 - 12.0:
+				_put(out, ctx, "roof_box", 0, rv + k2, 0.9, 0.04, 9.0, WHITE, 0.08)
+				k2 += 22.0
+			for side in [-1.0, 1.0]:
+				_put(out, ctx, "roof_box", side * (rw * 0.5 - 1.0), rv, 0.5, 0.04, rl - 4.0, WHITE, 0.08)
+				for t in 6:
+					_put(out, ctx, "roof_box", (t - 2.5) * 3.2, rv + side * (rl * 0.5 - 8.0), 1.6, 0.04, 10.0, WHITE, 0.08)
+			_put(out, ctx, "roof_box", w * 0.3, -d * 0.5 - 3.0, 14.0, 0.08, 10.0, Color(0.3, 0.31, 0.33), -0.02)   # taxiway
+			_put(out, ctx, "office", -w * 0.08, d * 0.25, w * 0.72, 11.0, d * 0.3, Color(0.88, 0.9, 0.93), 0, ServiceModels._facade(s, 0.85, 3.6))
+			_put(out, ctx, "roof_box", -w * 0.08, d * 0.25, w * 0.76, 0.6, d * 0.36, WHITE, 11.0)
+			_put(out, ctx, "tank", w * 0.4, d * 0.3, 3.4, 26.0, 3.4, WHITE)
+			_put(out, ctx, "tank", w * 0.4, d * 0.3, 6.5, 3.6, 6.5, GLASS, 26.0)
+			_put(out, ctx, "tank", w * 0.4, d * 0.3, 7.2, 0.6, 7.2, Color(0.3, 0.32, 0.35), 29.6)
+			_plane(out, ctx, -w * 0.25, -d * 0.12, 1.0)
+			_plane(out, ctx, w * 0.12, -d * 0.18, 0.85)
+			_plane(out, ctx, 0, rv + rl * 0.25, 1.0)
+
+
+## Quay from the lot out over the water with two gantry cranes and a docked
+## container ship alongside.
+static func _quay(out: Array[Dictionary], ctx: Dictionary, w: float, s: float) -> void:
+	var c: Vector2 = ctx["centre"]
+	var hit := ServiceModels._towards_water(c)
+	var dir: Vector2 = hit[0]
+	if dir == Vector2.ZERO or float(hit[1]) > 140.0:
+		return
+	var length := float(hit[1]) + 20.0
+	var dir3 := Vector3(dir.x, 0, dir.y)
+	var side := Vector3.UP.cross(dir3)
+	var side2 := Vector2(side.x, side.z)
+	_free(out, ctx, "roof_box", c + dir * length * 0.5, 0.5, side * w, Vector3.UP * 1.6, dir3 * length, Color(0.6, 0.6, 0.58))
+	var edge := c + dir * length
+	for k in 2:
+		var cp: Vector2 = edge - dir * 8.0 + side2 * (k - 0.5) * w * 0.5
+		for lu in [-5.0, 5.0]:
+			for lv in [-4.0, 4.0]:
+				_free(out, ctx, "roof_box", cp + side2 * lu + dir * lv, 15.0, side * 1.0, Vector3.UP * 28.0, dir3 * 1.0, Color(0.9, 0.35, 0.12))
+		_free(out, ctx, "roof_box", cp + dir * 14.0, 29.5, side * 3.0, Vector3.UP * 2.0, dir3 * 56.0, Color(0.9, 0.35, 0.12))
+		_free(out, ctx, "roof_box", cp + dir * 4.0, 26.0, side * 3.4, Vector3.UP * 3.0, dir3 * 4.0, WHITE)
+	var ship := edge + dir * 11.0
+	_free(out, ctx, "roof_box", ship, 2.0, dir3 * 16.0, Vector3.UP * 7.0, -side * 110.0, Color(0.18, 0.24, 0.34))
+	_free(out, ctx, "roof_box", ship, 0.4, dir3 * 16.2, Vector3.UP * 1.6, -side * 110.2, Color(0.7, 0.15, 0.12))
+	_free(out, ctx, "roof_box", ship - side2 * 46.0, 9.5, dir3 * 13.0, Vector3.UP * 8.0, -side * 10.0, WHITE)
+	for k in 14:
+		var cpos: Vector2 = ship + side2 * (-36.0 + k * 5.6)
+		_free(out, ctx, "roof_box", cpos, 6.8, dir3 * 12.0, Vector3.UP * 2.6, -side * 5.4, FUN[int(k + s) % FUN.size()].darkened(0.2))
+
+
+## Airliner parked with its nose towards the street (along v).
+static func _plane(out: Array[Dictionary], ctx: Dictionary, u: float, v: float, sc: float) -> void:
+	_put(out, ctx, "roof_box", u, v, 3.8 * sc, 3.8 * sc, 36.0 * sc, WHITE, 1.4 * sc)
+	_put(out, ctx, "cone", u, v + 19.5 * sc, 3.8 * sc, 3.0 * sc, 3.8 * sc, WHITE, 1.6 * sc)
+	_put(out, ctx, "roof_box", u, v + 1.0 * sc, 34.0 * sc, 0.5 * sc, 6.0 * sc, Color(0.85, 0.86, 0.88), 2.6 * sc)
+	for side in [-1.0, 1.0]:
+		_put(out, ctx, "roof_box", u + side * 6.5 * sc, v + 2.5 * sc, 2.2 * sc, 2.2 * sc, 4.0 * sc, Color(0.7, 0.72, 0.75), 1.0 * sc)
+	_put(out, ctx, "roof_box", u, v - 16.0 * sc, 12.0 * sc, 0.4 * sc, 3.6 * sc, WHITE, 4.6 * sc)
+	_put(out, ctx, "roof_box", u, v - 16.0 * sc, 0.5 * sc, 6.5 * sc, 4.5 * sc, Color(0.15, 0.4, 0.8), 4.6 * sc)
+	_put(out, ctx, "roof_box", u, v, 3.9 * sc, 0.6 * sc, 30.0 * sc, Color(0.2, 0.45, 0.85), 3.4 * sc)
