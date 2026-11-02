@@ -168,6 +168,7 @@ func _on_up(screen_pos: Vector2) -> void:
 			if _highlight >= 0:
 				var res: Dictionary = _net.upgrade(_highlight, _type)
 				if res["ok"]:
+					remember({"kind": "upgraded", "seg": _highlight, "old": str(res["old_type"]), "cost": int(res["cost"])})
 					EventBus.sfx_requested.emit("build_road")
 					EventBus.notification_posted.emit("roads", tr("ROAD_UPGRADED") % [tr(_net.type_config(_type)["name_key"]), UiStyle.format_int(int(res["cost"]))])
 				else:
@@ -231,6 +232,11 @@ func _cut_at(screen_pos: Vector2) -> void:
 	_cut_ids.append_array(veg.cut_trees(g, radius))
 
 
+## Public entry point for other tools (catalogue placement).
+func remember(entry: Dictionary) -> void:
+	_remember(entry)
+
+
 func _remember(entry: Dictionary) -> void:
 	_history.append(entry)
 	if _history.size() > UNDO_DEPTH:
@@ -263,7 +269,7 @@ func undo_last() -> void:
 		EventBus.sfx_requested.emit("error")
 		return
 	var entry: Dictionary = _history.back()
-	var refund := int(entry.get("refund", 0))
+	var refund := int(entry.get("refund", 0))   # demolitions: the refund is paid back
 	if refund > 0 and not EconomySystem.can_afford(refund):
 		EventBus.notification_posted.emit("roads", tr("ROAD_ERR_MONEY"))
 		EventBus.sfx_requested.emit("error")
@@ -280,6 +286,17 @@ func undo_last() -> void:
 			ok = _net.restore_road(entry["rec"])
 			if ok:
 				_rezone(entry["zones"])
+		# Construction: taken away again with the full price back.
+		"built_road":
+			ok = _net.remove_built(entry["ids"], int(entry["cost"]))
+		"upgraded":
+			ok = _net.revert_upgrade(int(entry["seg"]), str(entry["old"]), int(entry["cost"]))
+		"placed":
+			ok = _buildings.buildings.has(int(entry["id"]))
+			if ok:
+				_buildings.demolish(int(entry["id"]), true)
+				EventBus.zones_changed.emit()
+				EconomySystem.refund(int(entry["cost"]))
 	if not ok:
 		_history.pop_back()
 		EventBus.undo_changed.emit(_history.size())
@@ -291,7 +308,7 @@ func undo_last() -> void:
 	_history.pop_back()
 	EventBus.undo_changed.emit(_history.size())
 	EventBus.sfx_requested.emit("build_place")
-	EventBus.notification_posted.emit("roads", tr("UNDO_DONE"))
+	EventBus.notification_posted.emit("roads", tr("UNDO_DONE_BUILD" if str(entry["kind"]) in ["built_road", "upgraded", "placed"] else "UNDO_DONE"))
 
 
 func _rezone(zones: Array) -> void:
@@ -327,6 +344,7 @@ func _try_build(a: Vector2, b: Vector2, control: Variant) -> void:
 			EventBus.notification_posted.emit("roads", tr(result["error"]))
 		else:
 			EventBus.sfx_requested.emit("build_road")
+			remember({"kind": "built_road", "ids": result.get("created", PackedInt32Array()), "cost": int(result.get("cost", 0))})
 	elif a.distance_to(b) > 0.5:
 		EventBus.sfx_requested.emit("error")
 		EventBus.notification_posted.emit("roads", tr(check["error"]))
@@ -365,6 +383,8 @@ func _evaluate(a: Vector2, b: Vector2, control: Variant) -> Dictionary:
 	if wet != "":
 		return {"valid": false, "error": wet, "cost": 0, "length": plan["length"]}
 	var cost: int = _net.plan_cost(plan, _type)
+	if not _net.buildings_in_way(plan, _type).is_empty():
+		return {"valid": false, "error": "ROAD_ERR_BUILDING", "cost": cost, "length": plan["length"]}
 	if not EconomySystem.can_afford(cost):
 		return {"valid": false, "error": "ROAD_ERR_MONEY", "cost": cost, "length": plan["length"]}
 	return {"valid": true, "error": "", "cost": cost, "length": plan["length"]}

@@ -392,3 +392,5 @@ UNDO_DONE,Son yıkım geri alındı,Last demolition undone
 UNDO_EMPTY,Geri alınacak yıkım yok,Nothing to undo
 UNDO_BLOCKED,"Geri alınamadı: yerinde artık başka bir şey var","Cannot undo: something else stands there now"
 TREES_CLEARED,%d ağaç kesildi,%d trees cleared
+ROAD_ERR_BUILDING,"Yolun önünde bina var: önce binayı yık ya da yolu başka yerden geçir","A building is in the way: demolish it first or route the road elsewhere"
+UNDO_DONE_BUILD,"Son inşaat geri alındı, para iade edildi","Last construction undone, money refunded"

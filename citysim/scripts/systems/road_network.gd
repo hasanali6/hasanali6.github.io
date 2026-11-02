@@ -96,6 +96,8 @@ func build_road(start: Vector2, end: Vector2, control: Variant, type: String) ->
 	var plan := graph.plan_road(start, end, control, graph.elevated_types.has(type))
 	if not plan["ok"]:
 		return plan
+	if not buildings_in_way(plan, type).is_empty():
+		return {"ok": false, "error": "ROAD_ERR_BUILDING"}
 	var wet := water_error(plan, type)
 	if wet != "":
 		return {"ok": false, "error": wet}
@@ -103,9 +105,99 @@ func build_road(start: Vector2, end: Vector2, control: Variant, type: String) ->
 	if not EconomySystem.try_spend(plan["cost"]):
 		return {"ok": false, "error": "ROAD_ERR_MONEY", "cost": plan["cost"]}
 	var before := _snapshot()
-	graph.commit_road(plan, type)
+	plan["created"] = graph.commit_road(plan, type)
 	_refresh_after_edit(before)
 	return plan
+
+
+## Buildings a planned road would push off their lots: lot cells inside the
+## road's clearance (the same rule that drops zoning cells), and lots right at
+## a new junction, where the corner gets trimmed. A road is not built over
+## them; demolish them first.
+func buildings_in_way(plan: Dictionary, type: String, with_junctions: bool = true) -> Dictionary:
+	var hits := {}
+	var zsys: Node = get_parent().get_node_or_null("ZoneSystem")
+	if zsys == null:
+		return hits
+	var grid: ZoneGrid = zsys.grid
+	var a: Vector2 = plan["a"]
+	var c: Vector2 = plan["control"]
+	var b: Vector2 = plan["b"]
+	var hw := RoadTypes.half_width(types[type])
+	var clear := GameData.num("zones/cells/road_clearance_m") - 0.3
+	var reach := hw + clear + grid.cell_size * 0.75
+	var n := RoadGraph.sample_count(a, c, b, 4.0)
+	for i in n + 1:
+		var p := RoadGraph.bezier(a, c, b, float(i) / n)
+		for cell in grid.cells_near(p, reach):
+			var bid := grid.building[cell]
+			if bid == ZoneGrid.FREE or hits.has(bid):
+				continue
+			var q := grid.centers[cell]
+			var d := RoadGraph.bezier(a, c, b, graph.closest_t(a, c, b, q)).distance_to(q)
+			if d - hw < clear:
+				hits[bid] = true
+	if not with_junctions:
+		return hits
+	# New junctions (where the road ends on or crosses another road) trim the
+	# corners: a lot is hit only if the corner reaches further than before.
+	var extra := float(mesh_cfg["corner_radius_m"]) + float(mesh_cfg["junction_extra_m"])
+	var joints: Array = []   # [point, half width of the widest road there afterwards]
+	for end: Vector2 in [a, b]:
+		var nid := graph.find_node_near(end, graph.merge_radius)
+		if nid >= 0:
+			var widest := hw
+			for sid in (graph.nodes[nid] as RoadGraph.RoadNode).segments:
+				widest = maxf(widest, RoadTypes.half_width(types[(graph.segments[sid] as RoadGraph.RoadSegment).type]))
+			joints.append([end, widest])
+			continue
+		var on := graph.find_segment_near(end, graph.merge_radius)
+		if not on.is_empty():
+			joints.append([end, maxf(hw, RoadTypes.half_width(types[(graph.segments[int(on["segment"])] as RoadGraph.RoadSegment).type]))])
+	for hit: Dictionary in plan.get("hits", []):
+		var on2 := graph.find_segment_near(hit["point"], graph.merge_radius)
+		var other := 0.0 if on2.is_empty() else RoadTypes.half_width(types[(graph.segments[int(on2["segment"])] as RoadGraph.RoadSegment).type])
+		joints.append([hit["point"], maxf(hw, other)])
+	for jd: Array in joints:
+		var j: Vector2 = jd[0]
+		var trim := float(jd[1]) + extra
+		for cell in grid.cells_near(j, trim + 30.0):
+			var bid := grid.building[cell]
+			if bid == ZoneGrid.FREE or hits.has(bid) or grid.depth[cell] != 0:
+				continue
+			var rel := grid.centers[cell] - j
+			var along := absf(rel.dot(grid.dirs[cell]))
+			var side_off := absf(rel.dot(grid.fronts[cell]))
+			if along < trim + grid.cell_size * 0.5 - 0.5 and side_off < float(jd[1]) + grid.cell_size + 2.0:
+				hits[bid] = true
+	return hits
+
+
+## Takes a just-built road away again (undo): its pieces go and the full
+## price comes back.
+func remove_built(seg_ids: PackedInt32Array, cost: int) -> bool:
+	var any := false
+	var before := _snapshot()
+	for sid in seg_ids:
+		if graph.segments.has(sid):
+			graph.remove_segment(sid)
+			any = true
+	if not any:
+		return false
+	_refresh_after_edit(before)
+	EconomySystem.refund(cost)
+	return true
+
+
+## Puts an upgraded road back to its old type and pays the upgrade back.
+func revert_upgrade(seg_id: int, old_type: String, cost: int) -> bool:
+	if not graph.segments.has(seg_id):
+		return false
+	var before := _snapshot()
+	(graph.segments[seg_id] as RoadGraph.RoadSegment).type = old_type
+	_refresh_after_edit(before, [seg_id])
+	EconomySystem.refund(cost)
+	return true
 
 
 ## Cost of changing a road to another type: the new road minus what the old
@@ -133,13 +225,16 @@ func upgrade(seg_id: int, type: String) -> Dictionary:
 	var wet := water_error({"a": c[0], "b": c[2]}, type)
 	if wet != "":
 		return {"ok": false, "error": wet}
+	if not buildings_in_way({"a": c[0], "control": c[1], "b": c[2]}, type, false).is_empty():
+		return {"ok": false, "error": "ROAD_ERR_BUILDING"}
 	var cost := upgrade_cost(seg_id, type)
 	if not EconomySystem.try_spend(cost):
 		return {"ok": false, "error": "ROAD_ERR_MONEY", "cost": cost}
 	var before := _snapshot()
+	var old_type := seg.type
 	seg.type = type
 	_refresh_after_edit(before, [seg_id])
-	return {"ok": true, "cost": cost}
+	return {"ok": true, "cost": cost, "old_type": old_type}
 
 
 func upkeep_per_month() -> float:

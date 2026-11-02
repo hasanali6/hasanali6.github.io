@@ -123,12 +123,22 @@ parmağını sürükle; geçtiğin yerdeki ağaçlar kesilir (fırça gibi, ücr
 Kesilen ağaçlar kayıtla birlikte saklanır. Sokak ağaçları ve bahçe ağaçları
 yola ve parsele aittir, onlar kesilmez.
 
-**Geri al (↺):** yık düğmesinin hemen yanında. Son yıkımı geri alır: kesilen
-ağaçlar geri gelir, yıkılan bina aynı yerine aynı seviyede döner, yıkılan
-yol geri yapılır ve kenarındaki imar yeniden boyanır. Aldığın iade parası
-geri ödenir. Art arda 20 işleme kadar geri gidebilirsin. Yerinde artık başka
-bir şey varsa geri alınamaz. Yolla birlikte giden binalar geri gelmez ama
-imarları geri boyandığı için yeniden büyürler.
+**Bina olan yere yol yapılmaz:** çizdiğin yol bir binanın parselinden
+geçiyorsa (ya da yeni kavşağın köşesi bir binaya denk geliyorsa) önizleme
+kırmızı olur ve "Yolun önünde bina var" uyarısı çıkar; yol yapılmaz, hiçbir
+bina yıkılmaz. Önce binayı yık ya da yolu başka yerden geçir. Yolu
+genişletirken (Yükselt) de aynı kural geçerli.
+
+**Geri al (↺):** yık düğmesinin yanında ve inşa modunda ekranın sağında
+(İnşa/Kamera düğmesinin altında) her zaman var. Son işlemi geri alır:
+- **İnşaat:** yaptığın yol kaldırılır, yerleştirdiğin bina kalkar, yükselttiğin
+  yol eski haline döner. Ödediğin paranın **tamamı** geri gelir.
+- **Yıkım:** kesilen ağaçlar geri gelir, yıkılan bina aynı yerine aynı
+  seviyede döner, yıkılan yol geri yapılır ve kenarındaki imar yeniden
+  boyanır. Aldığın iade parası geri ödenir.
+
+Art arda 20 işleme kadar geri gidebilirsin (en yenisinden başlayarak). Yerinde
+artık başka bir şey varsa o işlem geri alınamaz.
 
 ### İmar
 Fırça, blok doldurma ve silgi. İmar ücretsizdir. Binalar ancak yola bakan

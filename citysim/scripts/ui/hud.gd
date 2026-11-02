@@ -421,6 +421,20 @@ func _build_mode_toggle() -> Control:
 	_mode_caption = _label("MODE_BUILDING", FONT_SIZE - 6)
 	_mode_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_mode_caption)
+	# Undo the last build or demolition, whichever tool is open.
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 14
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(gap)
+	var undo := UiStyle.round_button("rotate-ccw", UiStyle.SLATE, MIN_TOUCH)
+	undo.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	undo.pressed.connect(func() -> void: get_tree().current_scene.get_node("RoadTool").undo_last())
+	undo.modulate.a = 0.45
+	col.add_child(undo)
+	var undo_caption := _label("UNDO", FONT_SIZE - 6)
+	undo_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(undo_caption)
+	EventBus.undo_changed.connect(func(n: int) -> void: undo.modulate.a = 1.0 if n > 0 else 0.45)
 	return col
 
 

@@ -168,8 +168,11 @@ func _build() -> void:
 		return
 	var cost := int(_item["cost"])
 	if not _buildings.lot_for(_item, _cell).is_empty() and EconomySystem.try_spend(cost):
-		_buildings.place(_item, _cell)
+		var bid: int = _buildings.place(_item, _cell)
 		EventBus.sfx_requested.emit("build_place")
+		var rt: Node = get_parent().get_node_or_null("RoadTool")
+		if rt != null and bid >= 0:
+			rt.remember({"kind": "placed", "id": bid, "cost": cost})
 	EventBus.road_preview_changed.emit({"active": false})
 
 
