@@ -27,7 +27,15 @@ class RoadSegment:
 	var control: Vector2
 	var type: String
 	var length: float
+	# Where this piece starts along the road it was cut from (metres, mod
+	# PHASE_WRAP): zoning cells keep their places when a road is split.
+	var phase: float = 0.0
+	# Creation order of the road it was cut from: older roads claim zoning
+	# space first, and splitting a road must not make it younger.
+	var age: int = 0
 
+
+const PHASE_WRAP := 64.0       # multiple of the 8 m zoning cell
 
 var nodes: Dictionary = {}     # id -> RoadNode
 var segments: Dictionary = {}  # id -> RoadSegment
@@ -43,6 +51,8 @@ var _next_segment: int = 1
 # Overpasses: road types that rise over the roads they cross (no junction),
 # on ramps at both ends.
 var elevated_types: Dictionary = {}
+var node_snap: float = 0.0   # an end landing this close to a road's end node joins that node
+var _config: Dictionary
 var overpass_height: float = 7.0
 var overpass_ramp: float = 55.0
 
@@ -66,6 +76,8 @@ func lift_at(seg_id: int, t: float) -> float:
 
 
 func _init(config: Dictionary) -> void:
+	_config = config
+	node_snap = float(config.get("node_snap_m", 0.0))
 	sample_step = float(config["sample_step_m"])
 	merge_radius = float(config["merge_radius_m"])
 	min_segment = float(config["min_segment_m"])
@@ -163,7 +175,15 @@ func find_segment_near(pos: Vector2, radius: float) -> Dictionary:
 
 
 func closest_t(a: Vector2, c: Vector2, b: Vector2, pos: Vector2) -> float:
-	var n := sample_count(a, c, b, sample_step)
+	# Straight road (control in the middle): the curve is linear in t, so the
+	# closest point is a plain projection.
+	var ab := b - a
+	var len2 := ab.length_squared()
+	if c.distance_squared_to((a + b) * 0.5) < 1e-4 and len2 > 1e-6:
+		return clampf((pos - a).dot(ab) / len2, 0.0, 1.0)
+	# Curves: coarse samples (a quadratic curve has at most two dips in
+	# distance), then a ternary search around the best one.
+	var n := clampi(sample_count(a, c, b, sample_step * 4.0), 8, 64)
 	var best_t := 0.0
 	var best_d := INF
 	for i in n + 1:
@@ -175,7 +195,7 @@ func closest_t(a: Vector2, c: Vector2, b: Vector2, pos: Vector2) -> float:
 	# Refine around the best sample with a ternary search.
 	var lo := maxf(best_t - 1.0 / n, 0.0)
 	var hi := minf(best_t + 1.0 / n, 1.0)
-	for i in 20:
+	for i in 24:
 		var m1 := lerpf(lo, hi, 1.0 / 3.0)
 		var m2 := lerpf(lo, hi, 2.0 / 3.0)
 		if bezier(a, c, b, m1).distance_squared_to(pos) < bezier(a, c, b, m2).distance_squared_to(pos):
@@ -203,8 +223,10 @@ func add_node(pos: Vector2) -> int:
 	return node.id
 
 
-func add_segment(na: int, nb: int, control: Vector2, type: String) -> int:
+func add_segment(na: int, nb: int, control: Vector2, type: String, phase: float = 0.0, age: int = -1) -> int:
 	var seg := RoadSegment.new()
+	seg.phase = fposmod(phase, PHASE_WRAP)
+	seg.age = age if age >= 0 else _next_segment
 	seg.id = _next_segment
 	_next_segment += 1
 	seg.a = na
@@ -248,8 +270,11 @@ func split_segment(seg_id: int, t: float) -> int:
 	var na := seg.a
 	var nb := seg.b
 	var type := seg.type
+	var phase := seg.phase
+	var age := seg.age
 	var left_control := c[0].lerp(c[1], t)
 	var right_control := c[1].lerp(c[2], t)
+	var left_len := curve_length(c[0], left_control, mid, sample_step)
 	remove_segment(seg_id)
 	# remove_segment may have dropped the end nodes if they were dead ends.
 	if not nodes.has(na):
@@ -257,8 +282,8 @@ func split_segment(seg_id: int, t: float) -> int:
 	if not nodes.has(nb):
 		nodes[nb] = _restore_node(nb, c[2])
 	var nm := add_node(mid)
-	add_segment(na, nm, left_control, type)
-	add_segment(nm, nb, right_control, type)
+	add_segment(na, nm, left_control, type, phase, age)
+	add_segment(nm, nb, right_control, type, phase + left_len, age)
 	return nm
 
 
@@ -363,7 +388,9 @@ func commit_road(plan: Dictionary, type: String) -> PackedInt32Array:
 		if n0 == n1:
 			continue
 		var sub := sub_control(a, ctrl, b, chain[i - 1]["t"], chain[i]["t"])
-		created.append(add_segment(n0, n1, sub, type))
+		var t0: float = chain[i - 1]["t"]
+		var done := 0.0 if t0 <= 0.0 else curve_length(a, sub_control(a, ctrl, b, 0.0, t0), bezier(a, ctrl, b, t0), sample_step)
+		created.append(add_segment(n0, n1, sub, type, done))
 	return created
 
 
@@ -379,6 +406,12 @@ func _endpoint_ref(pos: Vector2) -> Dictionary:
 		return {"kind": "node", "id": nid, "point": (nodes[nid] as RoadNode).pos}
 	var hit := find_segment_near(pos, merge_radius)
 	if not hit.is_empty():
+		# Close to a junction already there: join it instead of making a
+		# second junction a few metres away (their corners would overlap).
+		var seg: RoadSegment = segments[int(hit["segment"])]
+		for end_id: int in [seg.a, seg.b]:
+			if (nodes[end_id] as RoadNode).pos.distance_to(hit["point"]) < node_snap:
+				return {"kind": "node", "id": end_id, "point": (nodes[end_id] as RoadNode).pos}
 		return {"kind": "segment", "id": hit["segment"], "t": hit["t"], "point": hit["point"]}
 	return {"kind": "free", "point": pos}
 
@@ -456,13 +489,41 @@ static func _segment_intersection(p1: Vector2, p2: Vector2, p3: Vector2, p4: Vec
 
 # --- Save / load ----------------------------------------------------------------
 
+## Independent copy (for trying a change out before making it).
+func clone() -> RoadGraph:
+	var g := RoadGraph.new(_config)
+	for node: RoadNode in nodes.values():
+		var n := RoadNode.new()
+		n.id = node.id
+		n.pos = node.pos
+		n.segments = node.segments.duplicate()
+		g.nodes[n.id] = n
+	for seg: RoadSegment in segments.values():
+		var c := RoadSegment.new()
+		c.id = seg.id
+		c.a = seg.a
+		c.b = seg.b
+		c.control = seg.control
+		c.type = seg.type
+		c.length = seg.length
+		c.phase = seg.phase
+		c.age = seg.age
+		g.segments[c.id] = c
+	g._next_node = _next_node
+	g._next_segment = _next_segment
+	g.elevated_types = elevated_types
+	g.overpass_height = overpass_height
+	g.overpass_ramp = overpass_ramp
+	return g
+
+
 func save_state() -> Dictionary:
 	var node_list := []
 	for node: RoadNode in nodes.values():
 		node_list.append([node.id, node.pos.x, node.pos.y])
 	var seg_list := []
 	for seg: RoadSegment in segments.values():
-		seg_list.append([seg.id, seg.a, seg.b, seg.control.x, seg.control.y, seg.type])
+		seg_list.append([seg.id, seg.a, seg.b, seg.control.x, seg.control.y, seg.type, seg.phase, seg.age])
 	return {"nodes": node_list, "segments": seg_list, "next_node": _next_node, "next_segment": _next_segment}
 
 
@@ -481,6 +542,8 @@ func load_state(state: Dictionary) -> void:
 		seg.b = int(s[2])
 		seg.control = Vector2(float(s[3]), float(s[4]))
 		seg.type = str(s[5])
+		seg.phase = float(s[6]) if s.size() > 6 else 0.0
+		seg.age = int(s[7]) if s.size() > 7 else seg.id
 		seg.length = curve_length((nodes[seg.a] as RoadNode).pos, seg.control, (nodes[seg.b] as RoadNode).pos, sample_step)
 		segments[seg.id] = seg
 		(nodes[seg.a] as RoadNode).segments.append(seg.id)

@@ -373,9 +373,11 @@ static func build_junction(graph: RoadGraph, node_id: int, types: Dictionary, cf
 		var l := Vector2(-d.y, d.x)
 		var cw := RoadTypes.carriageway_width(t) * 0.5
 		var hw := RoadTypes.half_width(t)
-		var lead := graph.leaving_direction(sid, node_id)
+		# Order arms by where their mouths actually are: a road that bends
+		# right after the junction can leave in a different direction.
+		var mouth := e - centre
 		arms.append({
-			"angle": atan2(lead.y, lead.x), "dir": d,
+			"angle": atan2(mouth.y, mouth.x), "dir": d,
 			"rc": e - l * cw, "lc": e + l * cw, "ro": e - l * hw, "lo": e + l * hw,
 		})
 	arms.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return x["angle"] < y["angle"])

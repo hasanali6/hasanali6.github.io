@@ -96,7 +96,7 @@ func build_road(start: Vector2, end: Vector2, control: Variant, type: String) ->
 	var plan := graph.plan_road(start, end, control, graph.elevated_types.has(type))
 	if not plan["ok"]:
 		return plan
-	if not buildings_in_way(plan, type).is_empty():
+	if not buildings_lost(func(g: RoadGraph) -> void: g.commit_road(plan, type)).is_empty():
 		return {"ok": false, "error": "ROAD_ERR_BUILDING"}
 	var wet := water_error(plan, type)
 	if wet != "":
@@ -110,7 +110,42 @@ func build_road(start: Vector2, end: Vector2, control: Variant, type: String) ->
 	return plan
 
 
-## Buildings a planned road would push off their lots: lot cells inside the
+## Exact check: tries a road change on copies of the road graph and the
+## zoning cells and returns the buildings that would lose any lot cell (the
+## same rule that removes them for real).
+func buildings_lost(change: Callable) -> Dictionary:
+	var lost := {}
+	var zsys: Node = get_parent().get_node_or_null("ZoneSystem")
+	var bsys: Node = get_parent().get_node_or_null("BuildingSystem")
+	if zsys == null or bsys == null or (bsys.buildings as Dictionary).is_empty():
+		return lost
+	var g := graph.clone()
+	change.call(g)
+	var real: ZoneGrid = zsys.grid
+	var z: ZoneGrid = real.clone()
+	z.rebuild(g, types, mesh_cfg, float(zsys.get("_playable_half")), MapWater.shared(), true)
+	# Only buildings on rows that were laid out again (or whose road is gone)
+	# can lose cells; the dry run left the rest out.
+	var counts := {}
+	for i in z.size():
+		var bid := z.building[i]
+		if bid != ZoneGrid.FREE:
+			counts[bid] = int(counts.get(bid, 0)) + 1
+	for bid: int in bsys.buildings:
+		var cells: PackedInt32Array = bsys.buildings[bid]["cells"]
+		var touched := false
+		for c in cells:
+			var sid := real.segment[c]
+			if z.last_recomputed.has(sid) or not g.segments.has(sid):
+				touched = true
+				break
+		if touched and int(counts.get(bid, 0)) != cells.size():
+			lost[bid] = true
+	return lost
+
+
+## Quick estimate for the drawing preview (the build itself uses
+## buildings_lost). Buildings a planned road would push off their lots: lot cells inside the
 ## road's clearance (the same rule that drops zoning cells), and lots right at
 ## a new junction, where the corner gets trimmed. A road is not built over
 ## them; demolish them first.
@@ -233,7 +268,7 @@ func upgrade(seg_id: int, type: String) -> Dictionary:
 	var wet := water_error({"a": c[0], "b": c[2]}, type)
 	if wet != "":
 		return {"ok": false, "error": wet}
-	if not buildings_in_way({"a": c[0], "control": c[1], "b": c[2]}, type, false).is_empty():
+	if not buildings_lost(func(g: RoadGraph) -> void: (g.segments[seg_id] as RoadGraph.RoadSegment).type = type).is_empty():
 		return {"ok": false, "error": "ROAD_ERR_BUILDING"}
 	var cost := upgrade_cost(seg_id, type)
 	if not EconomySystem.try_spend(cost):
@@ -353,7 +388,7 @@ func _on_month(_m: int) -> void:
 func record_of(seg_id: int) -> Dictionary:
 	var seg: RoadGraph.RoadSegment = graph.segments[seg_id]
 	var c := graph.curve_of(seg)
-	return {"a": c[0], "control": c[1], "b": c[2], "type": seg.type}
+	return {"a": c[0], "control": c[1], "b": c[2], "type": seg.type, "phase": seg.phase, "age": seg.age}
 
 
 ## Builds a demolished road again at no cost (the caller takes the refund
@@ -363,7 +398,12 @@ func restore_road(rec: Dictionary) -> bool:
 	if not plan["ok"]:
 		return false
 	var before := _snapshot()
-	graph.commit_road(plan, str(rec["type"]))
+	var made := graph.commit_road(plan, str(rec["type"]))
+	# Back in its old place: the same cell places as before.
+	for sid in made:
+		var piece: RoadGraph.RoadSegment = graph.segments[sid]
+		piece.phase = fposmod(float(rec.get("phase", 0.0)) + piece.phase, RoadGraph.PHASE_WRAP)
+		piece.age = int(rec.get("age", piece.age))
 	_refresh_after_edit(before)
 	return true
 

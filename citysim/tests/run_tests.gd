@@ -40,6 +40,9 @@ func _initialize() -> void:
 	_test_overpass()
 	_test_incremental_zoning()
 	_test_t_junction_sides()
+	_test_dry_run_copies()
+	_test_split_keeps_cells()
+	_test_closest_t()
 	_test_progression()
 	_test_weather_traffic()
 	_test_highway_bridge()
@@ -645,6 +648,62 @@ func _test_lane_geometry() -> void:
 	var before := lg.piece_total()
 	lg.rebuild(g, roads["types"], roads["mesh"])
 	_check(lg.piece_total() == before, "rebuilding reuses unchanged pieces")
+
+
+func _test_closest_t() -> void:
+	var g := _graph()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var worst := 0.0
+	for k in 200:
+		var a := Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))
+		var b := Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))
+		var c := (a + b) * 0.5 if k % 2 == 0 else Vector2(rng.randf_range(-300, 300), rng.randf_range(-300, 300))
+		var p := Vector2(rng.randf_range(-350, 350), rng.randf_range(-350, 350))
+		var fast := RoadGraph.bezier(a, c, b, g.closest_t(a, c, b, p)).distance_to(p)
+		var brute := INF
+		for i in 4001:
+			brute = minf(brute, RoadGraph.bezier(a, c, b, float(i) / 4000.0).distance_to(p))
+		worst = maxf(worst, fast - brute)
+	_check(worst < 0.05, "closest point on straight and curved roads matches brute force (worst %.3f m)" % worst)
+
+
+func _test_split_keeps_cells() -> void:
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(-200, 17000), Vector2(200, 17000), null), "street")
+	var grid := ZoneGrid.new(_zones()["cells"])
+	grid.rebuild(g, _roads()["types"], _roads()["mesh"], 20000.0)
+	var north := func(gr: ZoneGrid) -> Array:
+		var out := []
+		for i in gr.size():
+			if gr.centers[i].y < 17000.0:
+				out.append(Vector2(snappedf(gr.centers[i].x, 0.01), snappedf(gr.centers[i].y, 0.01)))
+		out.sort()
+		return out
+	var before: Array = north.call(grid)
+	# A street joins from the south at an odd spot (13 m, not on the 8 m grid).
+	g.commit_road(g.plan_road(Vector2(13, 17000), Vector2(13, 17150), null), "street")
+	grid.rebuild(g, _roads()["types"], _roads()["mesh"], 20000.0)
+	var after: Array = north.call(grid)
+	_check(before == after, "splitting a road at any point keeps the cells across it in place (%d / %d)" % [before.size(), after.size()])
+
+
+func _test_dry_run_copies() -> void:
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(-200, 16000), Vector2(200, 16000), null), "street")
+	var grid := ZoneGrid.new(_zones()["cells"])
+	grid.rebuild(g, _roads()["types"], _roads()["mesh"], 20000.0)
+	var cells := grid.size()
+	var segs := g.segments.size()
+	var g2 := g.clone()
+	g2.commit_road(g2.plan_road(Vector2(0, 16000), Vector2(0, 16200), null), "street")
+	var z2 := grid.clone()
+	z2.rebuild(g2, _roads()["types"], _roads()["mesh"], 20000.0)
+	_check(g.segments.size() == segs and grid.size() == cells and g2.segments.size() > segs and z2.size() != cells,
+		"a dry run on copies leaves the real roads and zoning untouched")
+	# An end landing a few metres from a road's end node joins that node.
+	var near := g.plan_road(Vector2(194, 16100), Vector2(194, 16000), null)
+	_check(near["ok"] and (near["b"] as Vector2).distance_to(Vector2(200, 16000)) < 0.01, "a road ending next to a junction joins it")
 
 
 func _test_t_junction_sides() -> void:

@@ -109,7 +109,8 @@
     "merge_radius_m": 2.0,
     "min_segment_m": 8.0,
     "max_segment_m": 800.0,
-    "min_angle_deg": 25.0
+    "min_angle_deg": 25.0,
+    "node_snap_m": 10.0
   },
   "snap": {
     "grid_m": 8.0,

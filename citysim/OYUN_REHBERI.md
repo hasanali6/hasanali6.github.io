@@ -123,10 +123,14 @@ parmağını sürükle; geçtiğin yerdeki ağaçlar kesilir (fırça gibi, ücr
 Kesilen ağaçlar kayıtla birlikte saklanır. Sokak ağaçları ve bahçe ağaçları
 yola ve parsele aittir, onlar kesilmez.
 
-**Bina olan yere yol yapılmaz:** çizdiğin yol bir binanın parselinden
-geçiyorsa (ya da yeni kavşağın köşesi bir binaya denk geliyorsa) önizleme
-kırmızı olur ve "Yolun önünde bina var" uyarısı çıkar; yol yapılmaz, hiçbir
-bina yıkılmaz. Önce binayı yık ya da yolu başka yerden geçir. Yolu
+**Bina olan yere yol yapılmaz:** oyun yolu yapmadan önce sonucu bir kopyada
+dener; tek bir bina bile parselini kaybedecekse önizleme kırmızı olur ve
+"Yolun önünde bina var" uyarısı çıkar; yol yapılmaz, hiçbir bina yıkılmaz.
+Yoldan geçtiğin tarafın karşısındaki parseller etkilenmez; bir yolu bölmek
+karşı taraftaki binaların yerini değiştirmez.
+
+**Kavşağa yapışma:** yolun ucu mevcut bir kavşağa 10 m'den yakın düşerse o
+kavşağa bağlanır; iç içe geçmiş iki kavşak oluşmaz. Önce binayı yık ya da yolu başka yerden geçir. Yolu
 genişletirken (Yükselt) de aynı kural geçerli.
 
 **Geri al (↺):** yık düğmesinin yanında ve inşa modunda ekranın sağında
@@ -465,7 +469,7 @@ araba durur.
   araçlar çizilir, uzaktakiler veri olarak, geri kalanı istatistik olarak
   hesaplanır (simülasyon LOD).
 - **Testler:** `godot --headless --path citysim -s res://tests/run_tests.gd`
-  (185 kontrol).
+  (190 kontrol).
 - **APK:** her push'ta GitHub Actions derler, Releases → `citysim-latest`.
 - Ayrıntılı faz notları, kabul kriterleri ve bilinen eksikler: `README.md`.
 

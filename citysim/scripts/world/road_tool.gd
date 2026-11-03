@@ -21,6 +21,8 @@ var _target_building: int = -1
 const UNDO_DEPTH := 20
 var _history: Array = []
 var _cutting: bool = false
+var _block_key: String = ""
+var _block_hit: bool = false
 var _cut_ids := PackedInt32Array()
 var _ref_angle: float = 0.0
 var _max_turn: float
@@ -335,6 +337,17 @@ func _rezone(zones: Array) -> void:
 		zsys.set_zone(by_zone[zid], zid)
 
 
+## Exact "would this road push a building off its lot" for the preview,
+## cached: dragging only re-checks when the snapped road changes.
+func _blocks_buildings(plan: Dictionary) -> bool:
+	var key := "%s|%s|%s|%s|%d" % [plan["a"], plan["b"], plan["control"], _type, _net.graph.segments.size()]
+	if key != _block_key:
+		_block_key = key
+		var t := _type
+		_block_hit = not _net.buildings_lost(func(g: RoadGraph) -> void: g.commit_road(plan, t)).is_empty()
+	return _block_hit
+
+
 func _try_build(a: Vector2, b: Vector2, control: Variant) -> void:
 	var check := _evaluate(a, b, control)
 	if check["valid"]:
@@ -383,7 +396,7 @@ func _evaluate(a: Vector2, b: Vector2, control: Variant) -> Dictionary:
 	if wet != "":
 		return {"valid": false, "error": wet, "cost": 0, "length": plan["length"]}
 	var cost: int = _net.plan_cost(plan, _type)
-	if not _net.buildings_in_way(plan, _type).is_empty():
+	if _blocks_buildings(plan):
 		return {"valid": false, "error": "ROAD_ERR_BUILDING", "cost": cost, "length": plan["length"]}
 	if not EconomySystem.can_afford(cost):
 		return {"valid": false, "error": "ROAD_ERR_MONEY", "cost": cost, "length": plan["length"]}

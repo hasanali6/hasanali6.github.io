@@ -31,12 +31,15 @@ var zone := PackedInt32Array()
 var building := PackedInt32Array()
 
 var _water: MapWater
+var _config: Dictionary
 var _lookup: Dictionary = {}   # Vector4i(segment, side, along, depth) -> cell index
 var _buckets: Dictionary = {}  # Vector2i -> PackedInt32Array of cell indices
 # Incremental rebuilds: each segment's rows from the last rebuild, reused when
 # neither the segment nor anything near it changed (big cities re-zone only
 # around the edited roads instead of everywhere).
 const _DIRTY_PAD := 150.0
+const _NEAR_PAD := 90.0      # rows that can touch a redone row (cells reach ~60 m)
+var last_recomputed: Dictionary = {}   # segment ids laid out afresh by the last rebuild
 var _old_lookup: Dictionary = {}
 var _old_zone := PackedInt32Array()
 var _old_building := PackedInt32Array()
@@ -47,11 +50,33 @@ var last_rebuilt_segments: int = 0
 
 
 func _init(config: Dictionary) -> void:
+	_config = config
 	cell_size = float(config["size_m"])
 	max_depth = int(config["depth"])
 	road_clearance = float(config["road_clearance_m"])
 	overlap = float(config["overlap_m"])
 	restore_radius = float(config["restore_radius_m"])
+
+
+## Copy for a dry run: rebuilding it leaves this grid untouched (rebuild
+## replaces the arrays and dictionaries instead of editing them).
+func clone() -> ZoneGrid:
+	var g := ZoneGrid.new(_config)
+	g.centers = centers
+	g.dirs = dirs
+	g.fronts = fronts
+	g.segment = segment
+	g.side = side
+	g.along = along
+	g.depth = depth
+	g.zone = zone.duplicate()
+	g.building = building.duplicate()
+	g._water = _water
+	g._lookup = _lookup
+	g._buckets = _buckets
+	g._rows = _rows
+	g._rows_env = _rows_env
+	return g
 
 
 func size() -> int:
@@ -65,7 +90,8 @@ func index_of(seg_id: int, row_side: int, along_index: int, depth_index: int) ->
 ## Regenerates all cells for the current road network. Zoning and building
 ## ownership are carried over to new cells at (almost) the same position, so
 ## splitting a road by drawing across it keeps the zoning around it.
-func rebuild(graph: RoadGraph, types: Dictionary, mesh_cfg: Dictionary, playable_half: float, water: MapWater = null) -> void:
+func rebuild(graph: RoadGraph, types: Dictionary, mesh_cfg: Dictionary, playable_half: float, water: MapWater = null,
+		partial: bool = false) -> void:
 	_water = water
 	var old_centers := centers
 	var old_zone := zone
@@ -79,7 +105,12 @@ func rebuild(graph: RoadGraph, types: Dictionary, mesh_cfg: Dictionary, playable
 
 	var seg_index := _segment_buckets(graph)
 	var ids := graph.segments.keys()
-	ids.sort()  # older roads claim space first
+	# Older roads claim space first (by the age of the road a piece was cut
+	# from, so splitting a road keeps its claim).
+	ids.sort_custom(func(x: int, y: int) -> bool:
+		var ax: int = (graph.segments[x] as RoadGraph.RoadSegment).age
+		var ay: int = (graph.segments[y] as RoadGraph.RoadSegment).age
+		return ax < ay or (ax == ay and x < y))
 	# Which segments changed (new, moved, retyped, other trims) or vanished;
 	# everything within _DIRTY_PAD of them is laid out again.
 	var env := "%.1f|%s" % [playable_half, "w" if water != null else "-"]
@@ -96,7 +127,7 @@ func rebuild(graph: RoadGraph, types: Dictionary, mesh_cfg: Dictionary, playable
 		var c := graph.curve_of(seg)
 		var sides := "%.1f,%.1f,%.1f,%.1f" % [side_trim(graph, seg, seg.a, ta, 1), side_trim(graph, seg, seg.a, ta, -1),
 			side_trim(graph, seg, seg.b, tb, 1), side_trim(graph, seg, seg.b, tb, -1)]
-		sigs[sid] = "%.2f,%.2f|%.2f,%.2f|%.2f,%.2f|%s|%.2f|%.2f|%s" % [c[0].x, c[0].y, c[1].x, c[1].y, c[2].x, c[2].y, seg.type, ta, tb, sides]
+		sigs[sid] = "%.2f,%.2f|%.2f,%.2f|%.2f,%.2f|%s|%.2f|%.2f|%s|%.2f" % [c[0].x, c[0].y, c[1].x, c[1].y, c[2].x, c[2].y, seg.type, ta, tb, sides, seg.phase]
 		var box := Rect2(c[0], Vector2.ZERO).expand(c[1]).expand(c[2])
 		boxes[sid] = box
 		var old: Dictionary = _rows.get(sid, {})
@@ -109,6 +140,7 @@ func rebuild(graph: RoadGraph, types: Dictionary, mesh_cfg: Dictionary, playable
 			dirty.append((_rows[sid]["box"] as Rect2).grow(_DIRTY_PAD))
 	var rows := {}
 	last_rebuilt_segments = 0
+	var redo := {}
 	for sid: int in ids:
 		var old: Dictionary = _rows.get(sid, {})
 		var reuse: bool = not old.is_empty() and old["sig"] == sigs[sid]
@@ -117,6 +149,26 @@ func rebuild(graph: RoadGraph, types: Dictionary, mesh_cfg: Dictionary, playable
 				if r.intersects(boxes[sid]):
 					reuse = false
 					break
+		if not reuse:
+			redo[sid] = true
+	# A dry run (partial) only lays out what is near the roads being redone;
+	# rows far from them cannot interact and are left out.
+	var near: Array[Rect2] = []
+	if partial:
+		for sid: int in redo:
+			near.append((boxes[sid] as Rect2).grow(_NEAR_PAD))
+	last_recomputed = redo
+	for sid: int in ids:
+		var old: Dictionary = _rows.get(sid, {})
+		var reuse: bool = not redo.has(sid)
+		if reuse and partial:
+			var close := false
+			for r: Rect2 in near:
+				if r.intersects(boxes[sid]):
+					close = true
+					break
+			if not close:
+				continue
 		if reuse:
 			_append_rows(sid, old)
 			rows[sid] = old
@@ -175,15 +227,36 @@ func _add_rows(graph: RoadGraph, sid: int, types: Dictionary, mesh_cfg: Dictiona
 	# Index 0 is the first cell after the full junction trim (as in older
 	# saves); a side no other road joins keeps its cells up to the junction,
 	# with negative indices.
-	var k0 := ceili(trim_a / cell_size - 0.001)
+	# A piece cut from a longer road keeps that road's cell places (phase).
+	var offset := fposmod(-seg.phase, cell_size)
+	if offset > cell_size - 0.01:
+		offset = 0.0
+	var k0 := ceili((trim_a - offset) / cell_size - 0.001)
+	var d_start := RoadGraph.bezier_tangent(c[0], c[1], c[2], 0.0).normalized()
+	var d_end := RoadGraph.bezier_tangent(c[0], c[1], c[2], 1.0).normalized()
 	for row_side: int in [1, -1]:
-		var first := ceili(side_trim(graph, seg, seg.a, trim_a, row_side) / cell_size - 0.001)
-		var last := floori((length - side_trim(graph, seg, seg.b, trim_b, row_side)) / cell_size + 0.001)
+		var trim_s := side_trim(graph, seg, seg.a, trim_a, row_side)
+		var trim_e := side_trim(graph, seg, seg.b, trim_b, row_side)
+		# Trimmed ends keep whole cells; an open end (no corner) takes the cell
+		# whose centre lies on this piece, so a cell across a split point
+		# stays (with the piece its centre is on).
+		var first := ceili((trim_s - offset) / cell_size - 0.001) if trim_s > 0.0 else ceili(-offset / cell_size - 0.5 - 0.0001)
+		var last := floori((length - trim_e - offset) / cell_size + 0.001) if trim_e > 0.0 else ceili((length - offset) / cell_size - 0.5 - 0.0001)
 		for idx in range(first, last):
 			var k := idx - k0
-			var tt := RoadMeshBuilder.t_at(table, cell_size * (idx + 0.5))
-			var p := RoadGraph.bezier(c[0], c[1], c[2], tt)
-			var d := RoadGraph.bezier_tangent(c[0], c[1], c[2], tt).normalized()
+			var at := offset + cell_size * (idx + 0.5)
+			var p: Vector2
+			var d: Vector2
+			if at < 0.0:
+				d = d_start
+				p = c[0] + d * at
+			elif at > length:
+				d = d_end
+				p = c[2] + d * (at - length)
+			else:
+				var tt := RoadMeshBuilder.t_at(table, at)
+				p = RoadGraph.bezier(c[0], c[1], c[2], tt)
+				d = RoadGraph.bezier_tangent(c[0], c[1], c[2], tt).normalized()
 			var out := Vector2(-d.y, d.x) * float(row_side)
 			for dep in max_depth:
 				var centre := p + out * (hw + cell_size * (dep + 0.5))
