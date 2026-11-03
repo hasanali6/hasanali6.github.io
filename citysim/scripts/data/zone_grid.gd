@@ -94,7 +94,9 @@ func rebuild(graph: RoadGraph, types: Dictionary, mesh_cfg: Dictionary, playable
 		var ta := RoadMeshBuilder.junction_radius(graph, seg.a, types, mesh_cfg)
 		var tb := RoadMeshBuilder.junction_radius(graph, seg.b, types, mesh_cfg)
 		var c := graph.curve_of(seg)
-		sigs[sid] = "%.2f,%.2f|%.2f,%.2f|%.2f,%.2f|%s|%.2f|%.2f" % [c[0].x, c[0].y, c[1].x, c[1].y, c[2].x, c[2].y, seg.type, ta, tb]
+		var sides := "%.1f,%.1f,%.1f,%.1f" % [side_trim(graph, seg, seg.a, ta, 1), side_trim(graph, seg, seg.a, ta, -1),
+			side_trim(graph, seg, seg.b, tb, 1), side_trim(graph, seg, seg.b, tb, -1)]
+		sigs[sid] = "%.2f,%.2f|%.2f,%.2f|%.2f,%.2f|%s|%.2f|%.2f|%s" % [c[0].x, c[0].y, c[1].x, c[1].y, c[2].x, c[2].y, seg.type, ta, tb, sides]
 		var box := Rect2(c[0], Vector2.ZERO).expand(c[1]).expand(c[2])
 		boxes[sid] = box
 		var old: Dictionary = _rows.get(sid, {})
@@ -170,13 +172,16 @@ func _add_rows(graph: RoadGraph, sid: int, types: Dictionary, mesh_cfg: Dictiona
 	var length: float = table[table.size() - 1].y
 	# Cells sit on a fixed 8 m phase from the segment start (not centred), so a
 	# road split at a grid point keeps its cells in place and keeps the zoning.
-	var start := ceilf(trim_a / cell_size - 0.001) * cell_size
-	var count := floori((length - trim_b - start) / cell_size + 0.001)
-	if count <= 0:
-		return
+	# Index 0 is the first cell after the full junction trim (as in older
+	# saves); a side no other road joins keeps its cells up to the junction,
+	# with negative indices.
+	var k0 := ceili(trim_a / cell_size - 0.001)
 	for row_side: int in [1, -1]:
-		for k in count:
-			var tt := RoadMeshBuilder.t_at(table, start + cell_size * (k + 0.5))
+		var first := ceili(side_trim(graph, seg, seg.a, trim_a, row_side) / cell_size - 0.001)
+		var last := floori((length - side_trim(graph, seg, seg.b, trim_b, row_side)) / cell_size + 0.001)
+		for idx in range(first, last):
+			var k := idx - k0
+			var tt := RoadMeshBuilder.t_at(table, cell_size * (idx + 0.5))
 			var p := RoadGraph.bezier(c[0], c[1], c[2], tt)
 			var d := RoadGraph.bezier_tangent(c[0], c[1], c[2], tt).normalized()
 			var out := Vector2(-d.y, d.x) * float(row_side)
@@ -185,6 +190,21 @@ func _add_rows(graph: RoadGraph, sid: int, types: Dictionary, mesh_cfg: Dictiona
 				if not _cell_ok(centre, graph, types, playable_half, seg_index):
 					break
 				_append(centre, d, -out, sid, row_side, k, dep)
+
+
+## Junction trim for one side of a segment at one of its nodes: the full
+## corner when another road leaves the node on that side, none when the side
+## only runs on straight (a T-junction leaves the lots across from it alone).
+static func side_trim(graph: RoadGraph, seg: RoadGraph.RoadSegment, node_id: int, trim: float, row_side: int) -> float:
+	if trim <= 0.0:
+		return 0.0
+	var c := graph.curve_of(seg)
+	var d := RoadGraph.bezier_tangent(c[0], c[1], c[2], 0.0 if node_id == seg.a else 1.0).normalized()
+	var side := Vector2(-d.y, d.x) * float(row_side)
+	for sid in (graph.nodes[node_id] as RoadGraph.RoadNode).segments:
+		if sid != seg.id and graph.leaving_direction(sid, node_id).normalized().dot(side) > 0.2:
+			return trim
+	return 0.0
 
 
 func _cell_ok(centre: Vector2, graph: RoadGraph, types: Dictionary, playable_half: float, seg_index: Dictionary) -> bool:

@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_test_products()
 	_test_overpass()
 	_test_incremental_zoning()
+	_test_t_junction_sides()
 	_test_progression()
 	_test_weather_traffic()
 	_test_highway_bridge()
@@ -644,6 +645,27 @@ func _test_lane_geometry() -> void:
 	var before := lg.piece_total()
 	lg.rebuild(g, roads["types"], roads["mesh"])
 	_check(lg.piece_total() == before, "rebuilding reuses unchanged pieces")
+
+
+func _test_t_junction_sides() -> void:
+	var g := _graph()
+	g.commit_road(g.plan_road(Vector2(-200, 15000), Vector2(200, 15000), null), "street")
+	var grid := ZoneGrid.new(_zones()["cells"])
+	grid.rebuild(g, _roads()["types"], _roads()["mesh"], 20000.0)
+	var count_side := func(gr: ZoneGrid, north: bool) -> int:
+		var n := 0
+		for i in gr.size():
+			var q := gr.centers[i]
+			if absf(q.x - 40.0) < 14.0 and absf(q.y - 15000.0) < 10.0 and gr.depth[i] == 0 and ((q.y < 15000.0) == north):
+				n += 1
+		return n
+	var north0: int = count_side.call(grid, true)
+	# A street joins from the south at x = 40: only the south corners give way.
+	g.commit_road(g.plan_road(Vector2(40, 15000), Vector2(40, 15200), null), "street")
+	grid.rebuild(g, _roads()["types"], _roads()["mesh"], 20000.0)
+	var north1: int = count_side.call(grid, true)
+	var south1: int = count_side.call(grid, false)
+	_check(north1 == north0 and south1 < north1, "a T-junction trims only the lots on its own side (north %d -> %d, south %d)" % [north0, north1, south1])
 
 
 func _test_incremental_zoning() -> void:

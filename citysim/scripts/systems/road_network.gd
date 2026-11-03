@@ -142,30 +142,38 @@ func buildings_in_way(plan: Dictionary, type: String, with_junctions: bool = tru
 	# New junctions (where the road ends on or crosses another road) trim the
 	# corners: a lot is hit only if the corner reaches further than before.
 	var extra := float(mesh_cfg["corner_radius_m"]) + float(mesh_cfg["junction_extra_m"])
-	var joints: Array = []   # [point, half width of the widest road there afterwards]
-	for end: Vector2 in [a, b]:
+	# [point, half width of the widest road there afterwards, direction the new
+	# road leaves in (ZERO at a crossing: it leaves both ways)]
+	var joints: Array = []
+	for e in 2:
+		var end: Vector2 = a if e == 0 else b
+		var away := RoadGraph.bezier_tangent(a, c, b, 0.0).normalized() if e == 0 else -RoadGraph.bezier_tangent(a, c, b, 1.0).normalized()
 		var nid := graph.find_node_near(end, graph.merge_radius)
 		if nid >= 0:
 			var widest := hw
 			for sid in (graph.nodes[nid] as RoadGraph.RoadNode).segments:
 				widest = maxf(widest, RoadTypes.half_width(types[(graph.segments[sid] as RoadGraph.RoadSegment).type]))
-			joints.append([end, widest])
+			joints.append([end, widest, away])
 			continue
 		var on := graph.find_segment_near(end, graph.merge_radius)
 		if not on.is_empty():
-			joints.append([end, maxf(hw, RoadTypes.half_width(types[(graph.segments[int(on["segment"])] as RoadGraph.RoadSegment).type]))])
+			joints.append([end, maxf(hw, RoadTypes.half_width(types[(graph.segments[int(on["segment"])] as RoadGraph.RoadSegment).type])), away])
 	for hit: Dictionary in plan.get("hits", []):
 		var on2 := graph.find_segment_near(hit["point"], graph.merge_radius)
 		var other := 0.0 if on2.is_empty() else RoadTypes.half_width(types[(graph.segments[int(on2["segment"])] as RoadGraph.RoadSegment).type])
-		joints.append([hit["point"], maxf(hw, other)])
+		joints.append([hit["point"], maxf(hw, other), Vector2.ZERO])
 	for jd: Array in joints:
 		var j: Vector2 = jd[0]
 		var trim := float(jd[1]) + extra
+		var away: Vector2 = jd[2]
 		for cell in grid.cells_near(j, trim + 30.0):
 			var bid := grid.building[cell]
 			if bid == ZoneGrid.FREE or hits.has(bid) or grid.depth[cell] != 0:
 				continue
 			var rel := grid.centers[cell] - j
+			# Only the corners on the side the new road joins from are trimmed.
+			if away != Vector2.ZERO and rel.dot(away) <= 0.0:
+				continue
 			var along := absf(rel.dot(grid.dirs[cell]))
 			var side_off := absf(rel.dot(grid.fronts[cell]))
 			if along < trim + grid.cell_size * 0.5 - 0.5 and side_off < float(jd[1]) + grid.cell_size + 2.0:
