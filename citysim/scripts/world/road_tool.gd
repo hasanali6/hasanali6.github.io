@@ -174,15 +174,15 @@ func _on_up(screen_pos: Vector2) -> void:
 	match _mode:
 		"upgrade":
 			_highlight = _segment_at(screen_pos)
-			if _highlight >= 0:
-				var res: Dictionary = _net.upgrade(_highlight, _type)
-				if res["ok"]:
-					remember({"kind": "upgraded", "seg": _highlight, "old": str(res["old_type"]), "cost": int(res["cost"])})
-					EventBus.sfx_requested.emit("build_road")
-					EventBus.notification_posted.emit("roads", tr("ROAD_UPGRADED") % [tr(_net.type_config(_type)["name_key"]), UiStyle.format_int(int(res["cost"]))])
-				else:
-					EventBus.sfx_requested.emit("error")
-					EventBus.notification_posted.emit("roads", tr(res["error"]))
+			var seg: RoadGraph.RoadSegment = (_net.graph as RoadGraph).segments.get(_highlight)
+			if seg != null and seg.type != _type:
+				# Ask first: the road stays highlighted until ✓ / ✗.
+				_pending = {"upgrade": _highlight}
+				EventBus.road_preview_changed.emit({"active": false})
+				EventBus.road_proposal_changed.emit({"active": true, "node": "RoadTool",
+					"label": _net.type_config(_type)["name_key"], "prefix": "ROAD_UPGRADE_Q",
+					"cost": int(_net.upgrade_cost(_highlight, _type))})
+				return
 			_reset()
 		"bulldoze":
 			if _cutting:
@@ -378,12 +378,29 @@ func _try_build(a: Vector2, b: Vector2, control: Variant) -> void:
 	_marker.visible = false
 	_show_lost(_pending["lost"])
 	EventBus.road_preview_changed.emit({"active": false})
-	EventBus.road_proposal_changed.emit({"active": true, "cost": int(check["cost"]), "length": float(check["length"]),
+	EventBus.road_proposal_changed.emit({"active": true, "node": "RoadTool", "cost": int(check["cost"]), "length": float(check["length"]),
 		"lost": (_pending["lost"] as Dictionary).size()})
+
+
+func _confirm_upgrade(seg_id: int) -> void:
+	var res: Dictionary = _net.upgrade(seg_id, _type)
+	if res["ok"]:
+		remember({"kind": "upgraded", "seg": seg_id, "old": str(res["old_type"]), "cost": int(res["cost"])})
+		EventBus.sfx_requested.emit("build_road")
+		EventBus.notification_posted.emit("roads", tr("ROAD_UPGRADED") % [tr(_net.type_config(_type)["name_key"]), UiStyle.format_int(int(res["cost"]))])
+	else:
+		EventBus.sfx_requested.emit("error")
+		EventBus.notification_posted.emit("roads", tr(res["error"]))
 
 
 func confirm_pending() -> void:
 	if _pending.is_empty():
+		return
+	if _pending.has("upgrade"):
+		var seg_id := int(_pending["upgrade"])
+		_clear_pending()
+		_confirm_upgrade(seg_id)
+		_reset()
 		return
 	var p := _pending
 	var lost: Dictionary = p["lost"]
@@ -407,7 +424,10 @@ func confirm_pending() -> void:
 func cancel_pending() -> void:
 	if _pending.is_empty():
 		return
+	var was_upgrade := _pending.has("upgrade")
 	_clear_pending()
+	if was_upgrade:
+		_reset()
 
 
 func has_pending() -> bool:

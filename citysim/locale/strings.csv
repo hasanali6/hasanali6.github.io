@@ -401,3 +401,4 @@ ROAD_WARN_DEMOLISH,"⚠ %d bina yıkılacak (kırmızı olanlar)","⚠ %d buildi
 ROAD_WARN_DEMOLISH_HINT,kırmızı binalar yıkılır,red buildings will be demolished
 ROAD_BUILT_DEMOLISHED,"Yol yapıldı, %d bina yıkıldı (Geri al ile geri getirebilirsin)","Road built, %d buildings demolished (Undo brings them back)"
 ROAD_ERR_PARALLEL,Başka bir yolun üstüne/çok yakınına paralel yol yapılamaz,A road cannot run on top of or right beside another road
+ROAD_UPGRADE_Q,Yükselt:,Upgrade to:

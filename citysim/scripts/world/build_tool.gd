@@ -1,8 +1,9 @@
 extends Node3D
 ## Hand placement of buildings and parks from data/catalog.json. While a
 ## catalogue item is selected, dragging a finger previews the lot on the
-## nearest road-facing cell (green = fits and affordable, red = not) and
-## releasing builds it. Placed buildings join the economy like grown ones.
+## nearest road-facing cell (green = fits and affordable, red = not);
+## releasing leaves the preview standing and asks ✓ / ✗ (confirm_pending).
+## Placed buildings join the economy like grown ones.
 ## Pumps, sewage outlets and treatment plants must stand next to water.
 
 @export var building_system_path: NodePath
@@ -16,6 +17,7 @@ var _cell: int = -1
 var _snap_radius: float
 var _water_reach: float
 var _valid: bool = false
+var _pending_cell: int = -1   # a placement waiting for ✓ / ✗
 var _preview: MeshInstance3D
 var _ok_mat: StandardMaterial3D
 var _bad_mat: StandardMaterial3D
@@ -47,6 +49,8 @@ func _material(color: Color, alpha: float) -> StandardMaterial3D:
 
 
 func _on_tool_selected(tool: String, options: Dictionary) -> void:
+	if _pending_cell >= 0:
+		cancel_pending()
 	_active = tool == "place"
 	_item = options.get("item", {}) if _active else {}
 	_preview.visible = false
@@ -59,11 +63,37 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 		GestureTracker.Pointer.CANCEL:
 			_preview.visible = false
 		GestureTracker.Pointer.DOWN, GestureTracker.Pointer.MOVE:
+			if phase == GestureTracker.Pointer.DOWN and _pending_cell >= 0:
+				cancel_pending()
 			_preview_at(screen_pos)
 		GestureTracker.Pointer.UP:
 			_preview_at(screen_pos)
-			_build()
-			_preview.visible = false
+			if _cell >= 0 and _valid:
+				# Ask first: the preview stays where it is.
+				_pending_cell = _cell
+				EventBus.road_preview_changed.emit({"active": false})
+				EventBus.road_proposal_changed.emit({"active": true, "node": "BuildTool", "label": _item["name_key"],
+					"cost": int(_item["cost"])})
+			else:
+				_build()
+				_preview.visible = false
+
+
+func confirm_pending() -> void:
+	if _pending_cell < 0:
+		return
+	_cell = _pending_cell
+	_valid = not _buildings.lot_for(_item, _cell).is_empty() and EconomySystem.can_afford(int(_item["cost"]))
+	_pending_cell = -1
+	_build()
+	_preview.visible = false
+	EventBus.road_proposal_changed.emit({"active": false})
+
+
+func cancel_pending() -> void:
+	_pending_cell = -1
+	_preview.visible = false
+	EventBus.road_proposal_changed.emit({"active": false})
 
 
 ## Water-side buildings need their lot within reach of a river or lake.

@@ -72,6 +72,7 @@ var _undo_button: Button
 var _confirm_bar: PanelContainer
 var _confirm_label: Label
 var _confirm_yes: Button
+var _proposal_node: String = "RoadTool"
 var _road_type: String = ""
 var _road_mode: String = "straight"
 var _zone_panel: PanelContainer
@@ -1206,12 +1207,12 @@ func _build_confirm_bar() -> PanelContainer:
 	_confirm_yes = UiStyle.chip_button("ROAD_CONFIRM", UiStyle.GREEN.darkened(0.1), UiStyle.GREEN.darkened(0.25), Vector2(170, MIN_TOUCH * 0.8))
 	_confirm_yes.toggle_mode = false
 	_confirm_yes.add_theme_font_size_override("font_size", FONT_SIZE - 4)
-	_confirm_yes.pressed.connect(func() -> void: get_tree().current_scene.get_node("RoadTool").confirm_pending())
+	_confirm_yes.pressed.connect(func() -> void: get_tree().current_scene.get_node(_proposal_node).confirm_pending())
 	row.add_child(_confirm_yes)
 	var no := UiStyle.chip_button("ROAD_CANCEL", UiStyle.RED.darkened(0.05), UiStyle.RED.darkened(0.2), Vector2(130, MIN_TOUCH * 0.8))
 	no.toggle_mode = false
 	no.add_theme_font_size_override("font_size", FONT_SIZE - 4)
-	no.pressed.connect(func() -> void: get_tree().current_scene.get_node("RoadTool").cancel_pending())
+	no.pressed.connect(func() -> void: get_tree().current_scene.get_node(_proposal_node).cancel_pending())
 	row.add_child(no)
 	return panel
 
@@ -1220,8 +1221,15 @@ func _on_road_proposal(info: Dictionary) -> void:
 	if not info.get("active", false):
 		_confirm_bar.visible = false
 		return
+	_proposal_node = str(info.get("node", "RoadTool"))
 	var lost := int(info.get("lost", 0))
-	var text := tr("ROAD_COST") % [UiStyle.format_int(int(info["cost"])), roundi(float(info["length"]))]
+	var text: String
+	if info.has("label"):
+		# Buildings and upgrades: what it is and what it costs.
+		text = "%s%s · %s" % [tr(str(info.get("prefix", ""))) + " " if info.has("prefix") else "", tr(str(info["label"])),
+			UiStyle.format_int(int(info["cost"]))]
+	else:
+		text = tr("ROAD_COST") % [UiStyle.format_int(int(info["cost"])), roundi(float(info["length"]))]
 	if lost > 0:
 		text += "\n" + tr("ROAD_WARN_DEMOLISH") % lost
 		_confirm_yes.text = tr("ROAD_CONFIRM_DEMOLISH")

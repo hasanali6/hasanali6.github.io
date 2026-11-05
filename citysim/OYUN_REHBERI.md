@@ -123,7 +123,12 @@ parmağını sürükle; geçtiğin yerdeki ağaçlar kesilir (fırça gibi, ücr
 Kesilen ağaçlar kayıtla birlikte saklanır. Sokak ağaçları ve bahçe ağaçları
 yola ve parsele aittir, onlar kesilmez.
 
-**Onay:** yolu çizip parmağını kaldırınca yol hemen yapılmaz; çizim ekranda
+**Onay (bütün inşaatlarda):** yol çizmek, bina/hizmet/park yerleştirmek ve
+yolu yükseltmek hemen yapılmaz; önizleme yerinde kalır ve üstte ne olduğu ve
+fiyatıyla birlikte **✓ Yap / ✗ Vazgeç** çıkar. (İmar boyamak ücretsiz olduğu
+için onay sormaz; hatalı boyadığını üstüne boyayarak düzeltirsin.)
+
+Yollarda: parmağını kaldırınca yol hemen yapılmaz; çizim ekranda
 kalır ve üstte fiyat/uzunlukla birlikte **✓ Yap / ✗ Vazgeç** çıkar. Başka bir
 yere dokunursan çizim iptal olur ve yeniden çizersin.
 
