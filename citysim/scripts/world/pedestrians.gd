@@ -8,7 +8,9 @@ extends Node3D
 ## game. Rebuilt monthly and after road or building changes.
 
 const SHADER := preload("res://assets/materials/pedestrian.gdshader")
-const CAP := {"low": 400, "medium": 1200, "high": 2500}
+const CAP := {"low": 250, "medium": 800, "high": 1800}
+# Walkers are a few pixels tall from higher up: not drawn above this camera height.
+const SHOW_BELOW_M := 260.0
 const PEOPLE_PER_WALKER := 12.0
 const MAX_PER_SEGMENT := 10
 const SIDEWALK_Y := 0.16
@@ -40,6 +42,14 @@ func _ready() -> void:
 	EventBus.buildings_changed.connect(_queue)
 	EventBus.graphics_preset_changed.connect(func(_p: String) -> void: _queue())
 	_queue()
+
+
+func _process(_delta: float) -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam != null:
+		var near := cam.global_position.y < SHOW_BELOW_M
+		if _mmi.visible != near:
+			_mmi.visible = near
 
 
 func _queue() -> void:
