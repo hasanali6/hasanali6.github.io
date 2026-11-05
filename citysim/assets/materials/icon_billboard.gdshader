@@ -14,6 +14,9 @@ void vertex() {
 	vec3 origin = MODEL_MATRIX[3].xyz;
 	float dist = length(CAMERA_POSITION_WORLD - origin);
 	float s = clamp(dist * size_per_m, min_size, max_size);
+	// Close to the camera the minimum size would fill the screen: keep the
+	// badge at most a small, fixed share of the view.
+	s = min(s, dist * 0.05);
 	origin.y += s * 0.5 + sin(TIME * 2.6 + origin.x * 0.05) * s * 0.06;
 	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0] * s, INV_VIEW_MATRIX[1] * s, INV_VIEW_MATRIX[2] * s, vec4(origin, 1.0));
 	MODELVIEW_NORMAL_MATRIX = mat3(MODELVIEW_MATRIX);

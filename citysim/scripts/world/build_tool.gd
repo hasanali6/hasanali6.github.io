@@ -133,6 +133,34 @@ func _runway_ok(centre: Vector2, f: Vector2, d: float) -> bool:
 	return true
 
 
+## The road-facing cell whose lot (for the selected item) fits and lies
+## closest to where the finger is: a tap anywhere on the plot, not only right
+## at the kerb, finds a place; past a junction corner or a taken neighbour it
+## slides along the row to the nearest lot that fits. Falls back to the
+## nearest road-facing cell (shown red) when nothing fits.
+func _best_cell(g: Vector2) -> int:
+	var grid: ZoneGrid = _zones.grid
+	var w := int(_item["lot"][0]) * grid.cell_size
+	var d := int(_item["lot"][1]) * grid.cell_size
+	var reach := _snap_radius + maxf(w, d) + grid.cell_size
+	var best := -1
+	var best_d := INF
+	for i in grid.cells_near(g, reach):
+		if grid.depth[i] != 0 or _buildings.lot_for(_item, i).is_empty():
+			continue
+		var f := grid.fronts[i]
+		var dir := grid.dirs[i]
+		var corner := grid.centers[i] - dir * grid.cell_size * 0.5 + f * grid.cell_size * 0.5
+		var centre := corner + dir * w * 0.5 - f * d * 0.5
+		var dist := centre.distance_to(g)
+		if dist < best_d:
+			best_d = dist
+			best = i
+	if best >= 0:
+		return best
+	return grid.front_cell_near(g, reach)
+
+
 func _preview_at(screen_pos: Vector2) -> void:
 	var g: Variant = _ground(screen_pos)
 	_cell = -1
@@ -141,7 +169,7 @@ func _preview_at(screen_pos: Vector2) -> void:
 		_preview.visible = false
 		return
 	var grid: ZoneGrid = _zones.grid
-	_cell = grid.front_cell_near(g, _snap_radius)
+	_cell = _best_cell(g)
 	if _cell < 0:
 		_preview.visible = false
 		EventBus.road_preview_changed.emit({"active": true, "valid": false, "error": "BUILD_ERR_ROAD", "screen_pos": screen_pos})
