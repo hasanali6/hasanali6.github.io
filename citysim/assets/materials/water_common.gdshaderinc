@@ -32,6 +32,12 @@ float segment_distance(vec2 p, vec2 a, vec2 b) {
 
 // Signed distance to the nearest water edge in metres (negative = water).
 float water_distance(vec2 p) {
+	// Out at sea the river and lakes are far away: the shore is all that
+	// matters, and the per-pixel river search is skipped.
+	float sea = coast_distance(p);
+	if (sea < -120.0) {
+		return sea;
+	}
 	float d = 1e9;
 	// Coarse pass over every 4th point; skip the fine pass when far away.
 	for (int i = 0; i < 92; i += 4) {
@@ -58,5 +64,5 @@ float water_distance(vec2 p) {
 		vec4 l = lakes[j];
 		d = min(d, (length((p - l.xy) / l.zw) - 1.0) * min(l.z, l.w));
 	}
-	return min(d, coast_distance(p));
+	return min(d, sea);
 }
