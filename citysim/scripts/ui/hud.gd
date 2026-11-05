@@ -1224,13 +1224,17 @@ func _on_road_proposal(info: Dictionary) -> void:
 	_proposal_node = str(info.get("node", "RoadTool"))
 	var lost := int(info.get("lost", 0))
 	var text: String
-	if info.has("label"):
+	if info.has("text"):
+		text = str(info["text"])
+	elif info.has("label"):
 		# Buildings and upgrades: what it is and what it costs.
 		text = "%s%s · %s" % [tr(str(info.get("prefix", ""))) + " " if info.has("prefix") else "", tr(str(info["label"])),
 			UiStyle.format_int(int(info["cost"]))]
 	else:
 		text = tr("ROAD_COST") % [UiStyle.format_int(int(info["cost"])), roundi(float(info["length"]))]
-	if lost > 0:
+	if info.get("demolish", false):
+		_confirm_yes.text = tr("DEMOLISH_CONFIRM")
+	elif lost > 0:
 		text += "\n" + tr("ROAD_WARN_DEMOLISH") % lost
 		_confirm_yes.text = tr("ROAD_CONFIRM_DEMOLISH")
 	else:

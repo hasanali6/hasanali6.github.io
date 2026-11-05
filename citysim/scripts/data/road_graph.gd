@@ -444,6 +444,12 @@ func _endpoint_ref(pos: Vector2) -> Dictionary:
 	return {"kind": "free", "point": pos}
 
 
+## True if a new road leaving the point pos along dir would meet the roads
+## already there at a wide enough angle (what plan_road checks at its ends).
+func direction_ok(pos: Vector2, dir: Vector2) -> bool:
+	return _angle_ok(_endpoint_ref(pos), dir.normalized())
+
+
 ## The new road leaving an endpoint along `dir` must not run (almost) on top
 ## of a road already there.
 func _angle_ok(ref: Dictionary, dir: Vector2) -> bool:

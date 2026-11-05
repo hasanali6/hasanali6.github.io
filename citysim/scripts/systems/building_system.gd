@@ -110,8 +110,14 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _rising.is_empty():
 		return
+	# Construction runs on game time: it stops while paused and goes faster
+	# at 2x / 3x. Bigger buildings take longer.
+	var clock: SimClock = TimeSystem.clock
+	var game_delta := delta * clock.speed_multipliers[clock.speed_index]
+	if game_delta <= 0.0:
+		return
 	for id: int in _rising.keys():
-		var p: float = minf(_rising[id] + delta / _rise_seconds, 1.0)
+		var p: float = minf(_rising[id] + game_delta / _build_seconds(id), 1.0)
 		if p >= 1.0 or not buildings.has(id):
 			_rising.erase(id)
 			p = 1.0
@@ -120,6 +126,15 @@ func _process(delta: float) -> void:
 		# A full redraw is coming this frame and will place it anyway.
 		if buildings.has(id) and not _render_queued:
 			_update_instances(id, p)
+
+
+## Seconds (at 1x speed) a building takes to go up: a base time plus some
+## per floor, so a house is quick and a tower takes a while.
+func _build_seconds(id: int) -> float:
+	var b: Dictionary = buildings.get(id, {})
+	var floors := float(b.get("floors", 1))
+	return minf(_rise_seconds + floors * float(_growth.get("rise_seconds_per_floor", 0.0)),
+		float(_growth.get("rise_seconds_max", 60.0)))
 
 
 # --- Growth ------------------------------------------------------------------------
@@ -163,13 +178,21 @@ func _try_grow(cell: int) -> bool:
 	var cfg: Dictionary = _zones.zone_config(zid)
 	var widths: Array = cfg["lot_widths"]
 	var depths: Array = cfg["lot_depths"]
+	# The lot takes the whole painted depth behind the frontage (up to the
+	# zone's deepest lot): what the building does not cover is its yard, so
+	# painted land fills up instead of staying empty behind the first row.
 	var w := _rng.randi_range(int(widths[0]), int(widths[1]))
-	var d := _rng.randi_range(int(depths[0]), int(depths[1]))
-	var lot := grid.find_lot(cell, w, d, zid)
-	if lot.is_empty():
-		w = int(widths[0])
-		d = int(depths[0])
-		lot = grid.find_lot(cell, w, d, zid)
+	var lot := PackedInt32Array()
+	var d := 0
+	for width: int in [w, int(widths[0])]:
+		for dd in range(int(depths[1]), int(depths[0]) - 1, -1):
+			lot = grid.find_lot(cell, width, dd, zid)
+			if not lot.is_empty():
+				w = width
+				d = dd
+				break
+		if not lot.is_empty():
+			break
 	if lot.is_empty():
 		return false
 	var styles: Array = cfg["styles"]
@@ -220,6 +243,9 @@ func _apply_capacity(b: Dictionary) -> void:
 	var key: String = b["zone_key"]
 	var group := "" if key == "" else str(_zones.zone_types[key]["group"])
 	var cells := (b["cells"] as PackedInt32Array).size()
+	if not b["manual"] and key != "":
+		var built := int((_zones.zone_types[key] as Dictionary).get("built_depth", 99))
+		cells = int(b["lot"].x) * mini(int(b["lot"].y), built)
 	b["households_cap"] = EconomyRules.households_capacity(key, b["floors"], cells, _hh_cfg) if group in ["residential", "mixed"] else 0
 	b["job_slots"] = EconomyRules.job_slots(key, group, b["floors"], cells, _co_cfg) if group in ["commercial", "office", "industrial", "mixed"] else PackedInt32Array([0, 0, 0])
 	b["company_kind"] = EconomyRules.company_kind(key, group)
@@ -917,7 +943,7 @@ func _parts_for(b: Dictionary, rise: float) -> Array[Dictionary]:
 				if style.begins_with("svc_"):
 					ServiceModels.parts(b, ctx, parts)
 					_service_sign(b, ctx, parts)
-	parts.append(_part("lot", _basis(ctx, ctx["lot_w"], 1.0, ctx["lot_d"]), ctx["centre"], 0.04, Color.WHITE,
+	parts.append(_part("lot", _basis(ctx, ctx["lot_w"], 1.0, ctx["full_d"]), ctx["full_centre"], 0.04, Color.WHITE,
 		Color(_lot_kind(b), float(b["seed"]), 0.0, 0.0)))
 	if b["abandoned"]:
 		for part in parts:
@@ -933,12 +959,21 @@ func _context(b: Dictionary, rise: float) -> Dictionary:
 	var fz := Vector3(f.x, 0, f.y)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(b["palette"])
-	var lot_d: float = b["depth"]
+	var full_d: float = b["depth"]
+	var lot_d := full_d
+	var centre: Vector2 = b["centre"]
+	# A grown building stands on the front part of a deep lot; the rest is its yard.
+	if not b["manual"] and str(b["zone_key"]) != "":
+		var built: float = float((_zones.zone_types[b["zone_key"]] as Dictionary).get("built_depth", 99)) * float(_zones.grid.cell_size)
+		if built < full_d:
+			lot_d = built
+			centre = (b["centre"] as Vector2) + f * (full_d - lot_d) * 0.5
 	return {
 		"f": f, "fz": fz, "dx": Vector3.UP.cross(fz),  # right-handed: x = y cross z
 		"side": Vector2(Vector3.UP.cross(fz).x, Vector3.UP.cross(fz).z),
-		"lot_w": float(b["width"]), "lot_d": lot_d, "centre": b["centre"],
-		"front_edge": (b["centre"] as Vector2) + f * (lot_d * 0.5 - float(_growth["front_setback_m"])),
+		"lot_w": float(b["width"]), "lot_d": lot_d, "centre": centre,
+		"full_d": full_d, "full_centre": b["centre"],
+		"front_edge": centre + f * (lot_d * 0.5 - float(_growth["front_setback_m"])),
 		"margin": float(_growth["lot_margin_m"]), "e": maxf(ease(rise, 0.4), 0.02), "rng": rng,
 		"spread": float(_vis["contact_spread_m"]),
 		"wall": _wall_palette[rng.randi_range(0, _wall_palette.size() - 1)],
@@ -986,7 +1021,7 @@ func _parts_house(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> v
 	var d := minf(ctx["lot_d"] * (0.62 if float(ctx["lot_d"]) < 9.0 else 0.55), 10.0)
 	var e: float = ctx["e"]
 	var h := int(b["floors"]) * float(_vis["house_floor_height_m"])
-	var pos: Vector2 = ctx["front_edge"] - ctx["f"] * (d * 0.5 + 2.0)
+	var pos: Vector2 = ctx["front_edge"] - ctx["f"] * (d * 0.5 + 0.2)
 	parts.append(_part("house", _basis(ctx, w, h * e, d), pos, h * e * 0.5, ctx["wall"], Color(b["seed"], 0.45, 2.2, 0.0)))
 	var roof := _roof_palette[rng.randi_range(0, _roof_palette.size() - 1)]
 	var rh := minf(w, d) * 0.4
@@ -994,10 +1029,10 @@ func _parts_house(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> v
 	var chimney_pos: Vector2 = pos + ctx["side"] * (w * 0.28) - ctx["f"] * (d * 0.18)
 	parts.append(_part("roof_box", _basis(ctx, 0.7, (rh + 0.8) * e, 0.7), chimney_pos, h * e + (rh + 0.8) * e * 0.5, Color(0.62, 0.36, 0.3), Color()))
 	_contact(parts, ctx, pos, w, d)
-	# Most lived-in houses have a car parked in the front yard, along the street.
-	if int(b["occupants"]) > 0 and fposmod(float(b["seed"]) * 7.13, 1.0) < 0.8:
+	# Most lived-in houses with a yard behind have a car parked there.
+	if int(b["occupants"]) > 0 and fposmod(float(b["seed"]) * 7.13, 1.0) < 0.8 and float(ctx["full_d"]) - float(ctx["lot_d"]) > 5.0:
 		var cu := clampf(w * 0.22, 0.0, 3.0)
-		var cv: float = float(ctx["lot_d"]) * 0.5 - float(_growth["front_setback_m"]) - 1.0
+		var cv: float = -float(ctx["lot_d"]) * 0.5 - 3.0
 		var paint: Color = PARKED_COLORS[int(float(b["seed"]) * 13.0) % PARKED_COLORS.size()]
 		ServiceModels._put(parts, ctx, "roof_box", cu, cv, 1.8, 0.9, 4.2, paint, 0.3, Color(), true)
 		ServiceModels._put(parts, ctx, "roof_box", cu - 0.25, cv, 1.55, 0.6, 2.1, Color(0.2, 0.24, 0.3), 1.2, Color(), true)

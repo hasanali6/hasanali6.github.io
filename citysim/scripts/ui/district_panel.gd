@@ -69,6 +69,7 @@ func _init(districts: Node, font_size: int, min_touch: float, on_close: Callable
 	_row = HBoxContainer.new()
 	_row.add_theme_constant_override("separation", 8)
 	scroll.add_child(_row)
+	UiStyle.touch_scroll(scroll, _row)
 	col.add_child(scroll)
 
 	_detail = HBoxContainer.new()

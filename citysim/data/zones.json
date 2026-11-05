@@ -24,7 +24,7 @@
       ],
       "lot_depths": [
         1,
-        1
+        6
       ],
       "floors_by_level": [
         [
@@ -47,7 +47,8 @@
           3,
           3
         ]
-      ]
+      ],
+      "built_depth": 1
     },
     "res_mid": {
       "name_key": "ZONE_RES_MID",
@@ -64,8 +65,8 @@
         2
       ],
       "lot_depths": [
-        2,
-        3
+        1,
+        6
       ],
       "floors_by_level": [
         [
@@ -88,7 +89,8 @@
           10,
           12
         ]
-      ]
+      ],
+      "built_depth": 2
     },
     "res_high": {
       "name_key": "ZONE_RES_HIGH",
@@ -103,8 +105,8 @@
         3
       ],
       "lot_depths": [
-        3,
-        4
+        2,
+        6
       ],
       "floors_by_level": [
         [
@@ -127,7 +129,8 @@
           34,
           46
         ]
-      ]
+      ],
+      "built_depth": 3
     },
     "com_low": {
       "name_key": "ZONE_COM_LOW",
@@ -143,8 +146,8 @@
         2
       ],
       "lot_depths": [
-        2,
-        2
+        1,
+        6
       ],
       "floors_by_level": [
         [
@@ -167,7 +170,8 @@
           3,
           4
         ]
-      ]
+      ],
+      "built_depth": 2
     },
     "com_high": {
       "name_key": "ZONE_COM_HIGH",
@@ -182,8 +186,8 @@
         3
       ],
       "lot_depths": [
-        3,
-        4
+        2,
+        6
       ],
       "floors_by_level": [
         [
@@ -206,7 +210,8 @@
           22,
           30
         ]
-      ]
+      ],
+      "built_depth": 3
     },
     "office": {
       "name_key": "ZONE_OFFICE",
@@ -221,8 +226,8 @@
         3
       ],
       "lot_depths": [
-        3,
-        4
+        2,
+        6
       ],
       "floors_by_level": [
         [
@@ -245,7 +250,8 @@
           32,
           44
         ]
-      ]
+      ],
+      "built_depth": 3
     },
     "industry": {
       "name_key": "ZONE_INDUSTRY",
@@ -261,8 +267,8 @@
         4
       ],
       "lot_depths": [
-        3,
-        4
+        2,
+        6
       ],
       "floors_by_level": [
         [
@@ -285,7 +291,8 @@
           3,
           3
         ]
-      ]
+      ],
+      "built_depth": 4
     },
     "mixed": {
       "name_key": "ZONE_MIXED",
@@ -301,8 +308,8 @@
         2
       ],
       "lot_depths": [
-        2,
-        3
+        1,
+        6
       ],
       "floors_by_level": [
         [
@@ -325,7 +332,8 @@
           9,
           12
         ]
-      ]
+      ],
+      "built_depth": 2
     }
   },
   "cells": {
@@ -341,9 +349,9 @@
     "base_chance": 0.7,
     "level_up_chance_per_month": 0.3,
     "max_level": 5,
-    "rise_seconds": 1.4,
+    "rise_seconds": 5.0,
     "lot_margin_m": 1.2,
-    "front_setback_m": 1.0,
+    "front_setback_m": 0.3,
     "densify": {
       "chain": {
         "res_low": "res_mid",
@@ -355,7 +363,9 @@
       "min_demand": 0.1,
       "chance_per_month": 0.1,
       "max_per_month": 4
-    }
+    },
+    "rise_seconds_per_floor": 1.0,
+    "rise_seconds_max": 40.0
   },
   "visuals": {
     "ground_floor_height_m": 4.5,

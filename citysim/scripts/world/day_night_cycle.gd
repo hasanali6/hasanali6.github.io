@@ -24,6 +24,9 @@ var _shadow_cap: float
 var _shadow_per_view: float
 var _shadow_min: float
 var _shadow_refit_ratio: float
+var _shadow_sweep: float = 1.0
+var _turn_step: float = 0.0
+var _last_light_dir := Vector3.ZERO
 var _last_sky_height: float = INF
 var _last_clouds: float = -1.0
 var _fog_base: float
@@ -41,6 +44,8 @@ func _ready() -> void:
 	_shadow_per_view = float(cfg["shadow_distance_per_view_m"])
 	_shadow_min = float(cfg["shadow_distance_min_m"])
 	_shadow_refit_ratio = float(cfg["shadow_refit_ratio"])
+	_shadow_sweep = float(cfg.get("shadow_sweep", 1.0))
+	_turn_step = deg_to_rad(float(cfg.get("shadow_turn_step_deg", 0.0)))
 	_keys = _parse_keys(cfg["keys"])
 	_build_environment(cfg)
 	_setup_sun(cfg)
@@ -169,9 +174,18 @@ func _update_lighting(force: bool) -> void:
 	var height := sun_dir.y
 	var key := _sample(height)
 	var is_day := height >= 0.0
-	var light_dir := sun_dir if is_day else -sun_dir
-
-	_sun.global_transform = Transform3D(Basis.looking_at(-light_dir, Vector3.FORWARD if absf(light_dir.y) > 0.99 else Vector3.UP), Vector3.ZERO)
+	# Shadows follow a calmer sun than the sky colours: a real sun sweeps
+	# 180 degrees in one game day (a few real minutes), which keeps every
+	# shadow swinging round. The shadow sun only moves through part of that
+	# arc around noon (midnight for the moon), and is re-aimed only once it
+	# has turned a little, so shadows stay put while you build.
+	# Hours from noon by day, from midnight by night (the moon lights the
+	# same way round as the noon sun).
+	var from_peak := fposmod(TimeSystem.get_visual_hour() - (12.0 if is_day else 0.0) + 12.0, 24.0) - 12.0
+	var light_dir := sun_direction(12.0 + from_peak * _shadow_sweep)
+	if force or _last_light_dir == Vector3.ZERO or _last_light_dir.angle_to(light_dir) >= _turn_step:
+		_last_light_dir = light_dir
+		_sun.global_transform = Transform3D(Basis.looking_at(-light_dir, Vector3.FORWARD if absf(light_dir.y) > 0.99 else Vector3.UP), Vector3.ZERO)
 	var clouds := WeatherSystem.clouds
 	_sun.light_color = kelvin_to_color(key["kelvin"]).lerp(Color(0.86, 0.89, 0.94), clouds * 0.6)
 	_sun.light_energy = key["light"] * WeatherSystem.light

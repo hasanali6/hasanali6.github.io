@@ -89,7 +89,8 @@ için kullan.
 ### Yık
 Menüdeki kırmızı **Yık** düğmesi (yol panelindeki yıkma modu da aynı işi
 yapar). Bir binaya ya da yola dokun: kırmızı işaretlenir, parmağını kaldırınca
-yıkılır.
+**"Yıkılsın mı? (+iade)"** sorusu çıkar; **✓ Yık** dersen yıkılır, **✗** ya da
+başka yere dokunursan vazgeçilir. (Ağaç kesme onay sormaz; Geri al ile döner.)
 - Yollar fiyatının %75'ini geri verir.
 - Elle konan binalar ve hizmet binaları fiyatının yarısını geri verir.
 - İmarla kendiliğinden büyüyen binalar para vermez. Yık aracı binanın imarını
@@ -123,9 +124,13 @@ parmağını sürükle; geçtiğin yerdeki ağaçlar kesilir (fırça gibi, ücr
 Kesilen ağaçlar kayıtla birlikte saklanır. Sokak ağaçları ve bahçe ağaçları
 yola ve parsele aittir, onlar kesilmez.
 
+**Yol açısı:** yollar birbirine en az 25° açıyla bağlanır. Çizerken dar açı
+önerilmez; araç seni en yakın uygun açıya ve uygun kavşağa yaslar.
+
 **Onay (bütün inşaatlarda):** yol çizmek, bina/hizmet/park yerleştirmek ve
 yolu yükseltmek hemen yapılmaz; önizleme yerinde kalır ve üstte ne olduğu ve
-fiyatıyla birlikte **✓ Yap / ✗ Vazgeç** çıkar. (İmar boyamak ücretsiz olduğu
+fiyatıyla birlikte **✓ Yap / ✗ Vazgeç** çıkar. Bina ya da yol yıkmak da
+onay ister (**✓ Yık**). (İmar boyamak ücretsiz olduğu
 için onay sormaz; hatalı boyadığını üstüne boyayarak düzeltirsin.)
 
 Yollarda: parmağını kaldırınca yol hemen yapılmaz; çizim ekranda
@@ -159,11 +164,18 @@ Art arda 20 işleme kadar geri gidebilirsin (en yenisinden başlayarak). Yerinde
 artık başka bir şey varsa o işlem geri alınamaz.
 
 ### İmar
-Fırça, blok doldurma ve silgi. İmar ücretsizdir. Binalar ancak yola bakan
-hücrelerde, talep varsa büyür.
+Fırça, blok doldurma ve silgi. İmar ücretsizdir. Binalar yola bakan
+hücrelerde, talep varsa büyür ve **boyadığın derinliğin tamamını** alır: bina
+yola sıfır, öndedir; arkada kalan boyalı kareler onun bahçesi/otoparkı olur.
+Yani boyadığın her kare bir binaya ait olur, boş kalmaz. Arkadan yol geçirmek
+istiyorsan sadece 1–2 sıra boya.
 
-- Düşük / orta / yüksek yoğunluk konut (düşük yoğunluk evler **tek kare**,
-  8 × 8 m; arkalarında yol geçecek boş yer kalır)
+**İnşaat süresi:** binalar oyun zamanıyla yükselir: ev birkaç saniyede, kat
+sayısı arttıkça daha uzun (gökdelen ~40 sn, 1× hızda). Oyun durunca inşaat da
+durur, 2×/3× hızda hızlanır.
+
+- Düşük / orta / yüksek yoğunluk konut (düşük yoğunluk evler **tek kare**
+  genişliğinde, 8 m cephe)
 - Düşük / yüksek yoğunluk ticari
 - Ofis, sanayi
 - Karma (altta dükkân, üstte konut)
@@ -433,6 +445,9 @@ araba durur.
 - Ekran yenileme hızına göre FPS kilidi otomatik ayarlanır. GPU yetişemezse 3B
   çözünürlük kendiliğinden düşer.
 - Sol alttaki satır FPS, GPU ve CPU süresini gösterir.
+- **Gölgeler sakin:** gökyüzü renkleri saate göre değişir ama gölgeler gün
+  boyu öğle güneşinin etrafında dar bir yayda, çok yavaş döner; yakınlaştırıp
+  uzaklaştırırken de gölge alanı sık sık değişmez, böylece titremezler.
 - **Ses:** Müzik / Efekt / Ortam kaydırıcıları.
 - **Ortam sesleri:** alçakta kuşlar ve trafik, gece cırcır böcekleri, yağmur,
   yükseklerde rüzgâr.

@@ -48,6 +48,7 @@ func _init(font_size: int, min_touch: float, on_close: Callable) -> void:
 	_row = HBoxContainer.new()
 	_row.add_theme_constant_override("separation", 8)
 	_scroll.add_child(_row)
+	UiStyle.touch_scroll(_scroll, _row)
 	col.add_child(_scroll)
 
 
@@ -101,6 +102,10 @@ func _unlock_id(item: Dictionary) -> String:
 
 
 func _select(id: String) -> void:
+	if UiStyle.is_dragging(_scroll):
+		for k: String in _buttons:
+			(_buttons[k] as Button).set_pressed_no_signal(k == _current)
+		return
 	var item: Dictionary = _items[id]
 	if ProgressionSystem.warn_if_locked(_unlock_id(item), item["name_key"]):
 		for k: String in _buttons:

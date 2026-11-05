@@ -179,6 +179,26 @@ static func chip_button(text: String, color: Color, on_color: Color, min_size: V
 
 
 ## Coloured circular icon badge used at the left end of a resource pill.
+## Makes a horizontal chip strip draggable with a finger: the chips let
+## presses through to the ScrollContainer (so a drag scrolls instead of being
+## swallowed by the button under the finger), and a press that turned into a
+## drag does not count as a tap. Call once with the strip and its row.
+static func touch_scroll(scroll: ScrollContainer, row: Control) -> void:
+	scroll.scroll_deadzone = 14
+	scroll.set_meta("dragging", false)
+	scroll.scroll_started.connect(func() -> void: scroll.set_meta("dragging", true))
+	scroll.scroll_ended.connect(func() -> void:
+		scroll.get_tree().create_timer(0.08).timeout.connect(func() -> void: scroll.set_meta("dragging", false)))
+	row.child_entered_tree.connect(func(node: Node) -> void:
+		if node is Control:
+			(node as Control).mouse_filter = Control.MOUSE_FILTER_PASS)
+
+
+## True while the strip is being dragged (a chip press then is not a tap).
+static func is_dragging(scroll: ScrollContainer) -> bool:
+	return scroll != null and bool(scroll.get_meta("dragging", false))
+
+
 static func badge(icon_name: String, color: Color, size: float) -> PanelContainer:
 	var panel := PanelContainer.new()
 	var box := circle_box(color, size, 3, false)

@@ -54,8 +54,8 @@ ROAD_ERR_SHORT,Yol çok kısa,Road too short
 ROAD_ERR_LONG,Yol çok uzun,Road too long
 ROAD_ERR_EXISTS,Bu yol zaten var,Road already exists
 ROAD_ERR_OVERLAP,Yollar üst üste biniyor,Roads overlap
-ROAD_ERR_ANGLE,Açı çok dar,Angle too sharp
-ROAD_ERR_TOO_CLOSE,Kavşaklar çok yakın,Junctions too close
+ROAD_ERR_ANGLE,"Yollar birbirine çok dar açıyla birleşiyor (en az 25°): yolu daha dik bağla","Roads meet at too sharp an angle (at least 25°): join at a wider angle"
+ROAD_ERR_TOO_CLOSE,"Kavşaklar birbirine çok yakın (en az 4 m): yolu biraz kaydır","Junctions too close together (at least 4 m): move the road a little"
 ROAD_ERR_MONEY,Para yetmiyor,Not enough money
 ROAD_ERR_OUTSIDE,Harita sınırı dışında,Outside the map
 ZONE_RES_LOW,Düşük yoğunluk konut,Low density residential
@@ -402,3 +402,6 @@ ROAD_WARN_DEMOLISH_HINT,kırmızı binalar yıkılır,red buildings will be demo
 ROAD_BUILT_DEMOLISHED,"Yol yapıldı, %d bina yıkıldı (Geri al ile geri getirebilirsin)","Road built, %d buildings demolished (Undo brings them back)"
 ROAD_ERR_PARALLEL,Başka bir yolun üstüne/çok yakınına paralel yol yapılamaz,A road cannot run on top of or right beside another road
 ROAD_UPGRADE_Q,Yükselt:,Upgrade to:
+DEMOLISH_BUILDING_Q,"Bu bina yıkılsın mı? (+%s iade)","Demolish this building? (+%s refund)"
+DEMOLISH_ROAD_Q,"Bu yol kaldırılsın mı? (+%s iade)","Remove this road? (+%s refund)"
+DEMOLISH_CONFIRM,✓ Yık,✓ Demolish

@@ -196,24 +196,21 @@ func _on_up(screen_pos: Vector2) -> void:
 				return
 			_pick_target(screen_pos)
 			if _target_building >= 0:
-				var back: int = _buildings.refund_of(_target_building)
-				_remember({"kind": "building", "rec": _buildings.record_of(_target_building), "refund": back})
-				_buildings.demolish(_target_building, true)
-				EventBus.zones_changed.emit()
-				if back > 0:
-					EconomySystem.refund(back)
-				EventBus.sfx_requested.emit("bulldoze")
-				EventBus.notification_posted.emit("roads", tr("BUILDING_DEMOLISHED") % UiStyle.format_int(back))
+				# Ask first: the building stays outlined until ✓ / ✗.
+				_pending = {"demolish_building": _target_building}
+				EventBus.road_preview_changed.emit({"active": false})
+				EventBus.road_proposal_changed.emit({"active": true, "node": "RoadTool", "demolish": true,
+					"text": tr("DEMOLISH_BUILDING_Q") % UiStyle.format_int(_buildings.refund_of(_target_building))})
+				return
 			elif _highlight >= 0 and _net.is_outside_segment(_highlight):
 				EventBus.sfx_requested.emit("error")
 				EventBus.notification_posted.emit("roads", tr("ROAD_ERR_OUTSIDE_LINK"))
 			elif _highlight >= 0:
-				var entry := {"kind": "road", "rec": _net.record_of(_highlight), "zones": _zones_along(_highlight)}
-				var refund: int = _net.demolish(_highlight)
-				entry["refund"] = refund
-				_remember(entry)
-				EventBus.sfx_requested.emit("bulldoze")
-				EventBus.notification_posted.emit("roads", tr("ROAD_REFUND") % UiStyle.format_int(refund))
+				_pending = {"demolish_road": _highlight}
+				EventBus.road_preview_changed.emit({"active": false})
+				EventBus.road_proposal_changed.emit({"active": true, "node": "RoadTool", "demolish": true,
+					"text": tr("DEMOLISH_ROAD_Q") % UiStyle.format_int(_net.refund_of(_highlight))})
+				return
 			_reset()
 		"curve":
 			if _curve_stage == 0:
@@ -393,8 +390,41 @@ func _confirm_upgrade(seg_id: int) -> void:
 		EventBus.notification_posted.emit("roads", tr(res["error"]))
 
 
+func _demolish_building(bid: int) -> void:
+	if not _buildings.buildings.has(bid):
+		return
+	var back: int = _buildings.refund_of(bid)
+	_remember({"kind": "building", "rec": _buildings.record_of(bid), "refund": back})
+	_buildings.demolish(bid, true)
+	EventBus.zones_changed.emit()
+	if back > 0:
+		EconomySystem.refund(back)
+	EventBus.sfx_requested.emit("bulldoze")
+	EventBus.notification_posted.emit("roads", tr("BUILDING_DEMOLISHED") % UiStyle.format_int(back))
+
+
+func _demolish_road(seg_id: int) -> void:
+	if not (_net.graph as RoadGraph).segments.has(seg_id):
+		return
+	var entry := {"kind": "road", "rec": _net.record_of(seg_id), "zones": _zones_along(seg_id)}
+	var refund: int = _net.demolish(seg_id)
+	entry["refund"] = refund
+	_remember(entry)
+	EventBus.sfx_requested.emit("bulldoze")
+	EventBus.notification_posted.emit("roads", tr("ROAD_REFUND") % UiStyle.format_int(refund))
+
+
 func confirm_pending() -> void:
 	if _pending.is_empty():
+		return
+	if _pending.has("demolish_building") or _pending.has("demolish_road"):
+		var p := _pending
+		_clear_pending()
+		if p.has("demolish_building"):
+			_demolish_building(int(p["demolish_building"]))
+		else:
+			_demolish_road(int(p["demolish_road"]))
+		_reset()
 		return
 	if _pending.has("upgrade"):
 		var seg_id := int(_pending["upgrade"])
@@ -424,7 +454,7 @@ func confirm_pending() -> void:
 func cancel_pending() -> void:
 	if _pending.is_empty():
 		return
-	var was_upgrade := _pending.has("upgrade")
+	var was_upgrade := _pending.has("upgrade") or _pending.has("demolish_building") or _pending.has("demolish_road")
 	_clear_pending()
 	if was_upgrade:
 		_reset()
@@ -680,11 +710,26 @@ func _snap(screen_pos: Vector2, anchor: Variant) -> Variant:
 	var ang := _ref_angle + roundf(rel / _angle_step) * _angle_step
 	if absf(angle_difference(ang, v.angle())) > _angle_tolerance:
 		ang = v.angle()
+	# Never offer a direction that would meet a road at the start at too
+	# sharp an angle: step on to the nearest angle that is allowed.
+	if not graph.direction_ok(a, Vector2.from_angle(ang)):
+		var best := ang
+		var best_diff := INF
+		for k in range(1, 7):
+			for sgn: float in [-1.0, 1.0]:
+				var cand := ang + sgn * k * _angle_step
+				var diff := absf(angle_difference(cand, v.angle()))
+				if diff < best_diff and graph.direction_ok(a, Vector2.from_angle(cand)):
+					best = cand
+					best_diff = diff
+		ang = best
 	var length := maxf(roundf(v.length() / _grid) * _grid, _grid)
 	var stepped := a + Vector2.from_angle(ang) * length
 	if target != null:
 		var tv: Vector2 = (target as Vector2) - a
-		if tv.length() > 1.0 and (absf(angle_difference(tv.angle(), ang)) <= _max_turn or target_px < _node_radius_px * 0.35):
+		# Snap onto a road or junction only where the angles work out at both ends.
+		if tv.length() > 1.0 and (absf(angle_difference(tv.angle(), ang)) <= _max_turn or target_px < _node_radius_px * 0.35) \
+				and graph.direction_ok(target, -tv) and graph.direction_ok(a, tv):
 			return target
 	return stepped
 
