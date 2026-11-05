@@ -105,9 +105,27 @@ def main() -> None:
     sq = square_crop(icon_src)
     rounded(sq.resize((512, 512), Image.LANCZOS), 0.22).save(os.path.join(ROOT, "icon.png"))
     rounded(sq.resize((192, 192), Image.LANCZOS), 0.22).save(os.path.join(OUT, "icon_192.png"))
-    # Adaptive icon: the art fills the background; the foreground is left
-    # clear so launchers can mask the shape without cutting the city.
-    sq.resize((432, 432), Image.LANCZOS).save(os.path.join(OUT, "icon_bg_432.png"))
+    # Adaptive icon: launchers cut the layers to a circle or squircle and
+    # only promise the middle two thirds, so the city is scaled into that
+    # safe zone over a blurred, enlarged copy of its own sky. The foreground
+    # is left clear.
+    # The sky behind: a gradient between the art's own corner colours, so
+    # the scaled art blends in without a visible frame.
+    small = sq.resize((64, 64), Image.LANCZOS)
+    c0 = small.getpixel((2, 2))
+    c1 = small.getpixel((61, 61))
+    bg = Image.new("RGB", (432, 432))
+    px = bg.load()
+    for y in range(432):
+        for x in range(432):
+            t = (x + y) / 862.0
+            px[x, y] = tuple(int(c0[i] + (c1[i] - c0[i]) * t) for i in range(3))
+    art = sq.resize((318, 318), Image.LANCZOS)
+    feather = Image.new("L", (318, 318), 0)
+    ImageDraw.Draw(feather).rounded_rectangle([18, 18, 299, 299], radius=50, fill=255)
+    feather = feather.filter(ImageFilter.GaussianBlur(14))
+    bg.paste(art, (57, 57), feather)
+    bg.save(os.path.join(OUT, "icon_bg_432.png"))
     Image.new("RGBA", (432, 432), (0, 0, 0, 0)).save(os.path.join(OUT, "icon_fg_432.png"))
 
     # Splash: the scene, the title over the open sky.
