@@ -5,6 +5,12 @@ uniform float river_half = 40.0;
 uniform vec4 lakes[4];
 uniform int lake_count = 0;
 uniform float coast_z = 1e9;       // sea south of the wavy shoreline (MapWater.coast_at)
+// Baked distance field (tools/gen_water_sdf.py): one texel read instead of a
+// search over every river segment per pixel.
+uniform sampler2D water_sdf : filter_linear, repeat_disable;
+uniform bool sdf_ready = false;
+uniform float sdf_extent = 8192.0;
+uniform float sdf_range = 64.0;
 uniform vec3 coast_waves[2];       // amplitude, wavelength, phase
 
 // Signed distance to the sea shore (negative = sea).
@@ -32,6 +38,14 @@ float segment_distance(vec2 p, vec2 a, vec2 b) {
 
 // Signed distance to the nearest water edge in metres (negative = water).
 float water_distance(vec2 p) {
+	if (sdf_ready) {
+		vec2 uv = p / sdf_extent + 0.5;
+		if (uv.x > 0.0 && uv.y > 0.0 && uv.x < 1.0 && uv.y < 1.0) {
+			return (texture(water_sdf, uv).r - 0.5) * 2.0 * sdf_range;
+		}
+		// Beyond the baked area only the open sea is near enough to matter.
+		return min(coast_distance(p), sdf_range);
+	}
 	// Out at sea the river and lakes are far away: the shore is all that
 	// matters, and the per-pixel river search is skipped.
 	float sea = coast_distance(p);

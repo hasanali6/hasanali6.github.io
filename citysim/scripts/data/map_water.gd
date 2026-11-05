@@ -9,6 +9,9 @@ extends RefCounted
 const MAX_SHADER_POINTS := 96
 const MAX_LAKES := 4
 const COARSE_SKIP_M := 160.0  # beyond this the coarse river distance is good enough
+const SDF_PATH := "res://assets/textures/water_sdf.png"
+const SDF_EXTENT := 8192.0      # must match tools/gen_water_sdf.py
+const SDF_RANGE := 64.0
 
 var river := PackedVector2Array()
 var river_half: float
@@ -162,4 +165,11 @@ func apply_to_material(mat: ShaderMaterial) -> void:
 	while waves.size() < 2:
 		waves.append(Vector3(0.0, 1000.0, 0.0))
 	mat.set_shader_parameter("coast_z", coast_z if has_coast() else 1e9)
+	# Baked distance field (tools/gen_water_sdf.py); the shaders fall back to
+	# working it out per pixel if it is missing.
+	if ResourceLoader.exists(SDF_PATH):
+		mat.set_shader_parameter("water_sdf", load(SDF_PATH))
+		mat.set_shader_parameter("sdf_ready", true)
+		mat.set_shader_parameter("sdf_extent", SDF_EXTENT)
+		mat.set_shader_parameter("sdf_range", SDF_RANGE)
 	mat.set_shader_parameter("coast_waves", waves)

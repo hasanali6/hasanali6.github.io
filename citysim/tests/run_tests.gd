@@ -43,6 +43,7 @@ func _initialize() -> void:
 	_test_dry_run_copies()
 	_test_split_keeps_cells()
 	_test_closest_t()
+	_test_water_sdf()
 	_test_progression()
 	_test_weather_traffic()
 	_test_highway_bridge()
@@ -648,6 +649,30 @@ func _test_lane_geometry() -> void:
 	var before := lg.piece_total()
 	lg.rebuild(g, roads["types"], roads["mesh"])
 	_check(lg.piece_total() == before, "rebuilding reuses unchanged pieces")
+
+
+func _test_water_sdf() -> void:
+	# The baked water distance must match MapWater (rerun tools/gen_water_sdf.py
+	# after changing data/map.json "water").
+	var img := Image.load_from_file(ProjectSettings.globalize_path("res://assets/textures/water_sdf.png"))
+	var cfg: Dictionary = DataLoader.load_json("res://data/map.json")["water"]
+	var w := MapWater.new(cfg)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var worst := 0.0
+	var size := img.get_width()
+	for k in 400:
+		var p := Vector2(rng.randf_range(-2200, 2200), rng.randf_range(-2200, 2200))
+		# Sample near the water too, where accuracy matters.
+		var rp: Vector2 = w.river[k % w.river.size()]
+		if k % 2 == 0 and absf(rp.x) < 3500.0 and absf(rp.y) < 3500.0:
+			p = rp + Vector2(rng.randf_range(-80, 80), rng.randf_range(-80, 80))
+		var uv := p / MapWater.SDF_EXTENT + Vector2(0.5, 0.5)
+		var px := Vector2i(clampi(int(uv.x * size), 0, size - 1), clampi(int(uv.y * size), 0, size - 1))
+		var baked := (img.get_pixel(px.x, px.y).r - 0.5) * 2.0 * MapWater.SDF_RANGE
+		var real := clampf(w.distance(p), -MapWater.SDF_RANGE, MapWater.SDF_RANGE)
+		worst = maxf(worst, absf(baked - real))
+	_check(worst < 4.5, "baked water distance matches the map (worst %.2f m)" % worst)
 
 
 func _test_closest_t() -> void:
