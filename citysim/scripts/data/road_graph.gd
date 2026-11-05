@@ -52,6 +52,7 @@ var _next_segment: int = 1
 # on ramps at both ends.
 var elevated_types: Dictionary = {}
 var node_snap: float = 0.0   # an end landing this close to a road's end node joins that node
+var parallel_gap: float = 0.0  # roads running (almost) side by side must be at least this far apart
 var _config: Dictionary
 var overpass_height: float = 7.0
 var overpass_ramp: float = 55.0
@@ -78,6 +79,7 @@ func lift_at(seg_id: int, t: float) -> float:
 func _init(config: Dictionary) -> void:
 	_config = config
 	node_snap = float(config.get("node_snap_m", 0.0))
+	parallel_gap = float(config.get("parallel_gap_m", 0.0))
 	sample_step = float(config["sample_step_m"])
 	merge_radius = float(config["merge_radius_m"])
 	min_segment = float(config["min_segment_m"])
@@ -359,6 +361,32 @@ func plan_road(start: Vector2, end: Vector2, control: Variant, elevated: bool = 
 		if unique.is_empty() or (unique.back()["point"] as Vector2).distance_to(hit["point"]) > merge_radius:
 			unique.append(hit)
 	hits = unique
+
+	# No road (almost) on top of another one: away from its ends and
+	# crossings, the new road must not run alongside a road closer than
+	# parallel_gap at a shallow angle.
+	if parallel_gap > 0.0:
+		var keep_clear: Array[Vector2] = [a, b]
+		for hit in hits:
+			keep_clear.append(hit["point"])
+		var n := maxi(int(length / 4.0), 2)
+		for i in range(1, n):
+			var t := float(i) / n
+			var p := bezier(a, ctrl, b, t)
+			var near_end := false
+			for q: Vector2 in keep_clear:
+				if p.distance_to(q) < parallel_gap * 1.5:
+					near_end = true
+					break
+			if near_end:
+				continue
+			var other := find_segment_near(p, parallel_gap)
+			if other.is_empty():
+				continue
+			var od := tangent_on(int(other["segment"]), float(other["t"])).normalized()
+			var nd := bezier_tangent(a, ctrl, b, t).normalized()
+			if absf(od.dot(nd)) > cos(min_angle):
+				return _fail("ROAD_ERR_PARALLEL")
 
 	# Junctions must not end up closer than half the minimum segment length.
 	var stops: Array[Vector2] = [a]

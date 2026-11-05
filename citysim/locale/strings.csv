@@ -394,3 +394,10 @@ UNDO_BLOCKED,"Geri alınamadı: yerinde artık başka bir şey var","Cannot undo
 TREES_CLEARED,%d ağaç kesildi,%d trees cleared
 ROAD_ERR_BUILDING,"Yolun önünde bina var: önce binayı yık ya da yolu başka yerden geçir","A building is in the way: demolish it first or route the road elsewhere"
 UNDO_DONE_BUILD,"Son inşaat geri alındı, para iade edildi","Last construction undone, money refunded"
+ROAD_CONFIRM,✓ Yap,✓ Build
+ROAD_CONFIRM_DEMOLISH,✓ Yine de yap,✓ Build anyway
+ROAD_CANCEL,✗ Vazgeç,✗ Cancel
+ROAD_WARN_DEMOLISH,"⚠ %d bina yıkılacak (kırmızı olanlar)","⚠ %d buildings will be demolished (in red)"
+ROAD_WARN_DEMOLISH_HINT,kırmızı binalar yıkılır,red buildings will be demolished
+ROAD_BUILT_DEMOLISHED,"Yol yapıldı, %d bina yıkıldı (Geri al ile geri getirebilirsin)","Road built, %d buildings demolished (Undo brings them back)"
+ROAD_ERR_PARALLEL,Başka bir yolun üstüne/çok yakınına paralel yol yapılamaz,A road cannot run on top of or right beside another road

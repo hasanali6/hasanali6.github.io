@@ -92,11 +92,13 @@ func water_error(plan: Dictionary, type: String) -> String:
 
 
 ## Plans and, if affordable, builds a road. Returns the plan with "cost" added.
-func build_road(start: Vector2, end: Vector2, control: Variant, type: String) -> Dictionary:
+## allow_demolish: the player confirmed building over the buildings in the
+## way (they go); otherwise such a road is refused.
+func build_road(start: Vector2, end: Vector2, control: Variant, type: String, allow_demolish: bool = false) -> Dictionary:
 	var plan := graph.plan_road(start, end, control, graph.elevated_types.has(type))
 	if not plan["ok"]:
 		return plan
-	if not buildings_lost(func(g: RoadGraph) -> void: g.commit_road(plan, type)).is_empty():
+	if not allow_demolish and not buildings_lost(func(g: RoadGraph) -> void: g.commit_road(plan, type)).is_empty():
 		return {"ok": false, "error": "ROAD_ERR_BUILDING"}
 	var wet := water_error(plan, type)
 	if wet != "":

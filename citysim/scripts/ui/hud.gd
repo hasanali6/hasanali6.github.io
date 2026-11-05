@@ -69,6 +69,9 @@ var _road_panel: PanelContainer
 var _road_type_buttons: Dictionary = {}
 var _road_mode_buttons: Dictionary = {}
 var _undo_button: Button
+var _confirm_bar: PanelContainer
+var _confirm_label: Label
+var _confirm_yes: Button
 var _road_type: String = ""
 var _road_mode: String = "straight"
 var _zone_panel: PanelContainer
@@ -165,6 +168,9 @@ func _ready() -> void:
 	EventBus.tapped.connect(func(_p: Vector2) -> void: _set_tray_open(false))
 	EventBus.money_changed.connect(func(balance: int) -> void: _money_label.text = UiStyle.format_int(balance))
 	EventBus.road_preview_changed.connect(_on_road_preview)
+	_confirm_bar = _build_confirm_bar()
+	_place(_confirm_bar, Vector2(0.5, 0.0), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_END, Vector2(0, 190))
+	EventBus.road_proposal_changed.connect(_on_road_proposal)
 	EventBus.building_inspected.connect(_on_building_inspected)
 	EventBus.city_stats_changed.connect(_on_city_stats)
 	EventBus.demand_changed.connect(func(d: Dictionary) -> void: _rci.set_values(d))
@@ -1180,6 +1186,50 @@ func _select_road(type: String, mode: String) -> void:
 	for key: String in _road_mode_buttons:
 		(_road_mode_buttons[key] as Button).set_pressed_no_signal(key == mode)
 	EventBus.build_tool_selected.emit("road", {"type": type, "mode": mode})
+
+
+## ✓ / ✗ for a drawn road, with its price and the buildings it would take.
+func _build_confirm_bar() -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.visible = false
+	var box := UiStyle.pill_box()
+	box.set_corner_radius_all(26)
+	box.set_content_margin_all(12)
+	panel.add_theme_stylebox_override("panel", box)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	panel.add_child(row)
+	_confirm_label = _label("", FONT_SIZE - 4)
+	_confirm_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_confirm_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(_confirm_label)
+	_confirm_yes = UiStyle.chip_button("ROAD_CONFIRM", UiStyle.GREEN.darkened(0.1), UiStyle.GREEN.darkened(0.25), Vector2(170, MIN_TOUCH * 0.8))
+	_confirm_yes.toggle_mode = false
+	_confirm_yes.add_theme_font_size_override("font_size", FONT_SIZE - 4)
+	_confirm_yes.pressed.connect(func() -> void: get_tree().current_scene.get_node("RoadTool").confirm_pending())
+	row.add_child(_confirm_yes)
+	var no := UiStyle.chip_button("ROAD_CANCEL", UiStyle.RED.darkened(0.05), UiStyle.RED.darkened(0.2), Vector2(130, MIN_TOUCH * 0.8))
+	no.toggle_mode = false
+	no.add_theme_font_size_override("font_size", FONT_SIZE - 4)
+	no.pressed.connect(func() -> void: get_tree().current_scene.get_node("RoadTool").cancel_pending())
+	row.add_child(no)
+	return panel
+
+
+func _on_road_proposal(info: Dictionary) -> void:
+	if not info.get("active", false):
+		_confirm_bar.visible = false
+		return
+	var lost := int(info.get("lost", 0))
+	var text := tr("ROAD_COST") % [UiStyle.format_int(int(info["cost"])), roundi(float(info["length"]))]
+	if lost > 0:
+		text += "\n" + tr("ROAD_WARN_DEMOLISH") % lost
+		_confirm_yes.text = tr("ROAD_CONFIRM_DEMOLISH")
+	else:
+		_confirm_yes.text = tr("ROAD_CONFIRM")
+	_confirm_label.text = text
+	_confirm_bar.visible = true
+	_confirm_bar.reset_size()
 
 
 func _on_road_preview(info: Dictionary) -> void:

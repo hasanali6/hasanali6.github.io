@@ -84,6 +84,8 @@ signal transit_reported(report: Dictionary)
 signal leisure_reported(report: Dictionary)
 ## Bulldozer actions that can be undone (count).
 signal undo_changed(count: int)
+## A drawn road waiting for ✓ / ✗: {active, cost, length, lost (buildings it would take)}.
+signal road_proposal_changed(info: Dictionary)
 signal districts_changed()
 ## District being drawn: {points, error}.
 signal district_draft_changed(info: Dictionary)

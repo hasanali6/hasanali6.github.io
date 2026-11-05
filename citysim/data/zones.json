@@ -20,11 +20,11 @@
       ],
       "lot_widths": [
         1,
-        2
+        1
       ],
       "lot_depths": [
-        2,
-        3
+        1,
+        1
       ],
       "floors_by_level": [
         [

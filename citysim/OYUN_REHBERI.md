@@ -123,9 +123,18 @@ parmağını sürükle; geçtiğin yerdeki ağaçlar kesilir (fırça gibi, ücr
 Kesilen ağaçlar kayıtla birlikte saklanır. Sokak ağaçları ve bahçe ağaçları
 yola ve parsele aittir, onlar kesilmez.
 
-**Bina olan yere yol yapılmaz:** oyun yolu yapmadan önce sonucu bir kopyada
-dener; tek bir bina bile parselini kaybedecekse önizleme kırmızı olur ve
-"Yolun önünde bina var" uyarısı çıkar; yol yapılmaz, hiçbir bina yıkılmaz.
+**Onay:** yolu çizip parmağını kaldırınca yol hemen yapılmaz; çizim ekranda
+kalır ve üstte fiyat/uzunlukla birlikte **✓ Yap / ✗ Vazgeç** çıkar. Başka bir
+yere dokunursan çizim iptal olur ve yeniden çizersin.
+
+**Yolun önünde bina varsa:** oyun yolu önce bir kopyada dener. Bir bina
+parselini kaybedecekse o bina **kırmızı** gösterilir ve onay çubuğunda
+"⚠ N bina yıkılacak" yazar; düğme **✓ Yine de yap** olur. Onaylamadıkça
+hiçbir bina yıkılmaz. Yanlışlıkla yıktıysan **Geri al** yolu kaldırır ve
+yıkılan binaları geri getirir.
+
+**Üst üste yol yok:** bir yol başka bir yolun üstüne ya da 12 m'den yakınına
+paralel (açısı 25°'den dar) çizilemez.
 Yoldan geçtiğin tarafın karşısındaki parseller etkilenmez; bir yolu bölmek
 karşı taraftaki binaların yerini değiştirmez.
 
@@ -148,7 +157,8 @@ artık başka bir şey varsa o işlem geri alınamaz.
 Fırça, blok doldurma ve silgi. İmar ücretsizdir. Binalar ancak yola bakan
 hücrelerde, talep varsa büyür.
 
-- Düşük / orta / yüksek yoğunluk konut
+- Düşük / orta / yüksek yoğunluk konut (düşük yoğunluk evler **tek kare**,
+  8 × 8 m; arkalarında yol geçecek boş yer kalır)
 - Düşük / yüksek yoğunluk ticari
 - Ofis, sanayi
 - Karma (altta dükkân, üstte konut)

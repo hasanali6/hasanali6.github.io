@@ -22,7 +22,10 @@ const UNDO_DEPTH := 20
 var _history: Array = []
 var _cutting: bool = false
 var _block_key: String = ""
-var _block_hit: bool = false
+var _block_lost: Dictionary = {}
+# A drawn road waiting for the player's ✓ / ✗ (see confirm_pending).
+var _pending: Dictionary = {}
+var _lost_boxes: Array[MeshInstance3D] = []
 var _cut_ids := PackedInt32Array()
 var _ref_angle: float = 0.0
 var _max_turn: float
@@ -96,6 +99,8 @@ func _preview_material(color: Color, alpha: float) -> StandardMaterial3D:
 
 
 func _on_tool_selected(tool: String, options: Dictionary) -> void:
+	if not _pending.is_empty():
+		_clear_pending()
 	_active = tool == "road"
 	if _active:
 		_type = str(options.get("type", _type))
@@ -119,6 +124,8 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 
 
 func _on_down(screen_pos: Vector2) -> void:
+	if not _pending.is_empty():
+		cancel_pending()
 	match _mode:
 		"bulldoze":
 			_pick_target(screen_pos)
@@ -291,6 +298,9 @@ func undo_last() -> void:
 		# Construction: taken away again with the full price back.
 		"built_road":
 			ok = _net.remove_built(entry["ids"], int(entry["cost"]))
+			if ok:
+				for rec: Dictionary in entry.get("lost", []):
+					_buildings.undo_demolish(rec)
 		"upgraded":
 			ok = _net.revert_upgrade(int(entry["seg"]), str(entry["old"]), int(entry["cost"]))
 		"placed":
@@ -339,29 +349,103 @@ func _rezone(zones: Array) -> void:
 
 ## Exact "would this road push a building off its lot" for the preview,
 ## cached: dragging only re-checks when the snapped road changes.
-func _blocks_buildings(plan: Dictionary) -> bool:
-	var key := "%s|%s|%s|%s|%d" % [plan["a"], plan["b"], plan["control"], _type, _net.graph.segments.size()]
+func _lost_for(plan: Dictionary) -> Dictionary:
+	var key := "%s|%s|%s|%s|%d|%d" % [plan["a"], plan["b"], plan["control"], _type, _net.graph.segments.size(),
+		_buildings.buildings.size() if _buildings != null else 0]
 	if key != _block_key:
 		_block_key = key
 		var t := _type
-		_block_hit = not _net.buildings_lost(func(g: RoadGraph) -> void: g.commit_road(plan, t)).is_empty()
-	return _block_hit
+		_block_lost = _net.buildings_lost(func(g: RoadGraph) -> void: g.commit_road(plan, t))
+	return _block_lost
 
 
+## A finished drawing is not built straight away: it waits, drawn, for the
+## player's ✓ (confirm_pending) or ✗ (cancel_pending). Buildings in its way
+## are shown in red and named in the question.
 func _try_build(a: Vector2, b: Vector2, control: Variant) -> void:
 	var check := _evaluate(a, b, control)
-	if check["valid"]:
-		var result: Dictionary = _net.build_road(a, b, control, _type)
-		if not result["ok"]:
+	if not check["valid"]:
+		if a.distance_to(b) > 0.5:
 			EventBus.sfx_requested.emit("error")
-			EventBus.notification_posted.emit("roads", tr(result["error"]))
-		else:
-			EventBus.sfx_requested.emit("build_road")
-			remember({"kind": "built_road", "ids": result.get("created", PackedInt32Array()), "cost": int(result.get("cost", 0))})
-	elif a.distance_to(b) > 0.5:
+			EventBus.notification_posted.emit("roads", tr(check["error"]))
+		_reset()
+		return
+	_pending = {"a": a, "b": b, "control": control, "lost": check.get("lost", {}), "cost": int(check["cost"])}
+	_start = null
+	_end = null
+	_control = null
+	_curve_stage = 0
+	_marker.visible = false
+	_show_lost(_pending["lost"])
+	EventBus.road_preview_changed.emit({"active": false})
+	EventBus.road_proposal_changed.emit({"active": true, "cost": int(check["cost"]), "length": float(check["length"]),
+		"lost": (_pending["lost"] as Dictionary).size()})
+
+
+func confirm_pending() -> void:
+	if _pending.is_empty():
+		return
+	var p := _pending
+	var lost: Dictionary = p["lost"]
+	var records := []
+	for bid: int in lost:
+		if _buildings.buildings.has(bid):
+			records.append(_buildings.record_of(bid))
+	var result: Dictionary = _net.build_road(p["a"], p["b"], p["control"], _type, not lost.is_empty())
+	_clear_pending()
+	if not result["ok"]:
 		EventBus.sfx_requested.emit("error")
-		EventBus.notification_posted.emit("roads", tr(check["error"]))
-	_reset()
+		EventBus.notification_posted.emit("roads", tr(result["error"]))
+		return
+	EventBus.sfx_requested.emit("build_road")
+	remember({"kind": "built_road", "ids": result.get("created", PackedInt32Array()), "cost": int(result.get("cost", 0)),
+		"lost": records})
+	if not records.is_empty():
+		EventBus.notification_posted.emit("roads", tr("ROAD_BUILT_DEMOLISHED") % records.size())
+
+
+func cancel_pending() -> void:
+	if _pending.is_empty():
+		return
+	_clear_pending()
+
+
+func has_pending() -> bool:
+	return not _pending.is_empty()
+
+
+func _clear_pending() -> void:
+	_pending = {}
+	_preview.visible = false
+	_show_lost({})
+	EventBus.road_proposal_changed.emit({"active": false})
+
+
+## Red boxes over the buildings a road would push off their lots.
+func _show_lost(lost: Dictionary) -> void:
+	var i := 0
+	for bid: int in lost:
+		if _buildings == null or not _buildings.buildings.has(bid):
+			continue
+		var b: Dictionary = _buildings.buildings[bid]
+		if i >= _lost_boxes.size():
+			var mi := MeshInstance3D.new()
+			mi.mesh = BoxMesh.new()
+			mi.material_override = _invalid_mat
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(mi)
+			_lost_boxes.append(mi)
+		var box := _lost_boxes[i]
+		var f: Vector2 = b["front"]
+		var fz := Vector3(f.x, 0, f.y)
+		var h := maxf(int(b["floors"]) * 3.4 + 2.0, 5.0)
+		(box.mesh as BoxMesh).size = Vector3(float(b["width"]) + 0.6, h, float(b["depth"]) + 0.6)
+		var c: Vector2 = b["centre"]
+		box.transform = Transform3D(Basis(Vector3.UP.cross(fz), Vector3.UP, fz), Vector3(c.x, h * 0.5, c.y))
+		box.visible = true
+		i += 1
+	for k in range(i, _lost_boxes.size()):
+		_lost_boxes[k].visible = false
 
 
 func _reset() -> void:
@@ -373,6 +457,7 @@ func _reset() -> void:
 	_target_building = -1
 	_preview.visible = false
 	_marker.visible = false
+	_show_lost({})
 	EventBus.road_preview_changed.emit({"active": false})
 
 
@@ -396,8 +481,10 @@ func _evaluate(a: Vector2, b: Vector2, control: Variant) -> Dictionary:
 	if wet != "":
 		return {"valid": false, "error": wet, "cost": 0, "length": plan["length"]}
 	var cost: int = _net.plan_cost(plan, _type)
-	if _blocks_buildings(plan):
-		return {"valid": false, "error": "ROAD_ERR_BUILDING", "cost": cost, "length": plan["length"]}
+	var lost := _lost_for(plan)
+	if not lost.is_empty():
+		return {"valid": true, "error": "", "cost": cost, "length": plan["length"], "lost": lost,
+			"hint": "ROAD_WARN_DEMOLISH_HINT"}
 	if not EconomySystem.can_afford(cost):
 		return {"valid": false, "error": "ROAD_ERR_MONEY", "cost": cost, "length": plan["length"]}
 	return {"valid": true, "error": "", "cost": cost, "length": plan["length"]}
@@ -431,7 +518,9 @@ func _refresh() -> void:
 	var width := RoadTypes.total_width(_net.type_config(_type))
 	_preview.transform = Transform3D.IDENTITY
 	_preview.mesh = _ribbon(a, ctrl, b, width)
-	_preview.material_override = _valid_mat if check["valid"] else _invalid_mat
+	var warn: bool = not (check.get("lost", {}) as Dictionary).is_empty()
+	_preview.material_override = _valid_mat if check["valid"] and not warn else _invalid_mat
+	_show_lost(check.get("lost", {}))
 	_marker.material_override = _preview.material_override
 	_preview.visible = true
 	check["active"] = true

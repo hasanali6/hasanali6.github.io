@@ -614,10 +614,13 @@ func record_of(id: int) -> Dictionary:
 	var grid: ZoneGrid = _zones.grid
 	var b: Dictionary = buildings[id]
 	var keys := []
+	var centres := []
 	for c: int in b["cells"]:
 		keys.append([grid.segment[c], grid.side[c], grid.along[c], grid.depth[c]])
+		centres.append([grid.centers[c].x, grid.centers[c].y])
 	var front_cell: int = b["cells"][0]
 	return {
+		"centres": centres,
 		"id": b["id"], "zone_key": b["zone_key"], "level": b["level"], "style": b["style"], "floors": b["floors"],
 		"manual": b["manual"], "seed": b["seed"], "palette": b["palette"], "lot": [b["lot"].x, b["lot"].y],
 		"abandoned": b["abandoned"], "empty_months": b["empty_months"], "abandoned_months": b["abandoned_months"],
@@ -667,13 +670,21 @@ func _restore_record(rec: Dictionary) -> int:
 	for k: Array in rec["cells"]:
 		var idx := grid.index_of(int(k[0]), int(k[1]), int(k[2]), int(k[3]))
 		if idx < 0 or grid.building[idx] != ZoneGrid.FREE:
-			return -1
+			lot = PackedInt32Array()
+			break
 		lot.append(idx)
+	# Undo after the roads were split again: find the same cells by place.
+	if lot.is_empty() and rec.has("centres"):
+		for cc: Array in rec["centres"]:
+			var idx := grid.cell_at(Vector2(float(cc[0]), float(cc[1])) + Vector2(0.01, 0.01))
+			if idx < 0 or grid.building[idx] != ZoneGrid.FREE or idx in lot:
+				return -1
+			lot.append(idx)
 	if lot.is_empty():
 		return -1
 	var f: Array = rec["front"]
 	var front := grid.index_of(int(f[0]), int(f[1]), int(f[2]), int(f[3]))
-	if front < 0:
+	if front < 0 or not front in lot:
 		front = lot[0]
 	var key := str(rec["zone_key"])
 	var zid: int = _zones.zone_id(key) if key != "" else ZoneGrid.UNZONED
@@ -971,7 +982,8 @@ func _parts_kenney(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> 
 func _parts_house(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> void:
 	var rng: RandomNumberGenerator = ctx["rng"]
 	var w := minf(ctx["lot_w"] - ctx["margin"] * 2.0, 12.0)
-	var d := minf(ctx["lot_d"] * 0.55, 10.0)
+	# A one-square lot (8 m) keeps a narrow front yard for the car.
+	var d := minf(ctx["lot_d"] * (0.62 if float(ctx["lot_d"]) < 9.0 else 0.55), 10.0)
 	var e: float = ctx["e"]
 	var h := int(b["floors"]) * float(_vis["house_floor_height_m"])
 	var pos: Vector2 = ctx["front_edge"] - ctx["f"] * (d * 0.5 + 2.0)
