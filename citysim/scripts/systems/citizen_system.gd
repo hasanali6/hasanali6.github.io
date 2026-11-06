@@ -49,6 +49,7 @@ var _traffic: Node
 var _commute_cfg: Dictionary
 var _noise_happiness: float
 var _districts: Node
+var _city_life: Node
 
 # Live counters (kept exact on every change).
 var population: int = 0
@@ -63,6 +64,7 @@ var _acc := {}
 func _ready() -> void:
 	_buildings = get_node(building_system_path)
 	_companies = get_node(company_system_path)
+	_city_life = get_node_or_null("../CityLifeSystem")
 	_rng.randomize()
 	_hh = GameData.section("economy/households")
 	_money = GameData.section("economy/money")
@@ -198,6 +200,8 @@ func _pick_home(max_rent: float, exclude: int) -> int:
 			score += 0.3
 		if _near_sea(home["pos"]):
 			score += 0.3
+		if _city_life != null and not b.is_empty():
+			score += float(_city_life.home_score(b))
 		if score > best_score:
 			best_score = score
 			best = bid
@@ -385,6 +389,9 @@ func _update(i: int) -> void:
 		return
 	var home: Dictionary = _homes[bid]
 	var wages: Array = _money["wage_by_education"]
+	var record: Dictionary = _buildings.buildings.get(bid, {})
+	# Better-off neighbourhoods (valuable land) pay more tax.
+	var tax_mult: float = 1.0 if _city_life == null or record.is_empty() else float(_city_life.tax_factor(record))
 	var income := float(_money["pension"]) * data.seniors[i]
 	var tax := 0.0
 	var working := 0
@@ -394,7 +401,7 @@ func _update(i: int) -> void:
 		if code != HouseholdData.NO_JOB:
 			var wage := float(wages[HouseholdData.job_level(code)])
 			income += wage
-			tax += wage * EconomySystem.residential_rate(data.edu[slot]) / 100.0 * EconomySystem.city_share()
+			tax += wage * EconomySystem.residential_rate(data.edu[slot]) / 100.0 * EconomySystem.city_share() * tax_mult
 			working += 1
 		elif population < int(_money["unemployment_aid_until_population"]):
 			income += float(_money["unemployment_aid"])
@@ -419,8 +426,9 @@ func _update(i: int) -> void:
 	var avg_tax := EconomySystem.residential_rate(data.edu[i * HouseholdData.MAX_ADULTS])
 	var h := EconomyRules.happiness(ratio, data.adults[i] > 0, data.broke[i] > 0, shop >= 0, avg_tax,
 		_near_park(home["pos"]), _happy, _default_tax)
-	var record: Dictionary = _buildings.buildings.get(bid, {})
 	h += float(record.get("service_happiness", 0.0))
+	# Crime and floods (CityLifeSystem).
+	h += float(record.get("life_happiness", 0.0))
 	if _near_sea(home["pos"]):
 		h += float(_happy.get("coast_bonus", 0.0))
 	if _districts != null and not record.is_empty():

@@ -32,9 +32,16 @@ var _distance: float
 var _tilt_target: float = 0.0
 var _tilt: float = 0.0
 var _fling: Vector2 = Vector2.ZERO
+var _shake: float = 0.0
+var _shake_left: float = 0.0
+var _shake_total: float = 1.0
 
 
 func _ready() -> void:
+	EventBus.camera_shake_requested.connect(func(strength: float, seconds: float) -> void:
+		_shake = strength
+		_shake_left = seconds
+		_shake_total = maxf(seconds, 0.01))
 	var cfg := GameData.section("camera")
 	camera.fov = float(cfg["fov_deg"])
 	camera.near = float(cfg["near_m"])
@@ -84,6 +91,11 @@ func _process(delta: float) -> void:
 	_distance = exp(lerpf(log(_distance), log(_distance_target), k))
 	_tilt = lerpf(_tilt, _tilt_target, k)
 	_apply_transform()
+	if _shake_left > 0.0:
+		# Earthquake: jitter that fades out, scaled with the zoom.
+		_shake_left -= delta
+		var amp := _shake * clampf(_shake_left / _shake_total, 0.0, 1.0) * clampf(_distance / 150.0, 0.5, 4.0)
+		global_position += Vector3(randf_range(-1.0, 1.0), randf_range(-0.5, 0.5), randf_range(-1.0, 1.0)) * amp
 
 
 ## Projects a screen point onto the ground plane (y = 0).

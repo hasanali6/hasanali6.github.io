@@ -59,6 +59,10 @@ signal loan_changed()
 signal service_budgets_changed()
 ## Coverage, utilities and pollution were recomputed (building fields updated).
 signal services_changed()
+## Land value, crime, missions, tutorial or disaster settings changed (CityLifeSystem).
+signal life_changed()
+## Shake the camera (earthquake): strength in metres, for seconds.
+signal camera_shake_requested(strength: float, seconds: float)
 ## Monthly service books: {upkeep: {category: amount}, fees: {power, water}, ...}.
 signal services_reported(report: Dictionary)
 ## Info overlay chosen in the UI ("" = off).

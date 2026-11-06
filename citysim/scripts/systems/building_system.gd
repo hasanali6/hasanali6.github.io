@@ -61,6 +61,7 @@ var _next_id: int = 1
 var _tick: int = 0
 var _meshes: Dictionary = {}      # mesh key -> MultiMeshInstance3D
 var _instances: Dictionary = {}   # building id -> Array of [mesh key, instance index]
+var _life: Node = null                  # CityLifeSystem (land value), if in the scene
 var _rising: Dictionary = {}      # building id -> progress 0..1
 var _rise_seconds: float
 var _wall_palette: Array[Color] = []
@@ -78,6 +79,7 @@ var _service_names: Dictionary = {}  # service id -> name key
 
 func _ready() -> void:
 	_zones = get_node(zone_system_path)
+	_life = get_node_or_null("../CityLifeSystem")
 	if not district_system_path.is_empty():
 		_districts = get_node(district_system_path)
 	_growth = GameData.section("zones/growth")
@@ -163,6 +165,9 @@ func _on_tick(_t: int) -> void:
 		if grid.building[cell] != ZoneGrid.FREE:
 			continue
 		var chance := float(_growth["base_chance"]) * clampf(_group_demand(_zones.zone_key(grid.zone[cell])), 0.0, 1.0) * Cheats.growth_factor()
+		# Valuable land fills up first (industry does not care).
+		if _life != null and _zones.zone_key(grid.zone[cell]) != "industry":
+			chance *= float(_life.growth_factor(grid.centers[cell], grid.segment[cell]))
 		if _rng.randf() >= chance:
 			continue
 		if _try_grow(cell):
@@ -458,6 +463,8 @@ func _densify() -> int:
 
 
 func _deserves_level(b: Dictionary) -> bool:
+	if _life != null and not _life.allows_level(b, int(b["level"]) + 1):
+		return false
 	if int(b["households_cap"]) > 0:
 		return int(b["occupants"]) >= int(b["households_cap"]) and float(b["happiness"]) >= float(_rules["level_up_happiness"])
 	return int(b["profit_months"]) >= int(_rules["level_up_profit_months"])
@@ -619,6 +626,8 @@ func _on_long_press(world_pos: Vector3) -> void:
 		"abandoned": b["abandoned"], "burned": b.get("burned", false), "profit": b["profit"],
 		"power": b.get("power", true), "water": b.get("water", true), "sewage": b.get("sewage", true),
 		"polluted_water": b.get("polluted_water", false), "pollution": b.get("pollution", 0.0),
+		"land_value": b.get("land_value", -1.0), "crime": b.get("crime", 0.0), "flooded": int(b.get("flooded", 0)),
+		"on_fire": _life != null and _life.is_burning(id),
 		"coverage": b.get("coverage", {}), "happiness": b.get("happiness", 0.0),
 		"residents": b.get("residents", 0), "no_utility_months": b.get("no_utility_months", 0),
 		"commute": b.get("commute", -1.0), "extractor": b.get("extractor", ""), "richness": b.get("richness", 0.0),

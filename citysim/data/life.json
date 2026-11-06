@@ -1,0 +1,130 @@
+{
+  "land_value": {
+    "base": 0.35,
+    "park_weight": 0.25,
+    "park_radius_default_m": 160.0,
+    "water_weight": 0.15,
+    "water_radius_m": 70.0,
+    "transit_weight": 0.12,
+    "service_weight": 0.15,
+    "service_categories": [
+      "health",
+      "education",
+      "police",
+      "fire"
+    ],
+    "pollution_weight": 0.45,
+    "noise_weight": 0.15,
+    "crime_weight": 0.3,
+    "nuisances": {
+      "port": [
+        300.0,
+        0.15
+      ],
+      "airport": [
+        600.0,
+        0.25
+      ]
+    },
+    "cache_cell_m": 32.0,
+    "growth_min": 0.6,
+    "growth_max": 1.4,
+    "tax_min": 0.85,
+    "tax_max": 1.2,
+    "home_choice_weight": 0.5,
+    "level_requirement": {
+      "4": 0.4,
+      "5": 0.52
+    }
+  },
+  "crime": {
+    "base": 0.08,
+    "density_weight": 0.22,
+    "density_floors": 30.0,
+    "unhappy_weight": 0.3,
+    "unemployment_weight": 0.6,
+    "abandoned_weight": 0.2,
+    "abandoned_radius_m": 50.0,
+    "police_reduction": 0.85,
+    "smoothing": 0.5,
+    "happiness_penalty": 28.0,
+    "high": 0.45,
+    "warn_count": 5
+  },
+  "fire": {
+    "put_out_seconds": 7.0,
+    "burn_down_seconds": 45.0,
+    "spread_interval_seconds": 9.0,
+    "spread_chance": 0.45,
+    "spread_radius_m": 18.0,
+    "max_fires": 12
+  },
+  "disasters": {
+    "min_population": 1500,
+    "earthquake_chance_per_month": 0.01,
+    "earthquake_radius_m": 260.0,
+    "earthquake_damage": 0.45,
+    "earthquake_fires": 3,
+    "earthquake_shake": [
+      1.6,
+      3.5
+    ],
+    "flood_rain": 0.7,
+    "flood_chance_per_month": 0.35,
+    "flood_distance_m": 32.0,
+    "flood_months": 2,
+    "flood_happiness_penalty": 22.0,
+    "flood_abandon_chance": 0.12
+  },
+  "missions": {
+    "active": 3,
+    "reward_base": 15000,
+    "reward_per_person": 12.0,
+    "reward_max": 400000,
+    "min_population_for": {
+      "crime": 400,
+      "land_value": 600,
+      "transit": 300,
+      "budget": 150,
+      "services": 200
+    }
+  },
+  "tutorial": [
+    {
+      "id": "road",
+      "text": "TUT_ROAD"
+    },
+    {
+      "id": "res",
+      "text": "TUT_RES"
+    },
+    {
+      "id": "jobs",
+      "text": "TUT_JOBS"
+    },
+    {
+      "id": "power",
+      "text": "TUT_POWER"
+    },
+    {
+      "id": "water",
+      "text": "TUT_WATER"
+    },
+    {
+      "id": "grow",
+      "text": "TUT_GROW"
+    },
+    {
+      "id": "safety",
+      "text": "TUT_SAFETY"
+    },
+    {
+      "id": "layers",
+      "text": "TUT_LAYERS"
+    },
+    {
+      "id": "missions",
+      "text": "TUT_MISSIONS"
+    }
+  ]
+}

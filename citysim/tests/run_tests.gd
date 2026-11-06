@@ -48,6 +48,7 @@ func _initialize() -> void:
 	_test_weather_traffic()
 	_test_highway_bridge()
 	_test_resources()
+	_test_city_life()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -68,7 +69,7 @@ func _input_config() -> Dictionary:
 
 
 func _test_data_files() -> void:
-	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy", "zones", "services", "vegetation", "catalog", "traffic", "transit", "districts", "progression", "weather", "audio"]:
+	for f in ["game", "time", "input", "camera", "map", "environment", "graphics", "reference_scene", "roads", "economy", "zones", "services", "vegetation", "catalog", "traffic", "transit", "districts", "progression", "weather", "audio", "life"]:
 		_check(not DataLoader.load_json("res://data/%s.json" % f).is_empty(), "data file %s loads" % f)
 	var db := DataLoader.load_files(PackedStringArray(["graphics"]))
 	for preset: String in DataLoader.lookup(db, "graphics/preset_order"):
@@ -1009,3 +1010,40 @@ func _test_resources() -> void:
 		if not (data["types"] as Dictionary).has(str(it["extractor"])):
 			linked = false
 	_check(linked, "every production site extracts a known resource")
+
+
+func _test_city_life() -> void:
+	var cfg := DataLoader.load_json("res://data/life.json")
+	var lv: Dictionary = cfg["land_value"]
+	var plain := CityLifeRules.land_value({}, lv)
+	_check(is_equal_approx(plain, float(lv["base"])), "land value: bare land is the base value")
+	var nice := CityLifeRules.land_value({"park": 1.0, "water": 1.0, "transit": 1.0, "services": 1.0}, lv)
+	var bad := CityLifeRules.land_value({"pollution": 1.0, "noise": 1.0, "crime": 1.0}, lv)
+	_check(nice > plain + 0.4 and nice <= 1.0, "land value: park, shore, metro and services raise it")
+	_check(bad < plain and bad >= 0.0, "land value: pollution, noise and crime lower it")
+	_check(is_equal_approx(CityLifeRules.closeness(0.0, 100.0), 1.0) and CityLifeRules.closeness(150.0, 100.0) == 0.0, "land value: closeness fades to 0 at the radius")
+	_check(CityLifeRules.level_requirement(5, lv) > CityLifeRules.level_requirement(4, lv) and CityLifeRules.level_requirement(3, lv) == 0.0, "land value: top levels need valuable land")
+	var cr: Dictionary = cfg["crime"]
+	var slum := CityLifeRules.crime({"floors": 30, "happiness": 10.0, "unemployment": 0.3, "abandoned": 0.5, "police": 0.0}, cr)
+	var policed := CityLifeRules.crime({"floors": 30, "happiness": 10.0, "unemployment": 0.3, "abandoned": 0.5, "police": 1.0}, cr)
+	var calm := CityLifeRules.crime({"floors": 1, "happiness": 90.0, "unemployment": 0.0, "police": 0.0}, cr)
+	_check(slum > 0.6, "crime: dense, unhappy, jobless, run-down place is high (%.2f)" % slum)
+	_check(policed < slum * 0.3, "crime: police coverage cuts it")
+	_check(calm < 0.2, "crime: a happy house is calm")
+	_check(is_equal_approx(CityLifeRules.smooth(0.0, 1.0, 0.5), 0.5), "crime: moves half way per month")
+	var fc: Dictionary = cfg["fire"]
+	_check(CityLifeRules.fire_state(1.0, 1.0, fc) == "burning", "fire: still burning at first")
+	_check(CityLifeRules.fire_state(float(fc["put_out_seconds"]) + 0.1, 1.0, fc) == "out", "fire: full coverage puts it out quickly")
+	_check(CityLifeRules.fire_state(float(fc["burn_down_seconds"]), 0.0, fc) == "down", "fire: no fire station, it burns down")
+	_check(CityLifeRules.fire_state(float(fc["burn_down_seconds"]) - 1.0, 0.1, fc) == "burning", "fire: weak coverage arrives too late")
+	var mc: Dictionary = cfg["missions"]
+	var s := {"population": 1000, "happiness": 60.0, "crime": 0.3, "land_value": 0.4, "parks": 2, "transit_lines": 1, "net": 5000.0, "coverage": 0.5}
+	for kind: String in ["population", "happiness", "crime", "land_value", "parks", "transit", "budget", "services"]:
+		var m := CityLifeRules.make_mission(kind, s, mc)
+		_check(not m.is_empty() and CityLifeRules.mission_progress(m, s) < 1.0, "mission %s: offered and not done yet" % kind)
+	var pm := CityLifeRules.make_mission("population", s, mc)
+	_check(CityLifeRules.mission_progress(pm, {"population": int(pm["target"])}) >= 1.0, "mission: done when the target is reached")
+	_check(CityLifeRules.make_mission("crime", {"population": 100, "crime": 0.5}, mc).is_empty(), "mission: crime goals wait for a bigger town")
+	_check(CityLifeRules.mission_reward(100000, mc) == int(mc["reward_max"]), "mission: reward is capped")
+	_check(not CityLifeRules.tutorial_done("road", {"roads_built": 0}) and CityLifeRules.tutorial_done("road", {"roads_built": 1}), "tutorial: road step")
+	_check(CityLifeRules.tutorial_done("jobs", {"com_cells": 4, "ind_cells": 4}) and not CityLifeRules.tutorial_done("jobs", {"com_cells": 4}), "tutorial: jobs step needs both")

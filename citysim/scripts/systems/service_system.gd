@@ -577,8 +577,13 @@ func _start_fire(records: Dictionary) -> void:
 		if not is_consumer(b):
 			continue
 		if _rng.randf() < float(_fx["fire_chance_uncovered"]) * (1.0 - coverage_of(b, "fire")):
-			_buildings.burn(id)
-			EventBus.notification_posted.emit("fire", tr("NOTIFY_FIRE"))
+			# The fire burns for a while (CityLifeSystem): firefighters may save it.
+			var life: Node = get_node_or_null("../CityLifeSystem")
+			if life != null:
+				life.ignite(id)
+			else:
+				_buildings.burn(id)
+				EventBus.notification_posted.emit("fire", tr("NOTIFY_FIRE"))
 			return
 
 

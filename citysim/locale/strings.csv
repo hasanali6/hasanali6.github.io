@@ -405,3 +405,46 @@ ROAD_UPGRADE_Q,Yükselt:,Upgrade to:
 DEMOLISH_BUILDING_Q,"Bu bina yıkılsın mı? (+%s iade)","Demolish this building? (+%s refund)"
 DEMOLISH_ROAD_Q,"Bu yol kaldırılsın mı? (+%s iade)","Remove this road? (+%s refund)"
 DEMOLISH_CONFIRM,✓ Yık,✓ Demolish
+TUT_STEP,Adım %d/%d ·,Step %d/%d ·
+TUT_ROAD,"İnşa Et → Yollar: şehrin dış bağlantısından başlayıp bir yol çiz, ✓ ile onayla.",Build → Roads: draw a road starting from the outside connection and confirm with ✓.
+TUT_RES,İnşa Et → İmar: yolun kenarına yeşil konut imarı boya (en az 8 kare).,Build → Zoning: paint green residential zoning along the road (at least 8 squares).
+TUT_JOBS,İş yeri lazım: mavi ticari ve sarı sanayi imarı da boya (4'er kare).,People need jobs: also paint blue commercial and yellow industrial zoning (4 squares each).
+TUT_POWER,İnşa Et → Altyapı: bir elektrik santrali koy (yola bitişik).,Build → Utilities: place a power plant next to a road.
+TUT_WATER,Altyapı'dan bir su pompası koy (nehir/göl kıyısına).,From Utilities place a water pump (on a river or lake shore).
+TUT_GROW,Oyunu başlat (▶) ve ilk sakinlerin gelmesini bekle (40 kişi).,Start the game (▶) and wait for the first residents (40 people).
+TUT_SAFETY,"İnşa Et → Hizmetler: polis, itfaiye ya da sağlık ocağı kur. Polis suçu, itfaiye yangınları önler.","Build → Services: place a police station, fire station or clinic. Police stop crime, firefighters stop fires."
+TUT_LAYERS,"Soldaki Katmanlar düğmesine bas: arsa değeri, suç, mutluluk haritalarına bak.","Tap the Layers button on the left: look at the land value, crime and happiness maps."
+TUT_MISSIONS,"Soldaki kupa düğmesi: görevleri tamamla, para ödülü kazan!",The trophy button on the left: complete missions to earn cash rewards!
+TUT_FINISHED,"Öğretici bitti, artık şehir senin! Görevler için kupaya bak.","Tutorial done, the city is yours! See the trophy for missions."
+TUT_SKIPPED,Öğretici kapatıldı (Görevler kartından yeniden başlatabilirsin).,Tutorial closed (restart it from the Missions card).
+NOTIFY_CRIME_HIGH,Suç artıyor: %d binada polis yok! Karakol kur.,Crime is rising: %d buildings have no police! Build a police station.
+NOTIFY_FIRE_STARTED,Yangın çıktı! İtfaiye yetişmezse bina yanacak.,"A fire broke out! If firefighters can't reach it, the building will burn down."
+NOTIFY_FIRE_OUT,İtfaiye yangını söndürdü.,Firefighters put the fire out.
+NOTIFY_FIRE_DOWN,Bina yanıp yıkıldı! Yakına itfaiye istasyonu kur.,A building burned down! Build a fire station nearby.
+NOTIFY_EARTHQUAKE,"Deprem! %d bina hasar gördü, yangınlar çıktı.","Earthquake! %d buildings damaged, fires broke out."
+NOTIFY_FLOOD,Sel! Nehir ve göl kıyısında %d bina su altında kaldı.,Flood! %d buildings by the river and lakes are under water.
+NOTIFY_FLOOD_NONE,Sel bastı ama kıyıda bina yok.,A flood came but no buildings are near the water.
+NOTIFY_MISSION_DONE,Görev tamam: %s (+%s),Mission complete: %s (+%s)
+MISSION_POPULATION,Nüfusu %d kişiye çıkar,Grow the population to %d
+MISSION_HAPPINESS,Ortalama mutluluğu %%%d yap,Raise average happiness to %d%%
+MISSION_CRIME,Ortalama suçu %%%d altına indir,Bring average crime below %d%%
+MISSION_LAND_VALUE,Ortalama arsa değerini %%%d yap,Raise average land value to %d%%
+MISSION_PARKS,Şehirde %d park olsun,Have %d parks in the city
+MISSION_TRANSIT,%d toplu taşıma hattın olsun,Run %d transit lines
+MISSION_BUDGET,Aylık bütçe en az +%s olsun,Make the monthly budget at least +%s
+MISSION_SERVICES,Evlerde hizmet kapsamı %%%d olsun,Reach %d%% service coverage in homes
+MISSIONS_TITLE,Görevler,Missions
+MISSIONS_TUTORIAL,Öğreticiyi baştan başlat,Restart the tutorial
+MISSIONS_NONE,"Şimdilik görev yok, şehir büyüdükçe gelir.",No missions right now; they come as the city grows.
+MISSIONS_SUMMARY,Ortalama arsa değeri %%%d · Suç %%%d · Yanan bina %d,Average land value %d%% · Crime %d%% · Buildings on fire %d
+OVERLAY_LAND_VALUE,Arsa değeri,Land value
+OVERLAY_CRIME,Suç,Crime
+OVERLAY_LEGEND_CRIME,Yeşil: güvenli · Kırmızı: suç yüksek · Ortalama %%%d,Green: safe · Red: high crime · Average %d%%
+OVERLAY_LEGEND_LAND_VALUE,"Yeşil: değerli · Kırmızı: ucuz (park, kıyı, metro ↑ · kirlilik, gürültü, suç ↓) · Ortalama %%%d","Green: valuable · Red: cheap (parks, shore, metro ↑ · pollution, noise, crime ↓) · Average %d%%"
+BUILDING_LAND_CRIME,Arsa değeri: %%%d · Suç: %%%d,Land value: %d%% · Crime: %d%%
+BUILDING_FLOODED,⚠ Sel hasarı (mutluluk düşük),⚠ Flood damage (lower happiness)
+BUILDING_ON_FIRE,🔥 Yanıyor!,🔥 On fire!
+SETTINGS_DISASTERS,"Afetler (deprem, sel)","Disasters (earthquake, flood)"
+CHEATS_EARTHQUAKE,Deprem,Earthquake
+CHEATS_FLOOD,Sel,Flood
+CHEATS_FIRE,Yangın,Fire

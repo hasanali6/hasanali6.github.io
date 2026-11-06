@@ -77,6 +77,9 @@ func save_game(path: String = AUTOSAVE) -> bool:
 	var veg: Node = get_parent().get_node_or_null("Vegetation")
 	if veg != null:
 		state["vegetation"] = veg.save_state()
+	var life: Node = get_parent().get_node_or_null("CityLifeSystem")
+	if life != null:
+		state["life"] = life.save_state()
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		push_error("SaveSystem: cannot write %s" % path)
@@ -126,6 +129,9 @@ func load_game(path: String = AUTOSAVE) -> bool:
 	var veg: Node = get_parent().get_node_or_null("Vegetation")
 	if veg != null:
 		veg.load_state(state.get("vegetation", {}))
+	var life: Node = get_parent().get_node_or_null("CityLifeSystem")
+	if life != null:
+		life.load_state(state.get("life", {}))
 	_loading = false
 	EventBus.notification_posted.emit("save", tr("NOTIFY_LOADED"))
 	return true

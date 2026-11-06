@@ -39,6 +39,26 @@ func _init(font_size: int, min_touch: float) -> void:
 		check.toggled.connect(func(on: bool) -> void: Cheats.set_option(key, on))
 		content.add_child(check)
 		_checks[key] = check
+	# Try out the city's emergencies (also work with Disasters switched off).
+	var life_row := HBoxContainer.new()
+	life_row.add_theme_constant_override("separation", 10)
+	for entry: Array in [["CHEATS_EARTHQUAKE", "earthquake"], ["CHEATS_FLOOD", "flood"], ["CHEATS_FIRE", "fire"]]:
+		var b := _button(entry[0])
+		var what: String = entry[1]
+		b.pressed.connect(func() -> void:
+			var life: Node = (Engine.get_main_loop() as SceneTree).current_scene.get_node_or_null("CityLifeSystem")
+			if life == null:
+				return
+			card.visible = false
+			if what == "earthquake":
+				life.earthquake()
+			elif what == "flood" and life.flood() == 0:
+				EventBus.notification_posted.emit("disaster", TranslationServer.translate("NOTIFY_FLOOD_NONE"))
+			elif what == "fire":
+				life.ignite_random()
+			return)
+		life_row.add_child(b)
+	content.add_child(life_row)
 	var hint := UiStyle.label("CHEATS_HINT", font_size - 8)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(hint)

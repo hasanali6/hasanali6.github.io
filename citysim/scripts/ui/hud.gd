@@ -34,6 +34,7 @@ const OVERLAYS: Array = [
 	["police", "SVC_CAT_POLICE", UiStyle.BLUE], ["fire", "SVC_CAT_FIRE", UiStyle.ORANGE],
 	["garbage", "SVC_CAT_GARBAGE", UiStyle.GREEN], ["deathcare", "SVC_CAT_DEATHCARE", UiStyle.SLATE],
 	["pollution", "OVERLAY_POLLUTION", UiStyle.SLATE], ["happiness", "OVERLAY_HAPPINESS", UiStyle.GREEN],
+	["land_value", "OVERLAY_LAND_VALUE", UiStyle.GOLD], ["crime", "OVERLAY_CRIME", UiStyle.RED],
 	["traffic", "OVERLAY_TRAFFIC", UiStyle.ORANGE], ["transit", "OVERLAY_TRANSIT", UiStyle.BLUE],
 	["resources", "OVERLAY_RESOURCES", UiStyle.GOLD],
 ]
@@ -86,6 +87,9 @@ var _economy: EconomyPanel
 var _catalog: CatalogPanel
 var _saves: SavesPanel
 var _cheats: CheatsPanel
+var _missions: MissionsPanel
+var _tutorial: PanelContainer
+var _tutorial_label: Label
 var _transit_panel: TransitPanel
 var _district_panel: DistrictPanel
 var _rci: RciBars
@@ -161,6 +165,12 @@ func _ready() -> void:
 	_place(_saves.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
 	_cheats = CheatsPanel.new(FONT_SIZE, MIN_TOUCH)
 	_place(_cheats.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+	_missions = MissionsPanel.new(get_parent().get_node("CityLifeSystem"), FONT_SIZE, MIN_TOUCH)
+	_place(_missions.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+	_tutorial = _build_tutorial()
+	_place(_tutorial, Vector2(0.5, 0), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_END, Vector2(0, 230))
+	EventBus.life_changed.connect(_refresh_tutorial)
+	_refresh_tutorial.call_deferred()
 
 	EventBus.speed_changed.connect(_on_speed_changed)
 	EventBus.ground_long_pressed.connect(_on_ground_long_pressed)
@@ -211,6 +221,11 @@ func _process(delta: float) -> void:
 		_set_text(_perf_label, tr("LABEL_PERF") % [
 			Engine.get_frames_per_second(), GraphicsSettings.get_gpu_ms(), GraphicsSettings.get_cpu_ms(),
 			("%d Hz" % roundi(hz)) if hz > 0.0 else "? Hz", roundi(GraphicsSettings.get_render_scale() * 100.0)])
+	if _tutorial_label != null and _tutorial_label.text != "":
+		# The tutorial steps aside while a menu card is open.
+		var card_open := _settings_panel.visible or _info_panel.visible or _economy.card.visible or _missions.card.visible \
+			or _saves.card.visible or _cheats.card.visible
+		_tutorial.visible = not card_open
 	if _toast_timer > 0.0:
 		_toast_timer -= delta
 		_toast_panel.modulate.a = clampf(_toast_timer / 0.4, 0.0, 1.0)
@@ -406,10 +421,23 @@ func _build_left_column() -> Control:
 		_info_panel.visible = false
 		_set_tray_open(false)
 		_economy.open())
-	col.add_child(economy)
+	# Economy and missions side by side, so the column stays as tall as before.
+	var money_row := HBoxContainer.new()
+	money_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	money_row.add_theme_constant_override("separation", 10)
+	money_row.add_child(economy)
+	var goals := UiStyle.round_button("trophy", UiStyle.GOLD, MIN_TOUCH * 0.8)
+	goals.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	goals.pressed.connect(func() -> void:
+		_settings_panel.visible = false
+		_info_panel.visible = false
+		_set_tray_open(false)
+		_missions.open())
+	money_row.add_child(goals)
+	col.add_child(money_row)
 	col.add_child(cam_grid)
 	# Keep the round buttons round although the camera grid is wider.
-	for child: Control in [overlays, economy]:
+	for child: Control in [overlays, money_row]:
 		child.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	return col
 
@@ -546,6 +574,44 @@ func _build_toast() -> PanelContainer:
 	return pill
 
 
+## Tutorial step banner under the toast: "Adım 2/9 · what to do" + Skip.
+func _build_tutorial() -> PanelContainer:
+	var pill := PanelContainer.new()
+	pill.visible = false
+	var box := UiStyle.pill_box()
+	box.bg_color = Color(0.13, 0.32, 0.5, 0.92)
+	box.content_margin_left = 18
+	box.content_margin_right = 10
+	pill.add_theme_stylebox_override("panel", box)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	pill.add_child(row)
+	row.add_child(UiStyle.badge("graduation-cap", UiStyle.GOLD, BADGE * 0.8))
+	_tutorial_label = _label("", FONT_SIZE - 6)
+	_tutorial_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tutorial_label.custom_minimum_size.x = 560
+	row.add_child(_tutorial_label)
+	var skip := UiStyle.round_button("x", UiStyle.SLATE, MIN_TOUCH * 0.62)
+	skip.pressed.connect(func() -> void:
+		get_parent().get_node("CityLifeSystem").skip_tutorial()
+		show_toast(tr("TUT_SKIPPED")))
+	row.add_child(skip)
+	return pill
+
+
+func _refresh_tutorial() -> void:
+	var life: Node = get_parent().get_node("CityLifeSystem")
+	var text: String = life.tutorial_text()
+	_tutorial.visible = text != ""
+	if text == "":
+		_tutorial_label.text = ""
+	else:
+		var p: Vector2i = life.tutorial_progress()
+		_tutorial_label.text = tr("TUT_STEP") % [p.x, p.y] + "  " + text
+		_tutorial.reset_size()
+
+
 ## Light menu card with a coloured header, a title and a round close button.
 func _card(title_key: String, width: float) -> Array:
 	return UiStyle.card(title_key, width, FONT_SIZE, MIN_TOUCH)
@@ -588,6 +654,16 @@ func _build_settings_panel() -> PanelContainer:
 	weather.button_pressed = WeatherSystem.enabled
 	weather.toggled.connect(WeatherSystem.set_enabled)
 	content.add_child(weather)
+
+	var disasters := CheckButton.new()
+	disasters.text = "SETTINGS_DISASTERS"
+	disasters.custom_minimum_size.y = MIN_TOUCH * 0.8
+	disasters.focus_mode = Control.FOCUS_NONE
+	var life: Node = get_parent().get_node("CityLifeSystem")
+	disasters.button_pressed = life.disasters_enabled
+	disasters.toggled.connect(life.set_disasters)
+	EventBus.life_changed.connect(func() -> void: disasters.set_pressed_no_signal(life.disasters_enabled))
+	content.add_child(disasters)
 
 	var perf := CheckButton.new()
 	perf.text = "SETTINGS_SHOW_FPS"
@@ -868,6 +944,12 @@ func _on_building_inspected(info: Dictionary) -> void:
 			pct.call("fire"), pct.call("garbage"), pct.call("deathcare")])
 		if float(info.get("pollution", 0.0)) > 0.02:
 			lines.append(tr("BUILDING_POLLUTION") % roundi(float(info["pollution"]) * 100.0))
+		if float(info.get("land_value", -1.0)) >= 0.0:
+			lines.append(tr("BUILDING_LAND_CRIME") % [roundi(float(info["land_value"]) * 100.0), roundi(float(info.get("crime", 0.0)) * 100.0)])
+		if int(info.get("flooded", 0)) > 0:
+			lines.append(tr("BUILDING_FLOODED"))
+		if info.get("on_fire", false):
+			lines.append(tr("BUILDING_ON_FIRE"))
 		if float(info.get("commute", -1.0)) >= 0.0 and int(info.get("households", 0)) > 0:
 			lines.append(tr("BUILDING_COMMUTE") % roundi(float(info["commute"])))
 	lines.append(tr("BUILDING_SIZE") % [roundi(info["width"]), roundi(info["depth"])])
@@ -1052,6 +1134,12 @@ func _refresh_overlay_legend() -> void:
 					UiStyle.format_int(roundi(float(sw[0]))), UiStyle.format_int(roundi(float(sw[1])))]
 		"pollution":
 			text = tr("OVERLAY_LEGEND_POLLUTION")
+		"land_value", "crime":
+			var ls: Dictionary = get_parent().get_node("CityLifeSystem").last_stats
+			if _overlay_key == "crime":
+				text = tr("OVERLAY_LEGEND_CRIME") % roundi(float(ls.get("crime", 0.0)) * 100.0)
+			else:
+				text = tr("OVERLAY_LEGEND_LAND_VALUE") % roundi(float(ls.get("land_value", 0.0)) * 100.0)
 		"resources":
 			text = tr("OVERLAY_LEGEND_RESOURCES")
 		"traffic":

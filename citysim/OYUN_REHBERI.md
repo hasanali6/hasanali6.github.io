@@ -385,10 +385,61 @@ Kilitli düğmeler gri görünür. Dokununca hangi unvanda açılacağı yazar.
 ## 7. Katmanlar (bilgi haritaları)
 
 Elektrik, su, sağlık, eğitim, polis, itfaiye, çöp, defin, kirlilik, mutluluk,
-trafik ve toplu taşıma. Zemin griye döner, hücreler ve binalar renklenir:
+**arsa değeri**, **suç**, trafik ve toplu taşıma. Zemin griye döner, hücreler ve binalar renklenir:
 yeşil iyi, sarı orta, kırmızı kötü. Trafik katmanında yollar doluluğa göre,
 evler işe gidiş süresine göre boyanır. Toplu taşıma katmanında durağa yakın
 sokaklar yeşildir ve hatlar renkli şerit olarak görünür.
+
+---
+
+## 7b. Şehir hayatı: arsa değeri, suç, yangın, afetler
+
+**Arsa değeri (%0–100).** Her binanın ve boş arsanın bir değeri var.
+- Artıranlar: parka yakınlık, nehir/göl/deniz kıyısı, metro/otobüs durağı,
+  sağlık-eğitim-polis-itfaiye kapsamı.
+- Düşürenler: kirlilik (sanayi), trafik gürültüsü, suç, liman ve havalimanı
+  çevresi.
+- Ne işe yarar: değerli arsada bina **daha hızlı** çıkar, oturanlar **daha çok
+  vergi** öder (%85–120), yeni gelenler önce oraya yerleşir. Bina
+  **seviye 4** için en az %40, **seviye 5** için en az %52 arsa değeri ister.
+  Yani gökdelen istiyorsan mahalleye park, metro ve hizmet götür.
+
+**Suç (%0–100).** Kalabalık, mutsuz, işsizliğin yüksek olduğu ve terk edilmiş
+binaların yanındaki yerlerde artar. **Karakol kapsamı** suçu %85'e kadar
+düşürür. Suç mutluluğu düşürür (insanlar taşınır) ve arsa değerini indirir.
+Polissiz yerde suç yükselince uyarı gelir.
+
+**Yangın.** Kapsama dışındaki binalarda ara sıra yangın çıkar (bina
+tepesinde alev, duman ve kırmızı 🔥 rozeti). İtfaiye kapsamı ne kadar iyiyse
+o kadar çabuk söner (tam kapsamda ~7 sn). İtfaiye yoksa ~45 sn sonra bina
+yanıp harabeye döner, yangın komşu binalara sıçrayabilir. Oyun durunca yangın
+da durur.
+
+**Afetler** (Ayarlar → "Afetler"den kapatılabilir; 1.500 nüfustan sonra):
+- **Deprem:** nadiren (yılda ~%11). Bir bölgedeki eski/alçak binaların bir
+  kısmı yıkılır, birkaç yangın çıkar, ekran sallanır.
+- **Sel:** şiddetli yağmurda nehir ve göl kıyısındaki (32 m) binalar 2 ay su
+  altında kalır: mutluluk düşer, bazıları terk edilir. Kıyıya yakın yerleşimi
+  dikkatli yap.
+
+Bina bilgi kartında arsa değeri, suç, sel ve yangın durumu yazar. Hileler
+kartında deneme için **Deprem / Sel / Yangın** düğmeleri var.
+
+## 7c. Görevler ve öğretici
+
+**Görevler (soldaki kupa düğmesi):** her zaman 3 kısa hedef var: nüfus,
+mutluluk, park, hizmet kapsamı, bütçe, toplu taşıma hattı, suç, arsa değeri.
+Biri tamamlanınca ödül parası gelir (şehir büyüdükçe ödül artar) ve yerine
+yenisi çıkar. Kartın altında ortalama arsa değeri, suç ve yanan bina sayısı
+yazar.
+
+**Öğretici:** yeni şehirde üstte mavi bir şerit adım adım ne yapacağını
+söyler (yol → konut imarı → iş yerleri → elektrik → su → büyüme → hizmetler
+→ katmanlar → görevler). Her adım yapınca kendiliğinden geçer. ✕ ile
+kapatılır; Görevler kartından "Öğreticiyi baştan başlat" ile geri gelir.
+
+**Kredi:** zaten vardı: Ekonomi → Kredi sekmesi (ayarlanabilir kredi, faiz,
+24 ay geri ödeme).
 
 ---
 

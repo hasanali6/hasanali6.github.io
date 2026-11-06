@@ -89,6 +89,7 @@ func _ready() -> void:
 		current = key
 		_refresh())
 	EventBus.services_changed.connect(_queue)
+	EventBus.life_changed.connect(_queue)
 	EventBus.zone_cells_rebuilt.connect(func() -> void:
 		_cells_dirty = true
 		_queue())
@@ -303,6 +304,15 @@ func _cell_color(i: int, grid: ZoneGrid, records: Dictionary, seg_colors: Dictio
 		"happiness":
 			if not b.is_empty() and int(b.get("occupants", 0)) > 0:
 				return Color(ramp(float(b.get("happiness", 0.0)) / 100.0), CELL_ALPHA)
+		"land_value":
+			if not b.is_empty() and b.has("land_value"):
+				return Color(ramp(float(b["land_value"])), CELL_ALPHA)
+			var life: Node = get_node_or_null("../CityLifeSystem")
+			if life != null:
+				return Color(ramp(float(life.value_at(grid.centers[i], sid, 0.0))), CELL_ALPHA * 0.8)
+		"crime":
+			if not b.is_empty() and _services.is_consumer(b):
+				return Color(ramp(1.0 - clampf(float(b.get("crime", 0.0)) * 1.6, 0.0, 1.0)), CELL_ALPHA)
 	return Color(NONE, CELL_ALPHA * 0.4)
 
 
@@ -328,6 +338,12 @@ func _building_color(b: Dictionary) -> Color:
 		"happiness":
 			if int(b.get("occupants", 0)) > 0:
 				return ramp(float(b.get("happiness", 0.0)) / 100.0)
+		"land_value":
+			if b.has("land_value"):
+				return ramp(float(b["land_value"]))
+		"crime":
+			if _services.is_consumer(b) and not b.get("abandoned", false):
+				return ramp(1.0 - clampf(float(b.get("crime", 0.0)) * 1.6, 0.0, 1.0))
 		"transit":
 			if _transit != null and _services.is_consumer(b):
 				var access: float = _transit.segment_access(int(b.get("segment", -1)))
