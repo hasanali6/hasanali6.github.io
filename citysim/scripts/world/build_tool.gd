@@ -1,7 +1,7 @@
 extends Node3D
 ## Hand placement of buildings and parks from data/catalog.json. While a
 ## catalogue item is selected, dragging a finger previews the lot on the
-## nearest road-facing cell (green = fits and affordable, red = not);
+## exact squares it will take (green = fits and affordable, red = not);
 ## releasing leaves the preview standing and asks ✓ / ✗ (confirm_pending).
 ## Placed buildings join the economy like grown ones.
 ## Pumps, sewage outlets and treatment plants must stand next to water.
@@ -45,6 +45,7 @@ func _material(color: Color, alpha: float) -> StandardMaterial3D:
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.albedo_color = Color(color, alpha)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return mat
 
 
@@ -133,31 +134,73 @@ func _runway_ok(centre: Vector2, f: Vector2, d: float) -> bool:
 	return true
 
 
-## The road-facing cell whose lot (for the selected item) fits and lies
-## closest to where the finger is: a tap anywhere on the plot, not only right
-## at the kerb, finds a place; past a junction corner or a taken neighbour it
-## slides along the row to the nearest lot that fits. Falls back to the
-## nearest road-facing cell (shown red) when nothing fits.
+## Where the selected item goes for a finger at g: its footprint covers the
+## square under the finger. Of all footprints (any road-facing cell nearby,
+## either road) that contain g, a free one whose middle is closest to the
+## finger wins; if none of them is free the closest one is shown red with
+## the reason. Only when the finger is on no footprint at all (on the road,
+## or off to the side) does it slide to the nearest free spot in reach.
 func _best_cell(g: Vector2) -> int:
 	var grid: ZoneGrid = _zones.grid
 	var w := int(_item["lot"][0]) * grid.cell_size
 	var d := int(_item["lot"][1]) * grid.cell_size
 	var reach := _snap_radius + maxf(w, d) + grid.cell_size
-	var best := -1
-	var best_d := INF
+	var best_in := -1
+	var best_in_d := INF
+	var bad_in := -1
+	var bad_in_d := INF
+	var best_near := -1
+	var best_near_d := INF
+	var near: Array[int] = []
+	# Any square may be the lot's first square (the lot only has to touch a
+	# road somewhere); far away only road-facing squares are tried.
+	var inner := (w + d) * 0.75 + grid.cell_size
 	for i in grid.cells_near(g, reach):
-		if grid.depth[i] != 0 or _buildings.lot_for(_item, i).is_empty():
+		if grid.depth[i] != 0:
+			if grid.centers[i].distance_to(g) > inner:
+				continue
+			# Cheap test first: would this square's lot cover the finger at all?
+			var c0 := grid.centers[i] - grid.dirs[i] * grid.cell_size * 0.5 + grid.fronts[i] * grid.cell_size * 0.5 \
+				+ grid.dirs[i] * w * 0.5 - grid.fronts[i] * d * 0.5
+			var r0 := g - c0
+			if absf(r0.dot(grid.dirs[i])) > w * 0.5 or absf(r0.dot(grid.fronts[i])) > d * 0.5:
+				continue
+		var fp: Dictionary = _buildings.footprint(_item, i, false)
+		var rel := g - (fp["centre"] as Vector2)
+		var inside := absf(rel.dot(grid.dirs[i])) <= w * 0.5 and absf(rel.dot(grid.fronts[i])) <= d * 0.5
+		if not inside:
+			# Only a fallback (finger on the road or beside the lots).
+			if fp["ok"] and grid.depth[i] == 0:
+				near.append(i)
 			continue
-		var f := grid.fronts[i]
-		var dir := grid.dirs[i]
-		var corner := grid.centers[i] - dir * grid.cell_size * 0.5 + f * grid.cell_size * 0.5
-		var centre := corner + dir * w * 0.5 - f * d * 0.5
-		var dist := centre.distance_to(g)
-		if dist < best_d:
-			best_d = dist
-			best = i
-	if best >= 0:
-		return best
+		if fp["ok"]:
+			# The road test is the slow part: only for lots under the finger.
+			fp = _buildings.footprint(_item, i)
+		var dist := rel.length()
+		if fp["ok"] and dist < best_in_d:
+			best_in_d = dist
+			best_in = i
+		elif not fp["ok"] and dist < bad_in_d:
+			bad_in_d = dist
+			bad_in = i
+	# Under the finger it would not reach a road (a square or two into the
+	# plot): slide to the nearest spot that does, right next to it.
+	var slide := best_in < 0 and bad_in >= 0 and str(_buildings.footprint(_item, bad_in)["error"]) == "BUILD_ERR_ROAD"
+	if best_in < 0 and (bad_in < 0 or slide):
+		for i: int in near:
+			var fp: Dictionary = _buildings.footprint(_item, i)
+			var dist := g.distance_to(fp["centre"])
+			if fp["ok"] and dist < best_near_d:
+				best_near_d = dist
+				best_near = i
+	if best_in >= 0:
+		return best_in
+	if slide and best_near >= 0 and best_near_d <= maxf(w, d) + grid.cell_size:
+		return best_near
+	if bad_in >= 0:
+		return bad_in
+	if best_near >= 0:
+		return best_near
 	return grid.front_cell_near(g, reach)
 
 
@@ -174,16 +217,11 @@ func _preview_at(screen_pos: Vector2) -> void:
 		_preview.visible = false
 		EventBus.road_preview_changed.emit({"active": true, "valid": false, "error": "BUILD_ERR_ROAD", "screen_pos": screen_pos})
 		return
-	var lot: PackedInt32Array = _buildings.lot_for(_item, _cell)
-	var w := int(_item["lot"][0]) * grid.cell_size
-	var d := int(_item["lot"][1]) * grid.cell_size
-	var f := grid.fronts[_cell]
-	var dir := grid.dirs[_cell]
-	var corner := grid.centers[_cell] - dir * grid.cell_size * 0.5 + f * grid.cell_size * 0.5
-	var centre := corner + dir * w * 0.5 - f * d * 0.5
-	var fz := Vector3(f.x, 0, f.y)
-	var dx := Vector3.UP.cross(fz)
-	_preview.transform = Transform3D(Basis(dx * w, Vector3.UP * 3.0, fz * d), Vector3(centre.x, 1.5, centre.y))
+	var fp: Dictionary = _buildings.footprint(_item, _cell)
+	var w := int(fp["w"]) * grid.cell_size
+	var d := int(fp["d"]) * grid.cell_size
+	var f: Vector2 = fp["front"]
+	var centre: Vector2 = fp["centre"]
 	var cost := int(_item["cost"])
 	var water_ok := _water_ok(centre, w, d)
 	var coast_ok := _coast_ok(centre, w, d)
@@ -194,13 +232,12 @@ func _preview_at(screen_pos: Vector2) -> void:
 		var field := str(GameData.value("resources/types/%s/field" % _item["extractor"]))
 		richness = ResourceMap.shared().lot_richness(field, centre, w, d)
 	var rich_ok := richness >= GameData.num("resources/min_richness")
-	var valid: bool = not lot.is_empty() and EconomySystem.can_afford(cost) and water_ok and rich_ok and coast_ok and runway_ok
+	var valid: bool = fp["ok"] and EconomySystem.can_afford(cost) and water_ok and rich_ok and coast_ok and runway_ok
 	_valid = valid
-	_preview.material_override = _ok_mat if valid else _bad_mat
-	_preview.visible = true
+	_draw_squares(fp, valid)
 	var error := ""
-	if lot.is_empty():
-		error = "BUILD_ERR_SPACE"
+	if not fp["ok"]:
+		error = str(fp["error"])
 	elif not water_ok:
 		error = "BUILD_ERR_WATER"
 	elif not coast_ok:
@@ -211,11 +248,46 @@ func _preview_at(screen_pos: Vector2) -> void:
 		error = "BUILD_ERR_RESOURCE"
 	elif not EconomySystem.can_afford(cost):
 		error = "ROAD_ERR_MONEY"
-	var hint: String = tr(_item["name_key"])
+	var hint: String = tr(_item["name_key"]) + " · " + tr("BUILD_SQUARES") % [int(_item["lot"][0]), int(_item["lot"][1])]
 	if _item.has("extractor"):
 		hint += " · " + tr("BUILD_RICHNESS") % roundi(richness * 100.0)
 	EventBus.road_preview_changed.emit({"active": true, "valid": valid, "error": error, "cost": cost,
 		"length": 0.0, "screen_pos": screen_pos, "hint": hint})
+
+
+## The footprint drawn square by square (w x d tiles with a thin gap) and a
+## faint box around the whole lot, so the exact size reads at a glance.
+func _draw_squares(fp: Dictionary, valid: bool) -> void:
+	var grid: ZoneGrid = _zones.grid
+	var cs := grid.cell_size
+	var f: Vector2 = fp["front"]
+	var dir: Vector2 = fp["dir"]
+	var tile := cs * 0.44
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	for p: Vector2 in fp["squares"]:
+		var a := p + dir * tile + f * tile
+		var b := p - dir * tile + f * tile
+		var c := p - dir * tile - f * tile
+		var e := p + dir * tile - f * tile
+		for v: Vector2 in [a, b, c, a, c, e]:
+			im.surface_add_vertex(Vector3(v.x, 0.35, v.y))
+	# Walls of the lot: a low translucent box edge on the outline.
+	var w := int(fp["w"]) * cs * 0.5
+	var d := int(fp["d"]) * cs * 0.5
+	var centre: Vector2 = fp["centre"]
+	var corners := [centre + dir * w + f * d, centre - dir * w + f * d, centre - dir * w - f * d, centre + dir * w - f * d]
+	for k in 4:
+		var p0: Vector2 = corners[k]
+		var p1: Vector2 = corners[(k + 1) % 4]
+		for v: Vector3 in [Vector3(p0.x, 0.0, p0.y), Vector3(p1.x, 0.0, p1.y), Vector3(p1.x, 3.0, p1.y),
+				Vector3(p0.x, 0.0, p0.y), Vector3(p1.x, 3.0, p1.y), Vector3(p0.x, 3.0, p0.y)]:
+			im.surface_add_vertex(v)
+	im.surface_end()
+	_preview.mesh = im
+	_preview.transform = Transform3D.IDENTITY
+	_preview.material_override = _ok_mat if valid else _bad_mat
+	_preview.visible = true
 
 
 func _build() -> void:

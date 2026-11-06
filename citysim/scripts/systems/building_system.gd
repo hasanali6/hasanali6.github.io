@@ -61,6 +61,7 @@ var _next_id: int = 1
 var _tick: int = 0
 var _meshes: Dictionary = {}      # mesh key -> MultiMeshInstance3D
 var _instances: Dictionary = {}   # building id -> Array of [mesh key, instance index]
+var _manual_ids: Array[int] = []      # hand-placed buildings (see building_at)
 var _life: Node = null                  # CityLifeSystem (land value), if in the scene
 var _rising: Dictionary = {}      # building id -> progress 0..1
 var _rise_seconds: float
@@ -557,6 +558,16 @@ func refund_of(id: int) -> int:
 
 func building_at(p: Vector2) -> int:
 	var grid: ZoneGrid = _zones.grid
+	# Hand-placed lots can sit across two roads' squares: test their real
+	# rectangle first (there are few of them).
+	for id: int in _manual_ids:
+		var b: Dictionary = buildings.get(id, {})
+		if b.is_empty():
+			continue
+		var rel := p - (b["centre"] as Vector2)
+		var f: Vector2 = b["front"]
+		if absf(rel.dot(f)) <= float(b["depth"]) * 0.5 and absf(rel.dot(Vector2(-f.y, f.x))) <= float(b["width"]) * 0.5:
+			return id
 	var cell := grid.cell_at(p)
 	return grid.building[cell] if cell >= 0 else -1
 
@@ -565,13 +576,137 @@ func building_at(p: Vector2) -> int:
 
 ## Lot for a catalogue item fronting the road at cell, or empty if it does not fit.
 func lot_for(item: Dictionary, cell: int) -> PackedInt32Array:
-	return (_zones.grid as ZoneGrid).find_free_lot(cell, int(item["lot"][0]), int(item["lot"][1]))
+	var fp := footprint(item, cell)
+	return fp["cells"] if fp["ok"] else PackedInt32Array()
+
+
+## Exact footprint of a hand-placed item whose front-left square is cell
+## `cell` (any square, not only the one touching the road): w squares along
+## that square's row and d squares back, each laid on whichever free square
+## lies there, also squares that belong to another road's block (a lot
+## between two roads works). One side of the footprint must touch a road;
+## the building faces that road. Returns {"ok", "cells" (cells[0] = cell),
+## "squares" (centres of the w x d squares), "centre", "front", "dir",
+## "w", "d" (squares along and across the facing road), "error"}.
+func footprint(item: Dictionary, cell: int, need_road: bool = true) -> Dictionary:
+	var grid: ZoneGrid = _zones.grid
+	var w := int(item["lot"][0])
+	var d := int(item["lot"][1])
+	var out := {"ok": false, "cells": PackedInt32Array(), "squares": PackedVector2Array(), "error": "BUILD_ERR_SPACE",
+		"centre": Vector2.ZERO, "front": Vector2.UP, "dir": Vector2.RIGHT, "w": w, "d": d}
+	if cell < 0 or cell >= grid.size():
+		return out
+	var cs := grid.cell_size
+	var f := grid.fronts[cell]
+	var dir := grid.dirs[cell]
+	var corner := grid.centers[cell] - dir * cs * 0.5 + f * cs * 0.5
+	var centre := corner + dir * w * cs * 0.5 - f * d * cs * 0.5
+	out["centre"] = centre
+	out["front"] = f
+	out["dir"] = dir
+	var cells := PackedInt32Array()
+	var squares := PackedVector2Array()
+	var ok := true
+	for b in d:
+		for a in w:
+			var p := corner + dir * (a + 0.5) * cs - f * (b + 0.5) * cs
+			squares.append(p)
+			var j := _square_under(p, cell if a == 0 and b == 0 else -1)
+			if j < 0:
+				ok = false
+				out["error"] = "BUILD_ERR_SPACE"
+			elif grid.building[j] != ZoneGrid.FREE:
+				ok = false
+				out["error"] = "BUILD_ERR_TAKEN"
+			elif not j in cells:
+				cells.append(j)
+	# Free squares that sit mostly under the footprint are taken too, so
+	# nothing grows half inside it.
+	if ok:
+		var hw := w * cs * 0.5 - cs * 0.3
+		var hd := d * cs * 0.5 - cs * 0.3
+		for j in grid.cells_near(centre, maxf(w, d) * cs):
+			if j in cells:
+				continue
+			var rel := grid.centers[j] - centre
+			if absf(rel.dot(dir)) < hw and absf(rel.dot(f)) < hd:
+				if grid.building[j] != ZoneGrid.FREE:
+					ok = false
+					out["error"] = "BUILD_ERR_TAKEN"
+					break
+				cells.append(j)
+	out["squares"] = squares
+	out["cells"] = cells
+	out["ok"] = ok and not cells.is_empty()
+	if out["ok"] and need_road:
+		var facing := _facing_road(centre, f, dir, w * cs, d * cs)
+		if facing.is_empty():
+			out["ok"] = false
+			out["error"] = "BUILD_ERR_ROAD"
+		else:
+			out["front"] = facing["front"]
+			out["dir"] = facing["dir"]
+			if facing["sideways"]:
+				out["w"] = d
+				out["d"] = w
+	return out
+
+
+## Which side of a w_m x d_m footprint (front f, row direction dir) touches
+## a road: {"front", "dir", "sideways"} with front pointing at that road,
+## or {} when no side does. The row's own road side wins ties.
+func _facing_road(centre: Vector2, f: Vector2, dir: Vector2, w_m: float, d_m: float) -> Dictionary:
+	var net: Node = get_node_or_null("../RoadNetwork")
+	if net == null:
+		return {"front": f, "dir": dir, "sideways": false}
+	var graph: RoadGraph = net.graph
+	var sides := [[f, dir, d_m * 0.5, w_m * 0.5, false], [-f, -dir, d_m * 0.5, w_m * 0.5, false],
+		[dir, -f, w_m * 0.5, d_m * 0.5, true], [-dir, f, w_m * 0.5, d_m * 0.5, true]]
+	for side: Array in sides:
+		var n: Vector2 = side[0]
+		var along: Vector2 = side[1]
+		var touches := 0
+		for k: float in [0.0, -0.6, 0.6]:
+			# Two misses out of three: this side cannot reach two touches.
+			if k > 0.0 and touches == 0:
+				break
+			var p: Vector2 = centre + n * (float(side[2]) + 1.5) + along * float(side[3]) * k
+			var hit := graph.find_segment_near(p, 16.0)
+			if hit.is_empty():
+				continue
+			var seg: RoadGraph.RoadSegment = graph.segments[int(hit["segment"])]
+			if (hit["point"] as Vector2).distance_to(p) <= RoadTypes.half_width(net.type_config(seg.type)) + 0.75:
+				touches += 1
+		if touches >= 2:
+			return {"front": n, "dir": along, "sideways": side[4]}
+	return {}
+
+
+## The buildable square under p (with a little slack for the small gaps
+## between rows of different roads), or -1. `prefer` wins when it fits.
+func _square_under(p: Vector2, prefer: int) -> int:
+	var grid: ZoneGrid = _zones.grid
+	var half := grid.cell_size * 0.5
+	if prefer >= 0:
+		return prefer
+	var best := -1
+	var best_d := INF
+	var slack := grid.cell_size * 0.2
+	for i in grid.cells_near(p, grid.cell_size):
+		var rel := p - grid.centers[i]
+		if absf(rel.dot(grid.dirs[i])) <= half + slack and absf(rel.dot(grid.fronts[i])) <= half + slack:
+			var dd := rel.length()
+			if dd < best_d:
+				best_d = dd
+				best = i
+	return best
 
 
 func place(item: Dictionary, cell: int) -> int:
-	var lot := lot_for(item, cell)
-	if lot.is_empty():
+	var fp := footprint(item, cell)
+	if not fp["ok"]:
 		return -1
+	var lot: PackedInt32Array = fp["cells"]
 	var grid: ZoneGrid = _zones.grid
 	var key := str(item.get("zone", ""))
 	var zid: int = _zones.zone_id(key) if key != "" else ZoneGrid.UNZONED
@@ -580,7 +715,12 @@ func place(item: Dictionary, cell: int) -> int:
 	var floors := int(item.get("floors", 1))
 	if key != "":
 		floors = maxi(floors, _floors_for(_zones.zone_config(zid), 1))
-	var id := _create(zid, lot, cell, int(item["lot"][0]), int(item["lot"][1]), str(item["style"]), floors, true)
+	var id := _create(zid, lot, cell, int(fp["w"]), int(fp["d"]), str(item["style"]), floors, true)
+	# Exactly where the preview showed it (not the average of the squares),
+	# facing the road its lot touches.
+	buildings[id]["centre"] = fp["centre"]
+	buildings[id]["front"] = fp["front"]
+	buildings[id]["dir"] = fp["dir"]
 	buildings[id]["service"] = str(item.get("service", ""))
 	if item.has("extractor"):
 		_init_extractor(buildings[id], str(item["extractor"]))
@@ -663,6 +803,8 @@ func record_of(id: int) -> Dictionary:
 		"extractor": b.get("extractor", ""), "richness": b.get("richness", 0.0), "deposit": b.get("deposit", -1.0),
 		"deposit_max": b.get("deposit_max", -1.0),
 		"cells": keys, "front": [grid.segment[front_cell], grid.side[front_cell], grid.along[front_cell], grid.depth[front_cell]],
+		"centre": [(b["centre"] as Vector2).x, (b["centre"] as Vector2).y],
+		"facing": [(b["front"] as Vector2).x, (b["front"] as Vector2).y, (b["dir"] as Vector2).x, (b["dir"] as Vector2).y],
 	}
 
 
@@ -726,6 +868,12 @@ func _restore_record(rec: Dictionary) -> int:
 	_next_id = int(rec["id"])
 	var id := _create(zid, lot, front, int(rec["lot"][0]), int(rec["lot"][1]), str(rec["style"]), int(rec["floors"]), bool(rec["manual"]))
 	var b: Dictionary = buildings[id]
+	if rec.has("centre"):
+		b["centre"] = Vector2(float(rec["centre"][0]), float(rec["centre"][1]))
+	if rec.has("facing"):
+		var fc: Array = rec["facing"]
+		b["front"] = Vector2(float(fc[0]), float(fc[1]))
+		b["dir"] = Vector2(float(fc[2]), float(fc[3]))
 	for field: String in ["level", "seed", "palette", "abandoned", "empty_months", "abandoned_months"]:
 		b[field] = rec[field]
 	for field: String in ["service", "no_utility_months", "burned"]:
@@ -1257,6 +1405,10 @@ const UNTINTED := ["lot", "contact", "smoke", "solar", "basin", "beacon"]
 ## Redraws every building once this frame (calls in between are merged).
 func _render_all() -> void:
 	_counts_dirty = true
+	_manual_ids.clear()
+	for b: Dictionary in buildings.values():
+		if b["manual"]:
+			_manual_ids.append(int(b["id"]))
 	if not _render_queued:
 		_render_queued = true
 		_render_now.call_deferred()

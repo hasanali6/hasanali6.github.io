@@ -77,7 +77,11 @@ func open(title_key: String, items: Array) -> void:
 		var price := UiStyle.format_int(int(item["cost"]))
 		if item.has("upkeep"):
 			price += " · " + TranslationServer.translate("CAT_UPKEEP") % UiStyle.format_int(int(item["upkeep"]))
-		b.text = "%s\n%s" % [TranslationServer.translate(item["name_key"]), price]
+		# The size in squares, so each building's footprint is known up front.
+		var size_text := ""
+		if item.has("lot"):
+			size_text = " · %d×%d" % [int(item["lot"][0]), int(item["lot"][1])]
+		b.text = "%s\n%s" % [TranslationServer.translate(item["name_key"]), price + size_text]
 		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		b.add_theme_font_size_override("font_size", _font - 6)
 		b.button_group = group

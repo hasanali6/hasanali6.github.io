@@ -448,3 +448,5 @@ SETTINGS_DISASTERS,"Afetler (deprem, sel)","Disasters (earthquake, flood)"
 CHEATS_EARTHQUAKE,Deprem,Earthquake
 CHEATS_FLOOD,Sel,Flood
 CHEATS_FIRE,Yangın,Fire
+BUILD_ERR_TAKEN,"Bu karelerde başka bir şey var","Something else stands on these squares"
+BUILD_SQUARES,%d×%d kare,%d×%d squares

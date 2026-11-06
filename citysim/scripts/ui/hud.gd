@@ -224,7 +224,7 @@ func _process(delta: float) -> void:
 	if _tutorial_label != null and _tutorial_label.text != "":
 		# The tutorial steps aside while a menu card is open.
 		var card_open := _settings_panel.visible or _info_panel.visible or _economy.card.visible or _missions.card.visible \
-			or _saves.card.visible or _cheats.card.visible
+			or _saves.card.visible or _cheats.card.visible or _cost_pill.visible or _confirm_bar.visible
 		_tutorial.visible = not card_open
 	if _toast_timer > 0.0:
 		_toast_timer -= delta

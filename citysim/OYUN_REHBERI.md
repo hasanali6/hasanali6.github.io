@@ -127,6 +127,15 @@ yola ve parsele aittir, onlar kesilmez.
 **Yol açısı:** yollar birbirine en az 25° açıyla bağlanır. Çizerken dar açı
 önerilmez; araç seni en yakın uygun açıya ve uygun kavşağa yaslar.
 
+**Bina/hizmet/park yerleştirme (kare kare):** her binanın kaç kare olduğu
+katalog düğmesinde yazar (ör. Sağlık ocağı 2×2, Hastane 3×4, Hayvanat bahçesi
+6×6). Parmağını koyduğun yerde tam o kadar kare yeşil (sığmıyorsa kırmızı)
+kutucuklarla gösterilir ve bina parmağının altındaki karelere oturur, başka
+yere kaymaz. İki yolun arasındaki kareler de olur: binanın bir kenarı herhangi
+bir yola değmesi yeter, bina o yola bakar. Hiçbir yola değmiyorsa kırmızı olur
+ve "Bir yola yakın yerleştir" der. Parmak yolun üstündeyse en yakın uygun yere
+yaslanır.
+
 **Onay (bütün inşaatlarda):** yol çizmek, bina/hizmet/park yerleştirmek ve
 yolu yükseltmek hemen yapılmaz; önizleme yerinde kalır ve üstte ne olduğu ve
 fiyatıyla birlikte **✓ Yap / ✗ Vazgeç** çıkar. Bina ya da yol yıkmak da
