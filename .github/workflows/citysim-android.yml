@@ -40,7 +40,7 @@ jobs:
           path: |
             ~/godot
             ~/.local/share/godot/export_templates
-          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}-android
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}-android-win
 
       - name: Download Godot and Android export templates
         if: steps.cache-godot.outputs.cache-hit != 'true'
@@ -56,7 +56,8 @@ jobs:
           DEST=~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}
           mkdir -p "$DEST"
           unzip -j -q /tmp/templates.tpz \
-            templates/android_debug.apk templates/android_release.apk templates/version.txt -d "$DEST"
+            templates/android_debug.apk templates/android_release.apk templates/version.txt \
+            templates/windows_debug_x86_64.exe templates/windows_release_x86_64.exe -d "$DEST"
           rm /tmp/templates.tpz /tmp/godot.zip
 
       - name: Import project (generates translations)

@@ -331,7 +331,7 @@ iki parmakla yukarı/aşağı kaydır = eğim · uzun bas = konum bilgisi · ger
 7. Testler: `godot --headless --path citysim -s res://tests/run_tests.gd` → `... checks, 0 failed`.
 8. Değişiklikleri GitHub'a push edince yeni APK ve Windows sürümü otomatik derlenir.
 
-Kayıtlar bilgisayarda ayrı tutulur (Windows: `%APPDATA%\Godot\app_userdata\Şehir Sim\saves`);
+Kayıtlar bilgisayarda ayrı tutulur (Windows: `%APPDATA%\Godot\app_userdata\Şehir Simülasyonu\saves`);
 telefondaki şehir bilgisayara kendiliğinden gelmez.
 
 ## APK nasıl alınır
