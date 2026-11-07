@@ -142,6 +142,11 @@ func _build_seconds(id: int) -> float:
 
 # --- Growth ------------------------------------------------------------------------
 
+## Current RCI demand for a zone (mixed = average of homes and shops).
+func group_demand(zone_key: String) -> float:
+	return _group_demand(zone_key)
+
+
 func _group_demand(zone_key: String) -> float:
 	var group := str(_zones.zone_types[zone_key]["group"])
 	if group == "mixed":

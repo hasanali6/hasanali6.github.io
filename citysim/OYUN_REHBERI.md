@@ -124,6 +124,9 @@ parmağını sürükle; geçtiğin yerdeki ağaçlar kesilir (fırça gibi, ücr
 Kesilen ağaçlar kayıtla birlikte saklanır. Sokak ağaçları ve bahçe ağaçları
 yola ve parsele aittir, onlar kesilmez.
 
+**Düzgün bloklar:** yol çizerken yön, 140 m içindeki bir yola 6°'den az
+sapıyorsa ona tam paralel ya da tam dik oturur; bloklar yamuk çıkmaz.
+
 **Yol açısı:** yollar birbirine en az 25° açıyla bağlanır. Çizerken dar açı
 önerilmez; araç seni en yakın uygun açıya ve uygun kavşağa yaslar.
 
@@ -133,8 +136,9 @@ katalog düğmesinde yazar (ör. Sağlık ocağı 2×2, Hastane 3×4, Hayvanat b
 kutucuklarla gösterilir ve bina parmağının altındaki karelere oturur, başka
 yere kaymaz. İki yolun arasındaki kareler de olur: binanın bir kenarı herhangi
 bir yola değmesi yeter, bina o yola bakar. Hiçbir yola değmiyorsa kırmızı olur
-ve "Bir yola yakın yerleştir" der. Parmak yolun üstündeyse en yakın uygun yere
-yaslanır.
+ve "Bir yola yakın yerleştir" der. Bina asla uzak bir yere zıplamaz: en fazla
+~6 m (parmak kaldırım kenarındaysa) yanındaki uygun yere yaslanır; kare
+olmayan boş araziye dokunursan kırmızı çerçeve parmağının altında görünür.
 
 **Onay (bütün inşaatlarda):** yol çizmek, bina/hizmet/park yerleştirmek ve
 yolu yükseltmek hemen yapılmaz; önizleme yerinde kalır ve üstte ne olduğu ve
@@ -173,6 +177,9 @@ Art arda 20 işleme kadar geri gidebilirsin (en yenisinden başlayarak). Yerinde
 artık başka bir şey varsa o işlem geri alınamaz.
 
 ### İmar
+Talebi olmayan imarı boyarsan (çubuğu boşsa) uyarı çıkar ve neyin eksik
+olduğunu söyler (ör. "dükkânlar için en az 30 nüfus lazım").
+
 Fırça, blok doldurma ve silgi. İmar ücretsizdir. Binalar yola bakan
 hücrelerde, talep varsa büyür ve **boyadığın derinliğin tamamını** alır: bina
 yola sıfır, öndedir; arkada kalan boyalı kareler onun bahçesi/otoparkı olur.

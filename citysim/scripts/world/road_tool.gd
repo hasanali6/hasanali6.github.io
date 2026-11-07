@@ -25,6 +25,8 @@ var _block_key: String = ""
 var _block_lost: Dictionary = {}
 # A drawn road waiting for the player's ✓ / ✗ (see confirm_pending).
 var _pending: Dictionary = {}
+const ALIGN_REACH := 140.0          # metres: roads this close set the alignment
+const ALIGN_TOLERANCE_DEG := 6.0
 var _lost_boxes: Array[MeshInstance3D] = []
 var _cut_ids := PackedInt32Array()
 var _ref_angle: float = 0.0
@@ -710,6 +712,12 @@ func _snap(screen_pos: Vector2, anchor: Variant) -> Variant:
 	var ang := _ref_angle + roundf(rel / _angle_step) * _angle_step
 	if absf(angle_difference(ang, v.angle())) > _angle_tolerance:
 		ang = v.angle()
+	# Line up with the roads around: a direction within a few degrees of
+	# parallel or square to a nearby road snaps onto it exactly, so blocks
+	# come out as clean rectangles instead of slightly crooked ones.
+	var aligned := _aligned_angle(a, v.angle())
+	if not is_nan(aligned):
+		ang = aligned
 	# Never offer a direction that would meet a road at the start at too
 	# sharp an angle: step on to the nearest angle that is allowed.
 	if not graph.direction_ok(a, Vector2.from_angle(ang)):
@@ -732,6 +740,31 @@ func _snap(screen_pos: Vector2, anchor: Variant) -> Variant:
 				and graph.direction_ok(target, -tv) and graph.direction_ok(a, tv):
 			return target
 	return stepped
+
+
+## The angle (radians) parallel or square to a road within ALIGN_REACH of
+## `from` that lies within ALIGN_TOLERANCE of `raw`, or NAN.
+func _aligned_angle(from: Vector2, raw: float) -> float:
+	var graph: RoadGraph = _net.graph
+	var best := NAN
+	var best_diff := deg_to_rad(ALIGN_TOLERANCE_DEG)
+	for seg: RoadGraph.RoadSegment in graph.segments.values():
+		var c := graph.curve_of(seg)
+		var lo := Vector2(minf(minf(c[0].x, c[1].x), c[2].x), minf(minf(c[0].y, c[1].y), c[2].y)) - Vector2.ONE * ALIGN_REACH
+		var hi := Vector2(maxf(maxf(c[0].x, c[1].x), c[2].x), maxf(maxf(c[0].y, c[1].y), c[2].y)) + Vector2.ONE * ALIGN_REACH
+		if from.x < lo.x or from.y < lo.y or from.x > hi.x or from.y > hi.y:
+			continue
+		var t := graph.closest_t(c[0], c[1], c[2], from)
+		if RoadGraph.bezier(c[0], c[1], c[2], t).distance_to(from) > ALIGN_REACH:
+			continue
+		var base := RoadGraph.bezier_tangent(c[0], c[1], c[2], t).angle()
+		for k in 4:
+			var cand := base + k * PI * 0.5
+			var diff := absf(angle_difference(cand, raw))
+			if diff < best_diff:
+				best_diff = diff
+				best = cand
+	return best
 
 
 ## Direction to measure angle steps from: the road the start point sits on

@@ -15,6 +15,7 @@ var _zone_key: String = ""
 var _mode: String = "brush"
 var _radius: float
 var _marker: MeshInstance3D
+var _painted: bool = false   # this stroke zoned something (for the no-demand hint)
 
 
 func _ready() -> void:
@@ -55,6 +56,9 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 		return
 	if phase == GestureTracker.Pointer.UP or phase == GestureTracker.Pointer.CANCEL:
 		_marker.visible = false
+		if _painted:
+			_painted = false
+			_warn_no_demand()
 		return
 	var g: Variant = _ground(screen_pos)
 	if g == null:
@@ -86,6 +90,35 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 			EventBus.sfx_requested.emit("zone_paint")
 	elif _zones.set_zone(cells, _zones.zone_id(_zone_key)) > 0:
 		EventBus.sfx_requested.emit("zone_paint")
+		_painted = true
+	if _mode == "fill" and _painted:
+		_painted = false
+		_warn_no_demand()
+
+
+## After painting a zone nobody wants yet, say why nothing will grow there
+## and what brings the demand (the matching K/T/O/S bar is empty).
+func _warn_no_demand() -> void:
+	var group := str(_zones.zone_types[_zone_key]["group"])
+	if _buildings.group_demand(_zone_key) > 0.02:
+		return
+	var population: int = get_node("../CitizenSystem").population
+	var cfg := GameData.section("economy/demand")
+	var text := ""
+	match group:
+		"residential", "mixed":
+			text = tr("ZONE_NO_DEMAND_RES")
+		"commercial":
+			var need := int(cfg["min_commercial_customers"])
+			text = tr("ZONE_NO_DEMAND_COM_POP") % need if population < need else tr("ZONE_NO_DEMAND_COM")
+		"industrial":
+			var need_i := int(cfg["min_industry_population"])
+			text = tr("ZONE_NO_DEMAND_IND_POP") % need_i if population < need_i else tr("ZONE_NO_DEMAND_IND")
+		"office":
+			var need_o := int(cfg["min_office_population"])
+			text = tr("ZONE_NO_DEMAND_OFF_POP") % need_o if population < need_o else tr("ZONE_NO_DEMAND_OFF")
+	if text != "":
+		EventBus.notification_posted.emit("zones", text)
 
 
 func _ground(screen_pos: Vector2) -> Variant:

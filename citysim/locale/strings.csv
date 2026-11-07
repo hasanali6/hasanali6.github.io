@@ -450,3 +450,10 @@ CHEATS_FLOOD,Sel,Flood
 CHEATS_FIRE,Yangın,Fire
 BUILD_ERR_TAKEN,"Bu karelerde başka bir şey var","Something else stands on these squares"
 BUILD_SQUARES,%d×%d kare,%d×%d squares
+ZONE_NO_DEMAND_RES,"Konut talebi yok (K çubuğu boş): iş yeri aç, mutluluğu artır, sonra evler çıkar","No housing demand (empty R bar): add jobs and raise happiness first"
+ZONE_NO_DEMAND_COM_POP,"Ticari talep yok: dükkânlar için en az %d nüfus lazım. Önce yeşil konut boya","No commercial demand: shops need at least %d people. Zone homes first"
+ZONE_NO_DEMAND_COM,"Ticari talep yok (T çubuğu boş): yeterince dükkân var, nüfus artınca dolar","No commercial demand (empty C bar): enough shops for now, grows with population"
+ZONE_NO_DEMAND_IND_POP,"Sanayi talebi yok: fabrikalar için en az %d nüfus lazım. Önce yeşil konut boya","No industrial demand: factories need at least %d people. Zone homes first"
+ZONE_NO_DEMAND_IND,"Sanayi talebi yok (S çubuğu boş): yeterince fabrika var, nüfus artınca dolar","No industrial demand (empty I bar): enough factories for now"
+ZONE_NO_DEMAND_OFF_POP,"Ofis talebi yok: ofisler için en az %d nüfus ve eğitimli işçi lazım","No office demand: offices need at least %d people and educated workers"
+ZONE_NO_DEMAND_OFF,"Ofis talebi yok (O çubuğu boş): lise/üniversite mezunu işçi lazım","No office demand (empty O bar): needs high-school/university graduates"

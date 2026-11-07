@@ -135,11 +135,12 @@ func _runway_ok(centre: Vector2, f: Vector2, d: float) -> bool:
 
 
 ## Where the selected item goes for a finger at g: its footprint covers the
-## square under the finger. Of all footprints (any road-facing cell nearby,
-## either road) that contain g, a free one whose middle is closest to the
-## finger wins; if none of them is free the closest one is shown red with
-## the reason. Only when the finger is on no footprint at all (on the road,
-## or off to the side) does it slide to the nearest free spot in reach.
+## square under the finger. Of all footprints (any square nearby, either
+## road) that contain g, a free one whose middle is closest to the finger
+## wins. If none fits, a free lot at most ~6 m from the finger (finger on the
+## kerb) takes over; otherwise the lot under the finger is shown red with the
+## reason, and -1 means there are no squares there at all. It never jumps
+## to a far-away spot.
 func _best_cell(g: Vector2) -> int:
 	var grid: ZoneGrid = _zones.grid
 	var w := int(_item["lot"][0]) * grid.cell_size
@@ -183,25 +184,26 @@ func _best_cell(g: Vector2) -> int:
 		elif not fp["ok"] and dist < bad_in_d:
 			bad_in_d = dist
 			bad_in = i
-	# Under the finger it would not reach a road (a square or two into the
-	# plot): slide to the nearest spot that does, right next to it.
-	var slide := best_in < 0 and bad_in >= 0 and str(_buildings.footprint(_item, bad_in)["error"]) == "BUILD_ERR_ROAD"
-	if best_in < 0 and (bad_in < 0 or slide):
+	# Nothing fits under the finger: only a lot right next to it (the finger
+	# on the kerb or a step into the plot) may take its place. Anything
+	# farther would put the building somewhere the player did not point.
+	if best_in < 0:
+		var tolerance := grid.cell_size * 0.75
 		for i: int in near:
-			var fp: Dictionary = _buildings.footprint(_item, i)
-			var dist := g.distance_to(fp["centre"])
-			if fp["ok"] and dist < best_near_d:
-				best_near_d = dist
+			var c0 := grid.centers[i] - grid.dirs[i] * grid.cell_size * 0.5 + grid.fronts[i] * grid.cell_size * 0.5 \
+				+ grid.dirs[i] * w * 0.5 - grid.fronts[i] * d * 0.5
+			var r0 := g - c0
+			var gap := Vector2(maxf(absf(r0.dot(grid.dirs[i])) - w * 0.5, 0.0), maxf(absf(r0.dot(grid.fronts[i])) - d * 0.5, 0.0)).length()
+			if gap > tolerance or gap >= best_near_d:
+				continue
+			if _buildings.footprint(_item, i)["ok"]:
+				best_near_d = gap
 				best_near = i
 	if best_in >= 0:
 		return best_in
-	if slide and best_near >= 0 and best_near_d <= maxf(w, d) + grid.cell_size:
-		return best_near
-	if bad_in >= 0:
-		return bad_in
 	if best_near >= 0:
 		return best_near
-	return grid.front_cell_near(g, reach)
+	return bad_in
 
 
 func _preview_at(screen_pos: Vector2) -> void:
@@ -214,8 +216,11 @@ func _preview_at(screen_pos: Vector2) -> void:
 	var grid: ZoneGrid = _zones.grid
 	_cell = _best_cell(g)
 	if _cell < 0:
-		_preview.visible = false
-		EventBus.road_preview_changed.emit({"active": true, "valid": false, "error": "BUILD_ERR_ROAD", "screen_pos": screen_pos})
+		# No squares here at all (far from roads): show the lot red right
+		# under the finger instead of jumping somewhere else.
+		_draw_squares(_phantom(g), false)
+		EventBus.road_preview_changed.emit({"active": true, "valid": false, "error": "BUILD_ERR_ROAD", "screen_pos": screen_pos,
+			"hint": tr(_item["name_key"]) + " · " + tr("BUILD_SQUARES") % [int(_item["lot"][0]), int(_item["lot"][1])]})
 		return
 	var fp: Dictionary = _buildings.footprint(_item, _cell)
 	var w := int(fp["w"]) * grid.cell_size
@@ -253,6 +258,31 @@ func _preview_at(screen_pos: Vector2) -> void:
 		hint += " · " + tr("BUILD_RICHNESS") % roundi(richness * 100.0)
 	EventBus.road_preview_changed.emit({"active": true, "valid": valid, "error": error, "cost": cost,
 		"length": 0.0, "screen_pos": screen_pos, "hint": hint})
+
+
+## A footprint-shaped outline centred on g, lined up with the nearest road
+## squares (or the map), for spots where nothing can be built.
+func _phantom(g: Vector2) -> Dictionary:
+	var grid: ZoneGrid = _zones.grid
+	var cs := grid.cell_size
+	var f := Vector2.UP
+	var dir := Vector2.RIGHT
+	var near := grid.cells_near(g, 80.0)
+	var best := INF
+	for i in near:
+		var dd := grid.centers[i].distance_squared_to(g)
+		if dd < best:
+			best = dd
+			f = grid.fronts[i]
+			dir = grid.dirs[i]
+	var w := int(_item["lot"][0])
+	var d := int(_item["lot"][1])
+	var corner := g - dir * w * cs * 0.5 + f * d * cs * 0.5
+	var squares := PackedVector2Array()
+	for b in d:
+		for a in w:
+			squares.append(corner + dir * (a + 0.5) * cs - f * (b + 0.5) * cs)
+	return {"ok": false, "squares": squares, "centre": g, "front": f, "dir": dir, "w": w, "d": d}
 
 
 ## The footprint drawn square by square (w x d tiles with a thin gap) and a

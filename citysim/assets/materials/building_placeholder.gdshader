@@ -47,7 +47,10 @@ void vertex() {
 
 void fragment() {
 	float seed = v_style.x;
-	float win_ratio = v_style.y;
+	// Public buildings (services) add 2 to the window ratio: more lit
+	// windows at night and a warm floodlight washing the lower walls.
+	float public_b = step(1.5, v_style.y);
+	float win_ratio = v_style.y - 2.0 * public_b;
 	float spacing = max(v_style.z, 1.0);
 	float curtain = v_style.w;
 
@@ -112,7 +115,8 @@ void fragment() {
 		}
 
 		float rnd = hash12(id + vec2(face * 131.0, seed * 71.0));
-		float lit = step(rnd, lit_ratio) * night_factor;
+		float share = mix(lit_ratio, 0.8, public_b);
+		float lit = step(rnd, share) * night_factor;
 		float warm = hash12(id.yx + seed);
 		vec3 lamp = mix(light_color, vec3(0.85, 0.9, 1.0), step(0.8, warm)) * (0.6 + warm * 0.6);
 		if (y < 0.0) {
@@ -127,8 +131,11 @@ void fragment() {
 		metallic = mix(0.0, 0.35, window);
 		// In the distance use a dimmed average instead of noisy per-window hashing;
 		// a full average reads as glowing walls rather than scattered lights.
-		float lit_window = mix(lit_ratio * coverage * night_factor * 0.35, lit * window, detail);
+		float lit_window = mix(share * coverage * night_factor * 0.35, lit * window, detail);
 		emission = lamp * light_energy * lit_window;
+		// Floodlights at the foot of public buildings, fading up the wall.
+		float wash = public_b * night_factor * (1.0 - smoothstep(0.0, 9.0, v_local.y)) * (1.0 - window);
+		emission += v_wall * light_color * 0.55 * wash;
 	}
 
 	// Weather: rain darkens the walls, snow settles on flat roofs.

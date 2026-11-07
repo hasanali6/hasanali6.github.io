@@ -252,8 +252,10 @@ static func _shadow(parts: Array[Dictionary], ctx: Dictionary, u: float, v: floa
 		Vector3(p.x, 0.07, p.y)), "color": Color.WHITE, "custom": Color(w, d, 0.0, 0.0)})
 
 
+## Window pattern of a public building (the +2 tells the building shader to
+## light most windows at night and floodlight the walls).
 static func _facade(seed: float, ratio: float, spacing: float) -> Color:
-	return Color(seed, ratio, spacing, 0.0)
+	return Color(seed, ratio + 2.0, spacing, 0.0)
 
 
 static func _roof_units(parts: Array[Dictionary], ctx: Dictionary, u: float, v: float, w: float, d: float, h: float) -> void:
