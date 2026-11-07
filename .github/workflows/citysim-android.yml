@@ -151,3 +151,24 @@ jobs:
             gh release create "$TAG" "$PROJECT_DIR/export/SehirSim.apk" "$PROJECT_DIR/export/SehirSim-GL.apk" --prerelease \
               --title "Şehir Simülasyonu (son derleme)" --notes "$NOTES"
           fi
+
+      # Windows build for playing on a PC (same release page). Kept after the
+      # APK publish and allowed to fail, so a desktop export problem never
+      # holds back the phone builds.
+      - name: Export Windows build (SehirSim-Windows.zip)
+        id: windows
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p "$PROJECT_DIR/export/windows"
+          ~/godot/godot --headless --path "$PROJECT_DIR" --export-release "Windows Desktop" "$GITHUB_WORKSPACE/$PROJECT_DIR/export/windows/SehirSim.exe"
+          test -s "$PROJECT_DIR/export/windows/SehirSim.exe"
+          (cd "$PROJECT_DIR/export/windows" && zip -q -r ../SehirSim-Windows.zip .)
+          ls -lh "$PROJECT_DIR/export/SehirSim-Windows.zip"
+
+      - name: Publish Windows build to the release
+        if: steps.windows.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload citysim-latest "$PROJECT_DIR/export/SehirSim-Windows.zip" --clobber

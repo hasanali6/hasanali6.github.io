@@ -311,6 +311,29 @@ iki parmakla yukarı/aşağı kaydır = eğim · uzun bas = konum bilgisi · ger
 | 9 | Uzun basma bilgi verir | Zemine uzun bas → konum (m), hücre (8 m) ve "oynanabilir alan / kilitli" bilgisi. |
 | 10 | APK telefonda açılır, yatay ekran, Türkçe arayüz, akıcı | Sol altta `FPS 60 · GPU 9.8 ms · CPU 3.1 ms · 120 Hz · 3D 75%` gibi bir satır var. GPU 14 ms'yi aşarsa 3D yüzdesi kendiliğinden düşer. CPU yüksekse sorun ekran kartında değil işlemcidedir. |
 
+## Bilgisayarda oynamak ve geliştirmek
+
+**Sadece oynamak (Windows):** Releases → `citysim-latest` → `SehirSim-Windows.zip` indir, aç,
+`SehirSim.exe`'yi çalıştır (kurulum yok). Windows "bilinmeyen yayıncı" uyarısı verirse
+"Ek bilgi → Yine de çalıştır". Her push'ta APK'larla birlikte otomatik derlenir.
+
+**Geliştirmek (Windows / Mac / Linux):**
+1. **Godot 4.7.2** (standart sürüm, .NET değil) indir: godotengine.org → Download → "Godot Engine" (tek dosya, kurulum yok).
+2. Repoyu indir: `git clone https://github.com/hasanali6/hasanali6.github.io` ve geliştirme dalına geç
+   (`git checkout ccr-36f23ef9-qlqpvv`), ya da GitHub'da dalı seçip *Code → Download ZIP*.
+3. Godot'u aç → *Import* → `citysim/project.godot` seç → *Import & Edit*. İlk açılışta dokular içe aktarılır (1–2 dk).
+4. **F5** ile çalıştır. Kontroller: sol sürükle = kaydır / çiz, sağ sürükle = döndür + eğim,
+   tekerlek = zoom, sol basılı tut = konum bilgisi. Pencere boyutu 1280×720 (telefon yatay oranı).
+5. Telefon ekranını taklit etmek için: *Project → Project Settings → Display → Window* altında
+   *Size* değiştirilebilir; ya da çalışırken pencereyi büyüt (arayüz ölçeklenir).
+6. Ayar sayıları kodda değil `citysim/data/*.json` dosyalarında (talep, ekonomi, afet sıklığı…):
+   bir değeri değiştir, F5'e bas, etkisini gör.
+7. Testler: `godot --headless --path citysim -s res://tests/run_tests.gd` → `... checks, 0 failed`.
+8. Değişiklikleri GitHub'a push edince yeni APK ve Windows sürümü otomatik derlenir.
+
+Kayıtlar bilgisayarda ayrı tutulur (Windows: `%APPDATA%\Godot\app_userdata\Şehir Sim\saves`);
+telefondaki şehir bilgisayara kendiliğinden gelmez.
+
 ## APK nasıl alınır
 
 ### Yol A — Otomatik (önerilen, hiçbir şey kurmadan)
