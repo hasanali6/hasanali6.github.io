@@ -115,6 +115,27 @@ func build_road(start: Vector2, end: Vector2, control: Variant, type: String, al
 ## Exact check: tries a road change on copies of the road graph and the
 ## zoning cells and returns the buildings that would lose any lot cell (the
 ## same rule that removes them for real).
+## True when no road of graph g runs over the rectangle (centre, front f,
+## width, depth): a road change that only re-lays the squares around a
+## building does not knock it down.
+func rect_clear(g: RoadGraph, centre: Vector2, f: Vector2, width: float, depth: float) -> bool:
+	var side := Vector2(-f.y, f.x)
+	var nu := maxi(ceili(width / 4.0), 1)
+	var nv := maxi(ceili(depth / 4.0), 1)
+	for a in nu + 1:
+		for b in nv + 1:
+			var p := centre + side * width * (float(a) / nu - 0.5) * 0.9 + f * depth * (float(b) / nv - 0.5) * 0.9
+			var hit := g.find_segment_near(p, 24.0)
+			if hit.is_empty():
+				continue
+			var seg: RoadGraph.RoadSegment = g.segments[int(hit["segment"])]
+			# Lots sit right against their road's kerb: only a point that is
+			# really on a road's surface counts.
+			if (hit["point"] as Vector2).distance_to(p) < RoadTypes.half_width(types[seg.type]) - 0.3:
+				return false
+	return true
+
+
 func buildings_lost(change: Callable) -> Dictionary:
 	var lost := {}
 	var zsys: Node = get_parent().get_node_or_null("ZoneSystem")
@@ -142,6 +163,12 @@ func buildings_lost(change: Callable) -> Dictionary:
 				touched = true
 				break
 		if touched and int(counts.get(bid, 0)) != cells.size():
+			# Squares re-laid around it (a new corner nearby): it stays if no
+			# road runs over it and squares are left under it.
+			var b: Dictionary = bsys.buildings[bid]
+			if rect_clear(g, b["centre"], b["front"], float(b["width"]), float(b["depth"])) \
+					and not z.cells_under(b["centre"], b["front"], float(b["width"]), float(b["depth"]), bid).is_empty():
+				continue
 			lost[bid] = true
 	return lost
 

@@ -240,8 +240,11 @@ func _add_rows(graph: RoadGraph, sid: int, types: Dictionary, mesh_cfg: Dictiona
 		# Trimmed ends keep whole cells; an open end (no corner) takes the cell
 		# whose centre lies on this piece, so a cell across a split point
 		# stays (with the piece its centre is on).
-		var first := ceili((trim_s - offset) / cell_size - 0.001) if trim_s > 0.0 else ceili(-offset / cell_size - 0.5 - 0.0001)
-		var last := floori((length - trim_e - offset) / cell_size + 0.001) if trim_e > 0.0 else ceili((length - offset) / cell_size - 0.5 - 0.0001)
+		# At a corner a square stays unless its centre lies inside the
+		# junction (the clearance test below still keeps it off both roads):
+		# a new side road no longer wipes out the lot just past the corner.
+		var first := ceili((trim_s - cell_size * 0.5 - offset) / cell_size - 0.001) if trim_s > 0.0 else ceili(-offset / cell_size - 0.5 - 0.0001)
+		var last := floori((length - trim_e + cell_size * 0.5 - offset) / cell_size + 0.001) if trim_e > 0.0 else ceili((length - offset) / cell_size - 0.5 - 0.0001)
 		for idx in range(first, last):
 			var k := idx - k0
 			var at := offset + cell_size * (idx + 0.5)
@@ -447,6 +450,24 @@ func find_free_lot(i: int, width: int, lot_depth: int) -> PackedInt32Array:
 			if j < 0 or building[j] != FREE:
 				return PackedInt32Array()
 			out.append(j)
+	return out
+
+
+## Cells whose centres lie under a building's rectangle (centre, front f,
+## width across, depth along f), free or already owned by `owner`. Used to
+## keep a building standing when a road change re-lays the squares around
+## it without touching the building itself.
+func cells_under(centre: Vector2, f: Vector2, width: float, lot_depth: float, owner: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	var side := Vector2(-f.y, f.x)
+	# A square counts when its centre lies under the building (squares of a
+	# re-laid row can sit half a square off the old grid).
+	var hw := width * 0.5 + 0.01
+	var hd := lot_depth * 0.5 + 0.01
+	for i in cells_near(centre, maxf(width, lot_depth) * 0.75 + cell_size):
+		var rel := centers[i] - centre
+		if absf(rel.dot(side)) <= hw and absf(rel.dot(f)) <= hd and (building[i] == FREE or building[i] == owner):
+			out.append(i)
 	return out
 
 

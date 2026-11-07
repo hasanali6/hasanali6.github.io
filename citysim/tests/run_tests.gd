@@ -348,7 +348,8 @@ func _test_zone_cells() -> void:
 	var g := _graph()
 	g.commit_road(g.plan_road(Vector2(0, 0), Vector2(96, 0), null), "street")
 	var grid := _zone_grid(g)
-	_check(grid.size() == 2 * 12 * 6, "straight 96 m street gets 12 x 6 cells per side (%d)" % grid.size())
+	var deep := int(_zones()["cells"]["depth"])
+	_check(grid.size() == 2 * 12 * deep, "straight 96 m street gets 12 x depth cells per side (%d)" % grid.size())
 	var i := grid.index_of(g.segments.keys()[0], 1, 0, 0)
 	_check(i >= 0 and absf(absf(grid.centers[i].y) - 8.0) < 0.01, "first row sits right behind the 8 m street")
 	_check(grid.fronts[i].dot(-grid.centers[i].normalized()) > 0.5, "cell front points back to the road")
@@ -378,7 +379,7 @@ func _test_zone_restore_and_lots() -> void:
 		if grid.side[c] == 1:
 			grid.zone[c] = 1
 	var row := grid.row_cells(grid.index_of(g.segments.keys()[0], 1, 3, 0))
-	_check(row.size() == 20 * 6, "row_cells returns the whole block side")
+	_check(row.size() == 20 * int(_zones()["cells"]["depth"]), "row_cells returns the whole block side")
 	var lot := grid.find_lot(grid.index_of(g.segments.keys()[0], 1, 2, 0), 2, 3, 1)
 	_check(lot.size() == 6, "a 2 x 3 lot fits on zoned free cells")
 	_check(grid.find_lot(grid.index_of(g.segments.keys()[0], -1, 2, 0), 2, 3, 1).is_empty(), "no lot on unzoned side")

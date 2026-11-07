@@ -24,7 +24,7 @@
       ],
       "lot_depths": [
         1,
-        6
+        8
       ],
       "floors_by_level": [
         [
@@ -66,7 +66,7 @@
       ],
       "lot_depths": [
         1,
-        6
+        8
       ],
       "floors_by_level": [
         [
@@ -106,7 +106,7 @@
       ],
       "lot_depths": [
         2,
-        6
+        8
       ],
       "floors_by_level": [
         [
@@ -147,7 +147,7 @@
       ],
       "lot_depths": [
         1,
-        6
+        8
       ],
       "floors_by_level": [
         [
@@ -187,7 +187,7 @@
       ],
       "lot_depths": [
         2,
-        6
+        8
       ],
       "floors_by_level": [
         [
@@ -227,7 +227,7 @@
       ],
       "lot_depths": [
         2,
-        6
+        8
       ],
       "floors_by_level": [
         [
@@ -268,7 +268,7 @@
       ],
       "lot_depths": [
         2,
-        6
+        8
       ],
       "floors_by_level": [
         [
@@ -309,7 +309,7 @@
       ],
       "lot_depths": [
         1,
-        6
+        8
       ],
       "floors_by_level": [
         [
@@ -338,7 +338,7 @@
   },
   "cells": {
     "size_m": 8.0,
-    "depth": 6,
+    "depth": 8,
     "road_clearance_m": 3.5,
     "overlap_m": 6.5,
     "restore_radius_m": 3.9

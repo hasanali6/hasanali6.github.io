@@ -499,10 +499,21 @@ func _on_cells_rebuilt() -> void:
 				owned[id] = []
 			(owned[id] as Array).append(i)
 	var changed := false
+	var net: Node = get_node_or_null("../RoadNetwork")
 	for id: int in buildings.keys():
 		var b: Dictionary = buildings[id]
 		var cells := PackedInt32Array(owned.get(id, []))
 		if cells.size() != (b["cells"] as PackedInt32Array).size():
+			# A road change re-laid the squares around it: keep it on the
+			# squares now under it, unless a road runs over it.
+			var kept := PackedInt32Array()
+			if net != null and net.rect_clear(net.graph, b["centre"], b["front"], float(b["width"]), float(b["depth"])):
+				kept = grid.cells_under(b["centre"], b["front"], float(b["width"]), float(b["depth"]), id)
+			if not kept.is_empty():
+				b["cells"] = _front_first(kept, b)
+				for c in kept:
+					grid.building[c] = id
+				continue
 			for c in cells:
 				grid.building[c] = ZoneGrid.FREE
 			buildings.erase(id)
@@ -517,6 +528,25 @@ func _on_cells_rebuilt() -> void:
 	_render_all()
 	if changed:
 		EventBus.buildings_changed.emit()
+
+
+## The lot's cells with the one nearest the street first (services and
+## traffic read the building's road from cells[0]).
+func _front_first(cells: PackedInt32Array, b: Dictionary) -> PackedInt32Array:
+	var grid: ZoneGrid = _zones.grid
+	var f: Vector2 = b["front"]
+	var best := 0
+	var best_v := -INF
+	for k in cells.size():
+		var v := (grid.centers[cells[k]] - (b["centre"] as Vector2)).dot(f)
+		if v > best_v:
+			best_v = v
+			best = k
+	var out := PackedInt32Array([cells[best]])
+	for k in cells.size():
+		if k != best:
+			out.append(cells[k])
+	return out
 
 
 ## A fire leaves a ruin that collapses like an abandoned building.
@@ -589,8 +619,9 @@ func lot_for(item: Dictionary, cell: int) -> PackedInt32Array:
 ## `cell` (any square, not only the one touching the road): w squares along
 ## that square's row and d squares back, each laid on whichever free square
 ## lies there, also squares that belong to another road's block (a lot
-## between two roads works). One side of the footprint must touch a road;
-## the building faces that road. Returns {"ok", "cells" (cells[0] = cell),
+## between two roads works). Squares only exist near roads, so any free
+## spot on them will do; the building faces the road its lot touches (else
+## the road of its squares). Returns {"ok", "cells" (cells[0] = cell),
 ## "squares" (centres of the w x d squares), "centre", "front", "dir",
 ## "w", "d" (squares along and across the facing road), "error"}.
 func footprint(item: Dictionary, cell: int, need_road: bool = true) -> Dictionary:
@@ -643,12 +674,12 @@ func footprint(item: Dictionary, cell: int, need_road: bool = true) -> Dictionar
 	out["squares"] = squares
 	out["cells"] = cells
 	out["ok"] = ok and not cells.is_empty()
+	# Squares only exist within a few squares of a road, so any free spot on
+	# them has road access (a path to the street); the building faces the
+	# road its lot touches, else the road its squares belong to.
 	if out["ok"] and need_road:
 		var facing := _facing_road(centre, f, dir, w * cs, d * cs)
-		if facing.is_empty():
-			out["ok"] = false
-			out["error"] = "BUILD_ERR_ROAD"
-		else:
+		if not facing.is_empty():
 			out["front"] = facing["front"]
 			out["dir"] = facing["dir"]
 			if facing["sideways"]:

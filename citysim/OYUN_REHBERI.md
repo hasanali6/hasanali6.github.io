@@ -133,6 +133,25 @@ sapıyorsa ona tam paralel ya da tam dik oturur; bloklar yamuk çıkmaz.
 **Bina/hizmet/park yerleştirme (kare kare):** her binanın kaç kare olduğu
 katalog düğmesinde yazar (ör. Sağlık ocağı 2×2, Hastane 3×4, Hayvanat bahçesi
 6×6). Parmağını koyduğun yerde tam o kadar kare yeşil (sığmıyorsa kırmızı)
+kutucuklarla gösterilir ve bina parmağının altındaki karelere oturur. Kareler
+yolların 8 sıra (64 m) içine kadar uzanır, yani bir bloğun ortası da olur:
+**boş kare sığıyorsa bina dikilir**, bina en yakın yola bakar. Bina asla
+uzak bir yere zıplamaz (en fazla ~6 m yaslanır); kare olmayan çok uzak araziye
+dokunursan kırmızı çerçeve parmağının altında görünür.
+
+**Yol çizince bina yıkılması:** sadece yolun **üstüne denk gelen** binalar
+yıkılır (onaydan önce kırmızı gösterilir). Yeni kavşağın yanındaki binalar
+yerinde kalır; kareleri yeniden dizilse bile bina aynı yerde durur.
+
+**Düzgün bloklar:** yol çizerken yön, 140 m içindeki bir yola 6°'den az
+sapıyorsa ona tam paralel ya da tam dik oturur; bloklar yamuk çıkmaz.
+
+**Yol açısı:** yollar birbirine en az 25° açıyla bağlanır. Çizerken dar açı
+önerilmez; araç seni en yakın uygun açıya ve uygun kavşağa yaslar.
+
+**Bina/hizmet/park yerleştirme (kare kare):** her binanın kaç kare olduğu
+katalog düğmesinde yazar (ör. Sağlık ocağı 2×2, Hastane 3×4, Hayvanat bahçesi
+6×6). Parmağını koyduğun yerde tam o kadar kare yeşil (sığmıyorsa kırmızı)
 kutucuklarla gösterilir ve bina parmağının altındaki karelere oturur, başka
 yere kaymaz. İki yolun arasındaki kareler de olur: binanın bir kenarı herhangi
 bir yola değmesi yeter, bina o yola bakar. Hiçbir yola değmiyorsa kırmızı olur
