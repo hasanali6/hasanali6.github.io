@@ -4,3 +4,4 @@ export/
 *.jks
 android/
 *.translation
+pc/godot/

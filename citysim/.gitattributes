@@ -1,0 +1,24 @@
+# Same line endings on Windows and Linux, so saving a file on the PC does
+# not mark every line as changed (applies to citysim/ only).
+*.gd text eol=lf
+*.tscn text eol=lf
+*.tres text eol=lf
+*.gdshader text eol=lf
+*.gdshaderinc text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+*.cfg text eol=lf
+*.godot text eol=lf
+*.md text eol=lf
+*.import text eol=lf
+*.uid text eol=lf
+*.py text eol=lf
+*.svg text eol=lf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.ogg binary
+*.wav binary
+*.glb binary
+*.ttf binary
+*.keystore binary

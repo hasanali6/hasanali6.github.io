@@ -10,6 +10,12 @@ on:
 permissions:
   contents: write
 
+# Pushes from the PC and from Claude can land close together: their builds
+# queue up instead of racing to update the same release.
+concurrency:
+  group: citysim-build
+  cancel-in-progress: false
+
 env:
   GODOT_VERSION: "4.7.2"
   GODOT_RELEASE: "stable"

@@ -313,6 +313,8 @@ iki parmakla yukarı/aşağı kaydır = eğim · uzun bas = konum bilgisi · ger
 
 ## Bilgisayarda oynamak ve geliştirmek
 
+**Adım adım rehber (Windows, GitHub Desktop, otomatik APK): [BILGISAYAR.md](BILGISAYAR.md).**
+
 **Sadece oynamak (Windows):** Releases → `citysim-latest` → `SehirSim-Windows.zip` indir, aç,
 `SehirSim.exe`'yi çalıştır (kurulum yok). Windows "bilinmeyen yayıncı" uyarısı verirse
 "Ek bilgi → Yine de çalıştır". Her push'ta APK'larla birlikte otomatik derlenir.
