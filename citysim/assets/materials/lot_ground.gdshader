@@ -12,6 +12,7 @@ global uniform float overlay_dim;
 global uniform float wetness;
 global uniform float snow_cover;
 global uniform float autumn;
+global uniform float surface_detail;
 
 uniform vec3 grass : source_color = vec3(0.38, 0.7, 0.3);
 uniform vec3 hedge : source_color = vec3(0.17, 0.45, 0.2);
@@ -23,6 +24,8 @@ uniform vec3 pitch : source_color = vec3(0.3, 0.62, 0.27);
 uniform vec3 dirt : source_color = vec3(0.47, 0.38, 0.27);
 uniform vec3 gravel : source_color = vec3(0.6, 0.58, 0.55);
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
+uniform sampler2D grass_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D paving_tex : source_color, filter_linear_mipmap, repeat_enable;
 
 varying vec2 v_local;
 varying vec2 v_size;
@@ -118,6 +121,25 @@ void fragment() {
 	col = mix(col, vec3(0.9, 0.92, 0.95), snow_amt);
 	rough = mix(mix(rough, 0.3, wetness * 0.8), 0.75, snow_amt);
 	col = mix(col, vec3(dot(col, vec3(0.3, 0.55, 0.15))) * 0.85, overlay_dim * 0.8);
+	// Surface detail up close, one texture read per pixel: grass blades on
+	// the green parts (lawns, gardens, pitches), paving slabs on plazas,
+	// car parks and yards. Both average 1, so nothing changes where they fade.
+	if (surface_detail > 0.5) {
+		float green = smoothstep(0.04, 0.16, col.g - max(col.r, col.b));
+		vec2 guv = v_world.xz / 5.0;
+		float fw = max(fwidth(guv.x), fwidth(guv.y));
+		if (green > 0.5) {
+			float gfade = green * clamp(1.6 - fw * 40.0, 0.0, 1.0);
+			if (gfade > 0.0) {
+				col *= mix(vec3(1.0), texture(grass_tex, guv).rgb * 2.0 / 0.47, gfade);
+			}
+		} else if (kind >= 1 && kind <= 3) {
+			float pfade = (1.0 - green) * clamp(1.6 - fw * 16.0, 0.0, 1.0);
+			if (pfade > 0.0) {
+				col *= mix(vec3(1.0), texture(paving_tex, guv).rgb * 2.0 / 0.43, pfade * 0.85);
+			}
+		}
+	}
 	ALBEDO = col * mix(1.0, 0.85, night_factor);
 	ROUGHNESS = rough;
 	SPECULAR = 0.35;

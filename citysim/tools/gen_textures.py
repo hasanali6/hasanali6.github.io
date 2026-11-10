@@ -1,5 +1,10 @@
 """Generates the tiling PBR detail textures in assets/textures/ (CC0, made here).
 
+SUPERSEDED: the game now ships textures made from AI-generated photos by
+tools/import_ai_textures.py. Running this script overwrites them with the
+older, purely mathematical ones (the shaders' brick and roof-tile scales
+are tuned for the new ones).
+
 Each material is two images:
   <name>_detail.png : RGB = colour detail around mid grey (the shader multiplies
                       its base colour by 2 * detail), A = roughness

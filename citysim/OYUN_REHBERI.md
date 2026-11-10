@@ -601,6 +601,7 @@ araba durur.
   yerin altında olduğu için çizilmiyor.
 - Yayalar süs amaçlı: yürüyüş yolları gerçek yolculuklardan değil sokağın
   nüfusundan gelir. Bisiklet yok.
-- Doku ve sesler sentetik. Geliştirme ortamı ücretsiz asset sitelerine
-  erişemedi; aynı dosya adlarıyla gerçek asset'lerle değiştirilebilir.
+- Yüzey dokuları (tuğla, sıva, kiremit, asfalt, kaldırım, çimen, kum) yapay
+  zekâ ile (Higgsfield) üretildi; sesler sentetik. Binalar hâlâ basit
+  hacimlerden kuruluyor (kutu + çatı); hazır 3B ev modelleri yok.
 - Tek dil dosyası: Türkçe ve İngilizce metinler hazır, arayüz şimdilik Türkçe.

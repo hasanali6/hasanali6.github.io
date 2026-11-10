@@ -123,6 +123,8 @@ func _build_material() -> ShaderMaterial:
 	_material.shader = TERRAIN_SHADER
 	_material.set_shader_parameter("noise_tex", _albedo_noise)
 	_material.set_shader_parameter("noise_normal", _normal_noise)
+	_material.set_shader_parameter("grass_tex", load("res://assets/textures/grass_detail.png"))
+	_material.set_shader_parameter("sand_tex", load("res://assets/textures/sand_detail.png"))
 	_material.set_shader_parameter("grass_a", GameData.color("map/grass_color_a"))
 	_material.set_shader_parameter("grass_b", GameData.color("map/grass_color_b"))
 	_material.set_shader_parameter("dry_grass", GameData.color("map/dry_grass_color"))

@@ -13,6 +13,9 @@ global uniform float snow_cover;
 global uniform float autumn;
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform sampler2D noise_normal : hint_normal, filter_linear_mipmap, repeat_enable;
+// Grass blades close to the camera (colour detail around mid grey, x2).
+uniform sampler2D grass_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D sand_tex : source_color, filter_linear_mipmap, repeat_enable;
 uniform vec3 grass_a : source_color = vec3(0.36, 0.42, 0.27);
 uniform vec3 grass_b : source_color = vec3(0.44, 0.45, 0.31);
 uniform vec3 dry_grass : source_color = vec3(0.54, 0.5, 0.37);
@@ -62,8 +65,17 @@ void fragment() {
 	float macro = texture(noise_tex, p / 1300.0).r;
 	float mid = texture(noise_tex, p / 113.0 + vec2(0.37, 0.11)).r;
 	float fine = 0.5;
-	if (near > 0.0) {
+	// Real grass close to the camera. It replaces the fine noise read there,
+	// so the ground costs the same number of texture reads as before.
+	float blades = detail_enabled ? 1.0 - smoothstep(90.0, 320.0, dist) : 0.0;
+	vec3 grass_detail = vec3(1.0);
+	if (blades > 0.0) {
+		grass_detail = texture(grass_tex, p / 7.0).rgb * 2.0 / 0.47;
+		fine = clamp(0.5 + (grass_detail.g - 1.0) * 0.8, 0.0, 1.0);
+	} else if (near > 0.0) {
 		fine = texture(noise_tex, p / 17.0 + vec2(0.71, 0.53)).r;
+	}
+	if (near > 0.0) {
 		NORMAL_MAP = texture(noise_normal, p / 9.0).xyz;
 		NORMAL_MAP_DEPTH = normal_strength * near;
 	}
@@ -73,6 +85,9 @@ void fragment() {
 	float dirt_mask = smoothstep(0.7, 0.84, mid * 0.55 + fine * 0.45) * near;
 	col = mix(col, dirt, dirt_mask * 0.6);
 	col *= 1.0 + (fine - 0.5) * 0.2 * near;
+	// The grass detail averages 1 (scaled above), so the tone stays the same
+	// where it fades out.
+	col *= mix(vec3(1.0), grass_detail, blades * (1.0 - dirt_mask * 0.7));
 
 	// Forest canopy seen from afar (trees themselves only render near the camera).
 	float forest = texture(forest_mask, p / forest_extent + 0.5).r;
@@ -87,6 +102,11 @@ void fragment() {
 	float cd = coast_distance(p) + (mid - 0.5) * 14.0 + (fine - 0.5) * 3.0;
 	float beach = 1.0 - smoothstep(beach_width * 0.7, beach_width, cd);
 	col = mix(col, mix(wet_sand_color, sand_color * 1.04, smoothstep(0.0, 7.0, cd)), beach);
+	// Rippled sand on beaches and banks close to the camera (sand pixels only).
+	float sandy = max(bank, beach) * blades;
+	if (sandy > 0.01) {
+		col *= mix(vec3(1.0), texture(sand_tex, p / 6.0).rgb * 2.0 / 0.47, sandy);
+	}
 
 	// Seasons and weather: drier, browner grass in autumn, snow that settles
 	// unevenly, darker ground when wet.

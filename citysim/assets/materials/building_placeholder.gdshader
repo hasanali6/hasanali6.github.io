@@ -85,12 +85,42 @@ void fragment() {
 		float coverage = (hi.x - lo.x) * (hi.y - lo.y);
 		window = mix(coverage, window, detail);
 
+		// Window surround on punched windows: a light frame, glazing bars and
+		// a shadow line under the sill (no extra texture reads).
+		float trim = 0.0;
+		float sill = 0.0;
+		if (curtain < 0.5 && y >= 0.0) {
+			vec2 fr = vec2(0.16 / spacing, 0.16 / floor_height);
+			vec2 outer = smoothstep(lo - fr - aa, lo - fr + aa, f) * (1.0 - smoothstep(hi + fr - aa, hi + fr + aa, f));
+			float bar_x = 1.0 - smoothstep(0.0, 0.05 / spacing + aa.x, abs(f.x - 0.5));
+			float bar_y = 1.0 - smoothstep(0.0, 0.05 / floor_height + aa.y, abs(f.y - mix(lo.y, hi.y, 0.58)));
+			window *= 1.0 - max(bar_x, bar_y) * detail;
+			trim = outer.x * outer.y * (1.0 - window) * detail;
+			float below = lo.y - fr.y - f.y;
+			sill = outer.x * step(0.0, below) * (1.0 - smoothstep(0.0, 0.14 / floor_height, below)) * detail;
+		}
+
 		if (y < 0.0) {
 			// Ground floor: tall shop-front glazing with piers.
 			float bay = fract(u / 6.0);
 			float shop = smoothstep(0.45, 0.6, v_local.y) * (1.0 - smoothstep(3.5, 3.7, v_local.y));
 			window = shop * smoothstep(0.06, 0.1, bay) * (1.0 - smoothstep(0.9, 0.94, bay));
 			id = vec2(floor(u / 6.0), -1.0);
+		}
+
+		// Front door on houses and small blocks (the face turned to the street).
+		float door = 0.0;
+		float door_frame = 0.0;
+		if (face == 3.0 && ground_floor_height < 0.1 && floor_height < 3.5 && v_size.y < 13.0) {
+			float du = abs(u - v_size.x * 0.5);
+			float daa = fwidth(u) + 0.01;
+			float in_h = 1.0 - smoothstep(2.15 - daa, 2.15 + daa, v_local.y);
+			door = (1.0 - smoothstep(0.55 - daa, 0.55 + daa, du)) * in_h;
+			float around = (1.0 - smoothstep(0.72 - daa, 0.72 + daa, du)) * (1.0 - smoothstep(2.32 - daa, 2.32 + daa, v_local.y));
+			door_frame = around * (1.0 - door);
+			window *= 1.0 - around;
+			trim *= 1.0 - around;
+			sill *= 1.0 - around;
 		}
 
 		// Imperfection: grime near the ground and below sills, slab lines, tone shifts.
@@ -105,8 +135,10 @@ void fragment() {
 		if (surface_detail > 0.5) {
 			vec2 wuv = vec2(u, v_local.y);
 			bool brick = curtain < 0.5 && fract(seed * 7.13) < 0.38 && v_size.y < 30.0;
-			vec2 buv = brick ? wuv / vec2(1.0, 0.6) : wuv / 2.6;
-			float wfade = clamp(1.6 - max(fwidth(buv.x), fwidth(buv.y)) * 3.0, 0.0, 1.0) * (1.0 - window);
+			// Bricks are drawn larger than life (courses about 25 cm) so
+			// they still read at the game camera's distance on a phone.
+			vec2 buv = brick ? wuv / vec2(1.9, 1.75) : wuv / 2.6;
+			float wfade = clamp(1.6 - max(fwidth(buv.x), fwidth(buv.y)) * (brick ? 7.0 : 3.0), 0.0, 1.0) * (1.0 - window);
 			vec4 det = brick ? texture(brick_tex, buv) : texture(plaster_tex, buv);
 			wall *= mix(vec3(1.0), det.rgb * 2.0, wfade * (brick ? 0.95 : 0.7));
 			roughness = mix(roughness, det.a, wfade);
@@ -126,6 +158,18 @@ void fragment() {
 		}
 		// Blinds / curtains: some windows read lighter or darker.
 		vec3 glass = glass_color * (0.75 + rnd * 0.45) * (1.0 - 0.7 * night_factor);
+		// The glass sits back in the wall: shaded under the lintel, a touch
+		// of sky towards the bottom.
+		float pane = clamp((f.y - lo.y) / max(hi.y - lo.y, 1e-3), 0.0, 1.0);
+		glass *= mix(1.12, 0.62, smoothstep(0.7, 1.0, pane) * detail * (1.0 - curtain));
+		// Frame, sill shadow and door before the glass goes in.
+		vec3 trim_col = mix(v_wall, vec3(0.96, 0.95, 0.92), 0.78);
+		wall = mix(wall, trim_col, trim);
+		wall *= 1.0 - sill * 0.32;
+		vec3 door_col = mix(vec3(0.42, 0.24, 0.14), mix(vec3(0.16, 0.3, 0.42), vec3(0.5, 0.14, 0.12), step(0.5, fract(seed * 3.7))),
+			step(0.45, fract(seed * 1.93)));
+		wall = mix(wall, trim_col, door_frame);
+		wall = mix(wall, door_col * (0.8 + 0.2 * smoothstep(0.0, 2.15, v_local.y)), door);
 		wall = mix(wall, glass, window);
 		roughness = mix(roughness, 0.06 + rnd * 0.08, window);
 		metallic = mix(0.0, 0.35, window);

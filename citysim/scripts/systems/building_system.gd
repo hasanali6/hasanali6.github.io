@@ -969,6 +969,8 @@ func _build_meshes() -> void:
 	var lot_mat := ShaderMaterial.new()
 	lot_mat.shader = LOT_SHADER
 	lot_mat.set_shader_parameter("noise_tex", _noise_texture())
+	lot_mat.set_shader_parameter("grass_tex", load("res://assets/textures/grass_detail.png"))
+	lot_mat.set_shader_parameter("paving_tex", load("res://assets/textures/concrete_detail.png"))
 	var lot := PlaneMesh.new()
 	lot.size = Vector2.ONE
 	lot.material = lot_mat
