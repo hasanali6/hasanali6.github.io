@@ -11,11 +11,29 @@ eder; ikimizin değişiklikleri aynı APK'da birleşir.
 
 1. **GitHub Desktop**'ı kur: https://desktop.github.com → GitHub hesabınla giriş yap.
 2. *File → Clone repository* → `hasanali6/hasanali6.github.io` → *Clone*.
+   - **OneDrive dışında bir klasör seç** (ör. `C:\Projeler\`). Godot proje içinde binlerce
+     küçük önbellek dosyası üretir; OneDrive bunları eşitlerken bilgisayarı yavaşlatır ve
+     dosyaları kilitleyebilir. Yanlış yere klonladıysan: *Repository → Remove*, sonra
+     yeniden *Clone*.
 3. Üstte **Current branch** → **`ccr-36f23ef9-qlqpvv`** seç. Önemli: APK bu daldan derleniyor.
 4. Klasörde `citysim\pc\kurulum.bat` dosyasına çift tıkla. Godot 4.7.2'yi indirip
-   (yaklaşık 70 MB) projeyi açar. İlk açılışta dokular 1–2 dakika yüklenir.
+   (yaklaşık 86 MB) projeyi açar. İlk açılışta dokular 1–2 dakika yüklenir.
    - Windows "korumalı" uyarısı verirse *Ek bilgi → Yine de çalıştır*.
    - Başka bir Godot sürümü kullanma: dosya biçimini değiştirip derlemeyi bozabilir.
+
+### İndirme takılırsa (zaman aşımı, 504 vb.)
+
+Betik iki ayrı sunucuyu dener, her birini birkaç kez yeniden dener ve yarım kalan
+indirmeyi kaldığı yerden sürdürür; `kurulum.bat`'ı tekrar çalıştırmak çoğu zaman yeter.
+Yine olmazsa elle:
+
+1. Tarayıcıda aç (Godot'un kendi sunucusu):
+   https://downloads.godotengine.org/?version=4.7.2&flavor=stable&slug=win64.exe.zip&platform=windows.64
+2. İnen **zip dosyasını açmadan** `citysim\pc\godot\` klasörüne taşı.
+3. `kurulum.bat`'a tekrar çift tıkla: zip'i kendisi açar ve projeyi başlatır.
+
+(Zip'i kendin açtıysan içindeki `Godot_v4.7.2-stable_win64.exe` dosyasını aynı klasöre
+koyup `gelistir.bat`'ı çalıştırman da olur.)
 
 ## 2. Her çalışmada
 
