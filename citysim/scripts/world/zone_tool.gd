@@ -16,6 +16,8 @@ var _mode: String = "brush"
 var _radius: float
 var _marker: MeshInstance3D
 var _painted: bool = false   # this stroke zoned something (for the no-demand hint)
+var _stroke: Dictionary = {}  # cell -> [centre, zone before] changed by this stroke (for undo)
+var _stroke_lost: Array = []  # buildings the eraser took down in this stroke
 
 
 func _ready() -> void:
@@ -56,6 +58,7 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 		return
 	if phase == GestureTracker.Pointer.UP or phase == GestureTracker.Pointer.CANCEL:
 		_marker.visible = false
+		_finish_stroke()
 		if _painted:
 			_painted = false
 			_warn_no_demand()
@@ -83,17 +86,42 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 			if grid.building[c] != ZoneGrid.FREE:
 				doomed[grid.building[c]] = true
 		for id: int in doomed:
+			_stroke_lost.append(_buildings.record_of(id))
 			_buildings.demolish(id)
+		_note_cells(cells, ZoneGrid.UNZONED)
 		if not doomed.is_empty():
 			EventBus.sfx_requested.emit("bulldoze")
 		if _zones.set_zone(cells, ZoneGrid.UNZONED) > 0:
 			EventBus.sfx_requested.emit("zone_paint")
-	elif _zones.set_zone(cells, _zones.zone_id(_zone_key)) > 0:
-		EventBus.sfx_requested.emit("zone_paint")
-		_painted = true
-	if _mode == "fill" and _painted:
-		_painted = false
-		_warn_no_demand()
+	else:
+		_note_cells(cells, _zones.zone_id(_zone_key))
+		if _zones.set_zone(cells, _zones.zone_id(_zone_key)) > 0:
+			EventBus.sfx_requested.emit("zone_paint")
+			_painted = true
+	if _mode == "fill":
+		_finish_stroke()
+		if _painted:
+			_painted = false
+			_warn_no_demand()
+
+
+## Remembers what the cells were before this stroke changes them.
+func _note_cells(cells: PackedInt32Array, to_zone: int) -> void:
+	var grid: ZoneGrid = _zones.grid
+	for c in cells:
+		if grid.building[c] == ZoneGrid.FREE and grid.zone[c] != to_zone and not _stroke.has(c):
+			_stroke[c] = [grid.centers[c], grid.zone[c]]
+
+
+## One finger stroke (or one block fill) is one step of Geri al.
+func _finish_stroke() -> void:
+	if _stroke.is_empty() and _stroke_lost.is_empty():
+		return
+	var rt: Node = get_parent().get_node_or_null("RoadTool")
+	if rt != null:
+		rt.remember({"kind": "zone", "cells": _stroke.values(), "lost": _stroke_lost})
+	_stroke = {}
+	_stroke_lost = []
 
 
 ## After painting a zone nobody wants yet, say why nothing will grow there

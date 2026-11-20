@@ -31,6 +31,22 @@ var _progress_label: Label
 var _progress_bar: ProgressBar
 var _milestone_list: Label
 var _categories: Dictionary
+var _chart: LineChart
+var _chart_key: String = "population"
+var _chart_buttons: Dictionary = {}
+## Chart series: key, label, colour, format ("int", "money", "pct"), from zero.
+const CHARTS: Array = [
+	["population", "CHART_POPULATION", Color(0.22, 0.56, 0.9), "int", true],
+	["balance", "CHART_BALANCE", Color(0.85, 0.62, 0.1), "money", false],
+	["net", "CHART_NET", Color(0.3, 0.65, 0.33), "money", false],
+	["happiness", "CHART_HAPPINESS", Color(0.25, 0.68, 0.4), "pct", true],
+	["crime", "CHART_CRIME", Color(0.85, 0.3, 0.27), "pct", true],
+	["land_value", "CHART_LAND_VALUE", Color(0.75, 0.55, 0.15), "pct", true],
+	["demand_r", "CHART_DEMAND_R", Color(0.3, 0.72, 0.33), "pct", false],
+	["demand_c", "CHART_DEMAND_C", Color(0.22, 0.56, 0.9), "pct", false],
+	["demand_i", "CHART_DEMAND_I", Color(0.9, 0.65, 0.15), "pct", false],
+	["traffic", "CHART_TRAFFIC", Color(0.55, 0.4, 0.75), "int", true],
+]
 
 
 func _init(font_size: int, min_touch: float) -> void:
@@ -44,7 +60,7 @@ func _init(font_size: int, min_touch: float) -> void:
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 10)
 	var group := ButtonGroup.new()
-	for key: String in ["budget", "taxes", "services", "loan", "production", "progress"]:
+	for key: String in ["budget", "graphs", "taxes", "services", "loan", "production", "progress"]:
 		var b := Button.new()
 		b.text = "ECON_TAB_" + key.to_upper()
 		b.toggle_mode = true
@@ -58,6 +74,7 @@ func _init(font_size: int, min_touch: float) -> void:
 	content.add_child(tabs)
 
 	_pages["budget"] = _build_budget()
+	_pages["graphs"] = _build_graphs()
 	_pages["taxes"] = _build_taxes()
 	_pages["services"] = _build_services()
 	_pages["loan"] = _build_loan()
@@ -100,6 +117,8 @@ func _show(key: String) -> void:
 		(_tab_buttons[k] as Button).set_pressed_no_signal(k == key)
 	if key == "services":
 		_refresh_utilities()
+	if key == "graphs":
+		_refresh_graph()
 
 
 func _row(text_key: String) -> Array:
@@ -460,3 +479,58 @@ func _refresh_production() -> void:
 		tr("PROD_TRADE") % [f.call(rep.get("exports", 0.0)), f.call(rep.get("imports", 0.0))],
 		tr("PROD_HINT"),
 	]))
+
+
+# --- Charts --------------------------------------------------------------------------
+
+func _build_graphs() -> Control:
+	var page := VBoxContainer.new()
+	page.add_theme_constant_override("separation", 8)
+	var grid := GridContainer.new()
+	grid.columns = 5
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	var group := ButtonGroup.new()
+	for c: Array in CHARTS:
+		var key: String = c[0]
+		var b := Button.new()
+		b.text = c[1]
+		b.toggle_mode = true
+		b.button_group = group
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(136, _touch * 0.6)
+		b.add_theme_font_size_override("font_size", _font - 10)
+		b.pressed.connect(func() -> void:
+			_chart_key = key
+			_refresh_graph())
+		_chart_buttons[key] = b
+		grid.add_child(b)
+	page.add_child(grid)
+	_chart = LineChart.new()
+	_chart.custom_minimum_size = Vector2(0, 300)
+	page.add_child(_chart)
+	EventBus.life_changed.connect(func() -> void:
+		if card.visible and page.visible:
+			_refresh_graph())
+	return page
+
+
+func _refresh_graph() -> void:
+	var life: Node = (Engine.get_main_loop() as SceneTree).current_scene.get_node_or_null("CityLifeSystem")
+	if life == null or _chart == null:
+		return
+	for c: Array in CHARTS:
+		if c[0] != _chart_key:
+			continue
+		(_chart_buttons[_chart_key] as Button).set_pressed_no_signal(true)
+		var kind: String = c[3]
+		var fmt := func(v: float) -> String:
+			match kind:
+				"money":
+					return UiStyle.format_int(roundi(v))
+				"pct":
+					return "%d%%" % roundi(v)
+			return UiStyle.format_int(roundi(v))
+		var series: PackedFloat32Array = (life.history as Dictionary).get(_chart_key, PackedFloat32Array())
+		_chart.set_series(series, c[2], fmt, bool(c[4]),
+			TranslationServer.translate("CHART_SPAN") % series.size())

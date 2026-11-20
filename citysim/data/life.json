@@ -49,15 +49,18 @@
     "smoothing": 0.5,
     "happiness_penalty": 28.0,
     "high": 0.45,
-    "warn_count": 5
+    "warn_count": 5,
+    "patrols_per_month": 2
   },
   "fire": {
     "put_out_seconds": 7.0,
-    "burn_down_seconds": 45.0,
+    "burn_down_seconds": 110.0,
     "spread_interval_seconds": 9.0,
     "spread_chance": 0.45,
     "spread_radius_m": 18.0,
-    "max_fires": 12
+    "max_fires": 12,
+    "truck_reach_m": 2500.0,
+    "truck_wait_seconds": 15.0
   },
   "disasters": {
     "min_population": 1500,

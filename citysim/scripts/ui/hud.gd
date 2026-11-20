@@ -88,6 +88,14 @@ var _catalog: CatalogPanel
 var _saves: SavesPanel
 var _cheats: CheatsPanel
 var _missions: MissionsPanel
+var _info_demolish: Button
+var _photo_ui: Control
+var _info_building: int = -1
+var _log_card: PanelContainer
+var _log_rows: VBoxContainer
+var _log: Array = []                 # [{text, when, pos}], newest first
+var _pending_pos: Variant = null     # place of the notification about to come
+const LOG_SIZE := 60
 var _tutorial: PanelContainer
 var _tutorial_label: Label
 var _transit_panel: TransitPanel
@@ -119,6 +127,8 @@ func _ready() -> void:
 	_safe.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_safe.theme = UiStyle.build_theme(FONT_SIZE)
 	add_child(_safe)
+	_photo_ui = _build_photo_ui()
+	add_child(_photo_ui)
 	_layer = Control.new()
 	_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_safe.add_child(_layer)
@@ -167,6 +177,8 @@ func _ready() -> void:
 	_place(_cheats.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
 	_missions = MissionsPanel.new(get_parent().get_node("CityLifeSystem"), FONT_SIZE, MIN_TOUCH)
 	_place(_missions.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+	_log_card = _build_log_card()
+	_place(_log_card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
 	_tutorial = _build_tutorial()
 	_place(_tutorial, Vector2(0.5, 0), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_END, Vector2(0, 230))
 	EventBus.life_changed.connect(_refresh_tutorial)
@@ -174,7 +186,10 @@ func _ready() -> void:
 
 	EventBus.speed_changed.connect(_on_speed_changed)
 	EventBus.ground_long_pressed.connect(_on_ground_long_pressed)
-	EventBus.notification_posted.connect(func(_c: String, text: String) -> void: show_toast(text))
+	EventBus.notification_posted.connect(func(c: String, text: String) -> void:
+		show_toast(text)
+		_log_note(c, text))
+	EventBus.notification_located.connect(func(p: Vector2) -> void: _pending_pos = p)
 	EventBus.graphics_preset_changed.connect(_on_preset_changed)
 	EventBus.tapped.connect(func(_p: Vector2) -> void: _set_tray_open(false))
 	EventBus.money_changed.connect(func(balance: int) -> void: _money_label.text = UiStyle.format_int(balance))
@@ -224,7 +239,7 @@ func _process(delta: float) -> void:
 	if _tutorial_label != null and _tutorial_label.text != "":
 		# The tutorial steps aside while a menu card is open.
 		var card_open := _settings_panel.visible or _info_panel.visible or _economy.card.visible or _missions.card.visible \
-			or _saves.card.visible or _cheats.card.visible or _cost_pill.visible or _confirm_bar.visible
+			or _saves.card.visible or _cheats.card.visible or _cost_pill.visible or _confirm_bar.visible or _log_card.visible
 		_tutorial.visible = not card_open
 	if _toast_timer > 0.0:
 		_toast_timer -= delta
@@ -259,6 +274,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_missions.card.visible = not _missions.card.visible
 			if _missions.card.visible:
 				_missions.open()
+		KEY_H:
+			_set_photo_mode(not _photo_ui.visible)
+		KEY_P:
+			if _photo_ui.visible:
+				_take_photo()
+		KEY_N:
+			if _log_card.visible:
+				_log_card.visible = false
+			else:
+				_open_log()
 		_:
 			return
 	get_viewport().set_input_as_handled()
@@ -459,6 +484,14 @@ func _build_left_column() -> Control:
 		_set_tray_open(false)
 		_missions.open())
 	money_row.add_child(goals)
+	var bell := UiStyle.round_button("bell", UiStyle.ORANGE, MIN_TOUCH * 0.8)
+	bell.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bell.pressed.connect(func() -> void:
+		_settings_panel.visible = false
+		_info_panel.visible = false
+		_set_tray_open(false)
+		_open_log())
+	money_row.add_child(bell)
 	col.add_child(money_row)
 	col.add_child(cam_grid)
 	# Keep the round buttons round although the camera grid is wider.
@@ -599,6 +632,115 @@ func _build_toast() -> PanelContainer:
 	return pill
 
 
+## The events log card: the latest notifications (fires, crime, floods,
+## missions...) with the date, and a button to fly to the place.
+func _build_log_card() -> PanelContainer:
+	var parts := _card("LOG_TITLE", 760)
+	var content: VBoxContainer = parts[1]
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 430)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_log_rows = VBoxContainer.new()
+	_log_rows.add_theme_constant_override("separation", 8)
+	_log_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_log_rows)
+	content.add_child(scroll)
+	return parts[0]
+
+
+func _log_note(category: String, text: String) -> void:
+	var pos: Variant = _pending_pos
+	_pending_pos = null
+	# Saving happens every month: not worth a line.
+	if category == "save" and pos == null:
+		return
+	_log.push_front({"text": text, "when": "%s %s" % [TimeSystem.get_date_text(), TimeSystem.get_clock_text()], "pos": pos})
+	if _log.size() > LOG_SIZE:
+		_log.resize(LOG_SIZE)
+	if _log_card.visible:
+		_fill_log()
+
+
+func _open_log() -> void:
+	_fill_log()
+	_log_card.visible = true
+
+
+func _fill_log() -> void:
+	for child in _log_rows.get_children():
+		_log_rows.remove_child(child)
+		child.queue_free()
+	if _log.is_empty():
+		_log_rows.add_child(_label("LOG_EMPTY", FONT_SIZE - 6))
+	for entry: Dictionary in _log:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		var label := _label("%s  ·  %s" % [entry["when"], entry["text"]], FONT_SIZE - 8)
+		label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(label)
+		if entry["pos"] != null:
+			var go := Button.new()
+			go.text = "LOG_GO"
+			go.focus_mode = Control.FOCUS_NONE
+			go.custom_minimum_size = Vector2(110, MIN_TOUCH * 0.6)
+			var p: Vector2 = entry["pos"]
+			go.pressed.connect(func() -> void:
+				_log_card.visible = false
+				EventBus.focus_requested.emit(p))
+			row.add_child(go)
+		_log_rows.add_child(row)
+
+
+## Photo mode: the whole interface goes away except two small buttons (take
+## a picture, leave). Pictures go to Pictures/SehirSim.
+func _build_photo_ui() -> Control:
+	var bar := HBoxContainer.new()
+	bar.visible = false
+	bar.add_theme_constant_override("separation", 16)
+	bar.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	bar.offset_left = -MIN_TOUCH * 2.6
+	bar.offset_top = -MIN_TOUCH * 1.4
+	bar.offset_right = -24
+	bar.offset_bottom = -24
+	var shot := UiStyle.round_button("camera", UiStyle.BLUE, MIN_TOUCH)
+	shot.pressed.connect(_take_photo)
+	bar.add_child(shot)
+	var leave := UiStyle.round_button("x", UiStyle.RED, MIN_TOUCH)
+	leave.pressed.connect(func() -> void: _set_photo_mode(false))
+	bar.add_child(leave)
+	return bar
+
+
+func _set_photo_mode(on: bool) -> void:
+	_safe.visible = not on
+	_photo_ui.visible = on
+	if on:
+		show_toast(tr("NOTIFY_PHOTO_MODE"))
+
+
+func _take_photo() -> void:
+	_photo_ui.visible = false
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	_photo_ui.visible = true
+	var dir := OS.get_system_dir(OS.SYSTEM_DIR_PICTURES)
+	if dir == "":
+		dir = OS.get_user_data_dir()
+	dir = dir.path_join("SehirSim")
+	DirAccess.make_dir_recursive_absolute(dir)
+	var stamp := Time.get_datetime_string_from_system(false, true).replace(":", "-").replace(" ", "_")
+	var path := dir.path_join("sehir_%s.png" % stamp)
+	if img != null and img.save_png(path) == OK:
+		EventBus.sfx_requested.emit("ui_click")
+		show_toast(tr("NOTIFY_PHOTO_SAVED") % path)
+	else:
+		show_toast(tr("NOTIFY_PHOTO_FAILED"))
+
+
 ## Tutorial step banner under the toast: "Adım 2/9 · what to do" + Skip.
 func _build_tutorial() -> PanelContainer:
 	var pill := PanelContainer.new()
@@ -698,6 +840,25 @@ func _build_settings_panel() -> PanelContainer:
 	perf.toggled.connect(func(on: bool) -> void: _perf_label.visible = on)
 	content.add_child(perf)
 
+	var battery := CheckButton.new()
+	battery.text = "SETTINGS_BATTERY"
+	battery.custom_minimum_size.y = MIN_TOUCH * 0.8
+	battery.focus_mode = Control.FOCUS_NONE
+	battery.button_pressed = GraphicsSettings.battery_saver
+	battery.toggled.connect(func(on: bool) -> void:
+		GraphicsSettings.set_battery_saver(on)
+		show_toast(tr("NOTIFY_BATTERY_ON") if on else tr("NOTIFY_BATTERY_OFF")))
+	content.add_child(battery)
+
+	var photo := Button.new()
+	photo.text = "SETTINGS_PHOTO"
+	photo.focus_mode = Control.FOCUS_NONE
+	photo.custom_minimum_size.y = MIN_TOUCH * 0.8
+	photo.pressed.connect(func() -> void:
+		_settings_panel.visible = false
+		_set_photo_mode(true))
+	content.add_child(photo)
+
 	var sound_row := HBoxContainer.new()
 	sound_row.add_theme_constant_override("separation", 8)
 	for entry: Array in [["Music", "SETTINGS_MUSIC"], ["SFX", "SETTINGS_SFX"], ["Ambient", "SETTINGS_AMBIENT"]]:
@@ -759,12 +920,21 @@ func _build_settings_panel() -> PanelContainer:
 
 
 func _build_info_panel() -> PanelContainer:
-	var parts := _card("INFO_TITLE", 440)
+	var parts := _card("INFO_TITLE", 480)
 	# Card -> column -> header -> header row -> title label.
 	_info_title = (parts[0] as Control).get_child(0).get_child(0).get_child(0).get_child(0) as Label
-	_info_label = _label("", FONT_SIZE - 2)
+	_info_label = _label("", FONT_SIZE - 4)
 	_info_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	(parts[1] as VBoxContainer).add_child(_info_label)
+	# Demolish straight from the card (asks to confirm, like the bulldozer).
+	_info_demolish = Button.new()
+	_info_demolish.text = "INFO_DEMOLISH"
+	_info_demolish.focus_mode = Control.FOCUS_NONE
+	_info_demolish.custom_minimum_size.y = MIN_TOUCH * 0.7
+	_info_demolish.pressed.connect(func() -> void:
+		_info_panel.visible = false
+		get_parent().get_node("RoadTool").ask_demolish(_info_building))
+	(parts[1] as VBoxContainer).add_child(_info_demolish)
 	return parts[0]
 
 
@@ -932,6 +1102,7 @@ func _refresh_locks() -> void:
 
 func _on_building_inspected(info: Dictionary) -> void:
 	_building_shown_frame = Engine.get_process_frames()
+	_info_building = int(info.get("id", -1))
 	var lines := PackedStringArray([tr(info["zone_key"])])
 	if str(info.get("service", "")) != "":
 		_service_info(info, lines)
@@ -945,6 +1116,12 @@ func _on_building_inspected(info: Dictionary) -> void:
 		lines.append(tr("BUILDING_LEVEL") % [info["level"], info["floors"]])
 	if int(info.get("households_cap", 0)) > 0:
 		lines.append(tr("BUILDING_HOMES") % [info["households"], info["households_cap"]])
+		var who: Dictionary = get_parent().get_node("CitizenSystem").home_details(int(info["id"]))
+		if not who.is_empty():
+			lines.append(tr("BUILDING_WHO") % [int(who["adults"]), int(who["children"]), int(who["seniors"])])
+			lines.append(tr("BUILDING_WORK") % [int(who["working"]), int(who["jobless"])])
+			var edu: Array = who["edu"]
+			lines.append(tr("BUILDING_EDU") % [int(edu[0]), int(edu[1]), int(edu[2])])
 	if str(info.get("extractor", "")) != "":
 		var res_key := str(GameData.value("resources/types/%s/name_key" % info["extractor"]))
 		lines.append(tr("BUILDING_RESOURCE") % [tr(res_key), roundi(float(info["richness"]) * 100.0)])
@@ -988,12 +1165,13 @@ func _on_road_inspected(info: Dictionary) -> void:
 	lines.append(tr("ROAD_INFO_DAILY") % UiStyle.format_int(roundi(float(info["daily"]))))
 	lines.append(tr("ROAD_INFO_LOAD") % [roundi(float(info["ratio"]) * 100.0), roundi(float(info["speed_kmh"]))])
 	lines.append(tr("ROAD_INFO_LENGTH") % roundi(float(info["length"])))
-	_show_info(lines)
+	_show_info(lines, false)
 	_info_title.text = "ROAD_INFO_TITLE"
 
 
-func _show_info(lines: PackedStringArray) -> void:
+func _show_info(lines: PackedStringArray, building: bool = true) -> void:
 	_info_title.text = "BUILDING_INFO_TITLE"
+	_info_demolish.visible = building and _info_building >= 0
 	_info_label.text = "\n".join(lines)
 	_settings_panel.visible = false
 	_set_tray_open(false)
@@ -1435,6 +1613,7 @@ func _show_location(world_pos: Vector3) -> void:
 	if _building_shown_frame == Engine.get_process_frames():
 		return
 	_info_title.text = "INFO_TITLE"
+	_info_demolish.visible = false
 	var cell := MapGrid.world_to_cell(world_pos, _cell_size)
 	var inside := MapGrid.is_inside(world_pos, _playable_half)
 	_info_label.text = "%s\n%s\n%s" % [
@@ -1448,6 +1627,9 @@ func _show_location(world_pos: Vector3) -> void:
 
 
 func _on_back_requested(can_quit: bool = true) -> void:
+	if _photo_ui.visible:
+		_set_photo_mode(false)
+		return
 	if _transit_panel.panel.visible:
 		_close_transit_panel()
 		return
@@ -1477,6 +1659,9 @@ func _on_back_requested(can_quit: bool = true) -> void:
 		return
 	if _missions.card.visible:
 		_missions.card.visible = false
+		return
+	if _log_card.visible:
+		_log_card.visible = false
 		return
 	if _settings_panel.visible or _info_panel.visible or _tray.visible:
 		_settings_panel.visible = false

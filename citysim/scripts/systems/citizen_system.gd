@@ -566,6 +566,35 @@ func _write_building_happiness() -> void:
 		records[bid]["commute"] = -1.0 if commute_n == 0 else commute_sum / commute_n
 
 
+## Who lives in a building (for the building card): households, people by
+## age, working adults, jobless adults, education of the adults (primary,
+## high school, university) and average happiness. {} if nobody lives there.
+func home_details(bid: int) -> Dictionary:
+	var home: Dictionary = _homes.get(bid, {})
+	if home.is_empty():
+		return {}
+	var residents: PackedInt32Array = home["residents"]
+	if residents.is_empty():
+		return {}
+	var out := {"households": residents.size(), "adults": 0, "children": 0, "seniors": 0, "working": 0, "jobless": 0,
+		"edu": [0, 0, 0], "happiness": 0.0}
+	for i in residents:
+		out["adults"] += int(data.adults[i])
+		out["children"] += int(data.children[i])
+		out["seniors"] += int(data.seniors[i])
+		out["happiness"] += float(data.happiness[i])
+		for k in data.adults[i]:
+			var slot := i * HouseholdData.MAX_ADULTS + k
+			if data.job[slot] != HouseholdData.NO_JOB:
+				out["working"] += 1
+			else:
+				out["jobless"] += 1
+			var e := clampi(int(data.edu[slot]), 0, 2)
+			out["edu"][e] += 1
+	out["happiness"] = float(out["happiness"]) / residents.size()
+	return out
+
+
 func stats() -> Dictionary:
 	var homes := 0
 	var occupied := 0

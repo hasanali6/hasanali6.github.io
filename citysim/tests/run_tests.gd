@@ -1037,7 +1037,7 @@ func _test_city_life() -> void:
 	_check(CityLifeRules.fire_state(1.0, 1.0, fc) == "burning", "fire: still burning at first")
 	_check(CityLifeRules.fire_state(float(fc["put_out_seconds"]) + 0.1, 1.0, fc) == "out", "fire: full coverage puts it out quickly")
 	_check(CityLifeRules.fire_state(float(fc["burn_down_seconds"]), 0.0, fc) == "down", "fire: no fire station, it burns down")
-	_check(CityLifeRules.fire_state(float(fc["burn_down_seconds"]) - 1.0, 0.1, fc) == "burning", "fire: weak coverage arrives too late")
+	_check(CityLifeRules.fire_state(float(fc["burn_down_seconds"]) - 1.0, 0.05, fc) == "burning", "fire: weak coverage arrives too late")
 	var mc: Dictionary = cfg["missions"]
 	var s := {"population": 1000, "happiness": 60.0, "crime": 0.3, "land_value": 0.4, "parks": 2, "transit_lines": 1, "net": 5000.0, "coverage": 0.5}
 	for kind: String in ["population", "happiness", "crime", "land_value", "parks", "transit", "budget", "services"]:

@@ -38,6 +38,10 @@ var _shake_total: float = 1.0
 
 
 func _ready() -> void:
+	EventBus.focus_requested.connect(func(p: Vector2) -> void:
+		_focus_target = Vector3(p.x, 0.0, p.y)
+		_distance_target = minf(_distance_target, 180.0)
+		_clamp_focus())
 	EventBus.camera_shake_requested.connect(func(strength: float, seconds: float) -> void:
 		_shake = strength
 		_shake_left = seconds

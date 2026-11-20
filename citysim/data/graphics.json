@@ -2,7 +2,11 @@
   "default_preset": "medium",
   "target_fps": 60,
   "refresh_divisor_tolerance": 0.05,
-  "preset_order": ["low", "medium", "high"],
+  "preset_order": [
+    "low",
+    "medium",
+    "high"
+  ],
   "presets": {
     "low": {
       "render_scale": 0.6,
@@ -73,5 +77,15 @@
     "step": 0.05,
     "gpu_budget_ratio": 0.85,
     "raise_below_ratio": 0.7
+  },
+  "battery_saver": {
+    "target_fps": 30,
+    "overrides": {
+      "shadow_splits": 1,
+      "shadow_max_distance_m": 260.0,
+      "glow": false,
+      "weather_particles": false,
+      "tree_shadows": false
+    }
   }
 }

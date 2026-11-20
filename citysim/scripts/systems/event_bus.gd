@@ -114,3 +114,8 @@ signal ground_long_pressed(world_pos: Vector3)
 signal graphics_preset_changed(preset: String)
 signal grid_overlay_toggled(enabled: bool)
 signal notification_posted(category: String, text: String)
+## Emitted right before a notification_posted that is about a place, so the
+## notification log can jump there.
+signal notification_located(world_pos: Vector2)
+## Move the camera to a point of the map.
+signal focus_requested(world_pos: Vector2)

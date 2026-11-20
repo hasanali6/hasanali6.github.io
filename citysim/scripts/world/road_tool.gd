@@ -302,6 +302,12 @@ func undo_last() -> void:
 					_buildings.undo_demolish(rec)
 		"upgraded":
 			ok = _net.revert_upgrade(int(entry["seg"]), str(entry["old"]), int(entry["cost"]))
+		# Zoning: the painted or erased squares go back to what they were,
+		# buildings the eraser took down come back.
+		"zone":
+			_rezone_exact(entry["cells"])
+			for rec: Dictionary in entry.get("lost", []):
+				_buildings.undo_demolish(rec)
 		"placed":
 			ok = _buildings.buildings.has(int(entry["id"]))
 			if ok:
@@ -319,7 +325,31 @@ func undo_last() -> void:
 	_history.pop_back()
 	EventBus.undo_changed.emit(_history.size())
 	EventBus.sfx_requested.emit("build_place")
-	EventBus.notification_posted.emit("roads", tr("UNDO_DONE_BUILD" if str(entry["kind"]) in ["built_road", "upgraded", "placed"] else "UNDO_DONE"))
+	var done_key := "UNDO_DONE"
+	if str(entry["kind"]) in ["built_road", "upgraded", "placed"]:
+		done_key = "UNDO_DONE_BUILD"
+	elif str(entry["kind"]) == "zone":
+		done_key = "UNDO_DONE_ZONE"
+	EventBus.notification_posted.emit("roads", tr(done_key))
+
+
+## Sets each square found at a remembered spot back to its old zone
+## (unzoned included); [centre, zone] pairs.
+func _rezone_exact(cells: Array) -> void:
+	var zsys: Node = get_parent().get_node_or_null("ZoneSystem")
+	if zsys == null:
+		return
+	var grid: ZoneGrid = zsys.grid
+	var by_zone := {}
+	for z: Array in cells:
+		var c := grid.cell_at(z[0])
+		if c < 0:
+			continue
+		var list: PackedInt32Array = by_zone.get(int(z[1]), PackedInt32Array())
+		list.append(c)
+		by_zone[int(z[1])] = list
+	for zid: int in by_zone:
+		zsys.set_zone(by_zone[zid], zid)
 
 
 func _rezone(zones: Array) -> void:
@@ -390,6 +420,22 @@ func _confirm_upgrade(seg_id: int) -> void:
 	else:
 		EventBus.sfx_requested.emit("error")
 		EventBus.notification_posted.emit("roads", tr(res["error"]))
+
+
+## Asks to demolish a building picked elsewhere (the building card): the
+## same red outline and ✓ / ✗ as the bulldozer.
+func ask_demolish(bid: int) -> void:
+	if not _buildings.buildings.has(bid):
+		return
+	if not _pending.is_empty():
+		_clear_pending()
+	_target_building = bid
+	_highlight = -1
+	_show_bulldoze()
+	_pending = {"demolish_building": bid}
+	EventBus.road_preview_changed.emit({"active": false})
+	EventBus.road_proposal_changed.emit({"active": true, "node": "RoadTool", "demolish": true,
+		"text": tr("DEMOLISH_BUILDING_Q") % UiStyle.format_int(_buildings.refund_of(bid))})
 
 
 func _demolish_building(bid: int) -> void:

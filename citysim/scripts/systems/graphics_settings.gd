@@ -15,6 +15,9 @@ extends Node
 const SETTINGS_PATH := "user://settings.cfg"
 
 var current_preset: String = ""
+## Battery saver (Ayarlar): 30 FPS and cheaper shadows on top of the preset.
+## Half the frames also leaves the GPU room for a sharper 3D image.
+var battery_saver: bool = false
 
 var _target_fps: float
 var _refresh_hz: float = -1.0
@@ -51,7 +54,27 @@ func _ready() -> void:
 		var saved := str(cfg.get_value("graphics", "preset", ""))
 		if GameData.has("graphics/presets/" + saved):
 			preset = saved
+		battery_saver = bool(cfg.get_value("graphics", "battery_saver", false))
+	_apply_battery_fps()
 	apply_preset(preset, false)
+
+
+func set_battery_saver(on: bool) -> void:
+	battery_saver = on
+	_apply_battery_fps()
+	var cfg := ConfigFile.new()
+	cfg.load(SETTINGS_PATH)
+	cfg.set_value("graphics", "battery_saver", on)
+	cfg.save(SETTINGS_PATH)
+	apply_preset(current_preset, false)
+
+
+func _apply_battery_fps() -> void:
+	_target_fps = GameData.num("graphics/battery_saver/target_fps") if battery_saver else GameData.num("graphics/target_fps")
+	_apply_frame_cap()
+	var dyn := GameData.section("graphics/dynamic_resolution")
+	_gpu_budget_ms = 1000.0 / _target_fps * float(dyn["gpu_budget_ratio"])
+	_raise_below_ms = _gpu_budget_ms * float(dyn["raise_below_ratio"])
 
 
 func _apply_frame_cap() -> void:
@@ -71,6 +94,10 @@ func get_preset_names() -> PackedStringArray:
 
 
 func get_value(key: String) -> Variant:
+	if battery_saver:
+		var over: Dictionary = GameData.value("graphics/battery_saver/overrides")
+		if over.has(key):
+			return over[key]
 	return GameData.value("graphics/presets/%s/%s" % [current_preset, key])
 
 

@@ -66,6 +66,9 @@ koyup `gelistir.bat`'ı çalıştırman da olur.)
 | Ctrl+Z | Geri al |
 | Esc | Açık paneli kapat |
 | B / L / G | İnşa menüsü / Katmanlar / Görevler |
+| N | Olaylar (uyarı geçmişi) |
+| H | Fotoğraf modu aç/kapa |
+| P | Fotoğraf çek (`Resimler\SehirSim`) |
 
 ## Şehri telefon ile bilgisayar arasında taşımak
 

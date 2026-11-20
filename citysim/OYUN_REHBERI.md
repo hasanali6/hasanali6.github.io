@@ -57,7 +57,11 @@ geçer.
   O = ofis, S = sanayi).
 - **Üst orta:** saat, tarih, hava ikonu, mevsim ve hız düğmeleri.
 - **Sağ üst:** para ve aylık net (yeşil artı, kırmızı eksi), ayarlar.
-- **Sol:** Katmanlar (bilgi haritaları) ve Ekonomi.
+- **Sol:** Katmanlar (bilgi haritaları), Ekonomi, Görevler ve 🔔 **Olaylar**.
+  - **Olaylar** son 60 uyarıyı (yangın, suç, sel, deprem, eksik hizmet…) tarih
+    ve saatle listeler.
+  - Yeri belli olan uyarının yanında **Git** düğmesi var; dokununca kamera
+    oraya uçar.
 - **Sağ alt:** büyük **İnşa Et** düğmesi ve kategori menüsü.
 
 ---
@@ -191,6 +195,8 @@ genişletirken (Yükselt) de aynı kural geçerli.
 - **Yıkım:** kesilen ağaçlar geri gelir, yıkılan bina aynı yerine aynı
   seviyede döner, yıkılan yol geri yapılır ve kenarındaki imar yeniden
   boyanır. Aldığın iade parası geri ödenir.
+- **İmar:** bir parmak vuruşuyla boyadığın ya da sildiğin imar eski haline
+  döner. Silgiyle yıkılan binalar da geri gelir.
 
 Art arda 20 işleme kadar geri gidebilirsin (en yenisinden başlayarak). Yerinde
 artık başka bir şey varsa o işlem geri alınamaz.
@@ -376,6 +382,7 @@ panelden değiştir.
 | Sekme | İçerik |
 |---|---|
 | **Bütçe** | Geçen ayın gelir ve giderleri kalem kalem, aylık net |
+| **Grafikler** | Son 10 yılın aylık çizgi grafiği: nüfus, kasa, aylık net, mutluluk, suç, arsa değeri, K/T/S talebi, işe gidiş süresi. Kayda girer |
 | **Vergiler** | Konut (eğitim düzeyine göre ayrı), ticari, ofis, sanayi; −%10 ile +%30 arası. Yüksek vergi geliri artırır ama talebi ve mutluluğu düşürür |
 | **Hizmetler** | Her hizmetin bütçesi %50–150 (verim ve bakım birlikte değişir); elektrik ve su ücreti |
 | **Kredi** | Tek, ayarlanabilir kredi. Limit kilometre taşlarıyla artar, faiz kullanılan orana göre değişir, 24 ayda geri ödenir |
@@ -445,10 +452,16 @@ düşürür. Suç mutluluğu düşürür (insanlar taşınır) ve arsa değerini
 Polissiz yerde suç yükselince uyarı gelir.
 
 **Yangın.** Kapsama dışındaki binalarda ara sıra yangın çıkar (bina
-tepesinde alev, duman ve kırmızı 🔥 rozeti). İtfaiye kapsamı ne kadar iyiyse
-o kadar çabuk söner (tam kapsamda ~7 sn). İtfaiye yoksa ~45 sn sonra bina
-yanıp harabeye döner, yangın komşu binalara sıçrayabilir. Oyun durunca yangın
-da durur.
+tepesinde alev, duman ve kırmızı 🔥 rozeti).
+- En yakın itfaiyeden (2,5 km içinde) **kırmızı itfaiye aracı** yola çıkar,
+  yanında ambulans da gider. Araç binaya varınca yangın söner.
+- Sokak o an doluysa araç birkaç saniye içinde yeniden çıkmayı dener.
+- Araç ~110 sn içinde yetişemezse bina yanıp harabeye döner. Yani itfaiyeyi
+  yakın kur, yolları tıkatma.
+- Yola bağlı itfaiye yoksa eski kural geçerli: kapsama iyiyse çabuk söner,
+  değilse yangın komşu binalara sıçrayabilir.
+- Oyun durunca yangın da durur.
+- Polis arabaları da ayda birkaç kez suçu yüksek binalara devriyeye gider.
 
 **Afetler** (Ayarlar → "Afetler"den kapatılabilir; 1.500 nüfustan sonra):
 - **Deprem:** nadiren (yılda ~%11). Bir bölgedeki eski/alçak binaların bir
@@ -457,8 +470,13 @@ da durur.
   altında kalır: mutluluk düşer, bazıları terk edilir. Kıyıya yakın yerleşimi
   dikkatli yap.
 
-Bina bilgi kartında arsa değeri, suç, sel ve yangın durumu yazar. Hileler
-kartında deneme için **Deprem / Sel / Yangın** düğmeleri var.
+**Bina bilgi kartı** (binaya uzun bas):
+- Konutta hane sayısı; yetişkin, çocuk ve yaşlı sayısı; çalışan ve işsiz;
+  eğitim dağılımı ve işe gidiş süresi yazar.
+- Arsa değeri, suç, sel ve yangın durumu da kartta.
+- Altındaki **Yık** düğmesi binayı (onay sorarak) yıkar.
+
+Hileler kartında deneme için **Deprem / Sel / Yangın** düğmeleri var.
 
 ## 7c. Görevler ve öğretici
 
@@ -543,6 +561,11 @@ araba durur.
 - **Gölgeler sakin:** gökyüzü renkleri saate göre değişir ama gölgeler gün
   boyu öğle güneşinin etrafında dar bir yayda, çok yavaş döner; yakınlaştırıp
   uzaklaştırırken de gölge alanı sık sık değişmez, böylece titremezler.
+- **Pil modu:** 30 FPS sınırı, tek kademe gölge, parıltı ve yağmur/kar
+  parçacıkları kapalı. Telefon ısınınca ya da şarj azalınca aç.
+- **Fotoğraf modu:** arayüz gizlenir, kamerayı serbestçe gezdirirsin. 📷 ile
+  ekran görüntüsü `Resimler/SehirSim` klasörüne kaydedilir, ✕ ya da geri tuşu
+  ile çıkarsın.
 - **Ses:** Müzik / Efekt / Ortam kaydırıcıları.
 - **Ortam sesleri:** alçakta kuşlar ve trafik, gece cırcır böcekleri, yağmur,
   yükseklerde rüzgâr.

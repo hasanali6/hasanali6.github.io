@@ -594,6 +594,55 @@ func pick_trip(hour: float, focus: Vector2, near_radius: float, far_accept: floa
 	return -1
 
 
+## Fastest route (free-flow travel times) from road segment from_seg to
+## to_seg as directed entries ((segment id << 1) | dir), both segments
+## included; empty when there is none. Used to send a fire engine or a
+## police car to an incident.
+func route_between(from_seg: int, to_seg: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	if graph == null:
+		return out
+	var a: int = graph.seg_index.get(from_seg, -1)
+	var b: int = graph.seg_index.get(to_seg, -1)
+	if a < 0 or b < 0:
+		return out
+	if a == b:
+		out.append(from_seg << 1)
+		return out
+	var factors := PackedFloat32Array()
+	factors.resize(graph.edge_count())
+	factors.fill(1.0)
+	var costs := TrafficRules.edge_costs(graph, factors, _cfg)
+	# Leave the start road at its far end (only forward on a one-way road).
+	var seeds := PackedInt32Array([graph.seg_b[a]])
+	var seed_costs := PackedFloat32Array([0.0])
+	if graph.seg_oneway[a] == 0:
+		seeds.append(graph.seg_a[a])
+		seed_costs.append(0.0)
+	var res := TrafficRules.dijkstra(graph, seeds, seed_costs, costs, true)
+	var dist: PackedFloat32Array = res["dist"]
+	# Enter the target road from whichever end is reached first and allowed.
+	var best := -1
+	var best_d := INF
+	for e: int in [b * 2, b * 2 + 1]:
+		if not graph.edge_allowed(e):
+			continue
+		var at := graph.edge_from(e)
+		if dist[at] < best_d:
+			best_d = dist[at]
+			best = e
+	if best < 0 or best_d >= 1e8:
+		return out
+	var path := TrafficRules.path_to(graph, res["via"], graph.edge_from(best))
+	var first_node := graph.edge_from(best) if path.is_empty() else graph.edge_from(path[0])
+	var edges := PackedInt32Array([a * 2 if graph.seg_b[a] == first_node else a * 2 + 1])
+	edges.append_array(path)
+	edges.append(best)
+	for e in edges:
+		out.append((graph.seg_ids[e >> 1] << 1) | (e & 1))
+	return out
+
+
 ## Route of a trip as directed road entries ((segment id << 1) | dir), from
 ## the cached shortest-time trees. Empty if routes are not ready.
 func route(i: int) -> PackedInt32Array:

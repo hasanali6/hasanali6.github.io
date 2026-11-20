@@ -17,11 +17,18 @@ extends Node3D
 const FIRE_SHADER := preload("res://assets/materials/fire.gdshader")
 const ICON_SHADER := preload("res://assets/materials/icon_billboard.gdshader")
 const MISSION_KINDS: Array[String] = ["population", "happiness", "parks", "services", "budget", "transit", "crime", "land_value"]
+const DISPATCH_PENDING := Vector2i(-2, -2)  # a road path exists, the engine leaves when the street clears
 
 var disasters_enabled: bool = true
 var missions: Array = []                 # [{kind, target, reward, start?}]
 var tutorial_step: int = -1              # index into life/tutorial, -1 = off
 var last_stats: Dictionary = {}
+## Month-by-month history for the charts: key -> PackedFloat32Array (oldest
+## first, at most HISTORY_MONTHS values).
+var history: Dictionary = {}
+const HISTORY_MONTHS := 120
+const HISTORY_KEYS: Array[String] = ["population", "balance", "net", "happiness", "crime", "land_value",
+	"demand_r", "demand_c", "demand_o", "demand_i", "traffic"]
 
 var _lv: Dictionary
 var _crime: Dictionary
@@ -195,9 +202,33 @@ func _on_month(_m: int) -> void:
 	_floods()
 	_earthquake_roll()
 	var s := _stats()
+	_record_history(s)
 	_update_missions(s)
 	_check_tutorial()
 	EventBus.life_changed.emit()
+
+
+## Adds this month to the chart history.
+func _record_history(s: Dictionary) -> void:
+	var demand: Dictionary = {}
+	var ds: Node = get_node_or_null("../DemandSystem")
+	if ds != null:
+		demand = ds.demand
+	var traffic: Node = get_node_or_null("../TrafficSystem")
+	var row := {
+		"population": float(s.get("population", 0)), "balance": float(EconomySystem.balance), "net": float(s.get("net", 0.0)),
+		"happiness": float(s.get("happiness", 0.0)), "crime": float(s.get("crime", 0.0)) * 100.0,
+		"land_value": float(s.get("land_value", 0.0)) * 100.0,
+		"demand_r": float(demand.get("residential", 0.0)) * 100.0, "demand_c": float(demand.get("commercial", 0.0)) * 100.0,
+		"demand_o": float(demand.get("office", 0.0)) * 100.0, "demand_i": float(demand.get("industrial", 0.0)) * 100.0,
+		"traffic": 0.0 if traffic == null else float(traffic.last_stats.get("avg_commute", 0.0)),
+	}
+	for key: String in HISTORY_KEYS:
+		var series: PackedFloat32Array = history.get(key, PackedFloat32Array())
+		series.append(float(row[key]))
+		if series.size() > HISTORY_MONTHS:
+			series = series.slice(series.size() - HISTORY_MONTHS)
+		history[key] = series
 
 
 func _update_buildings() -> void:
@@ -215,6 +246,9 @@ func _update_buildings() -> void:
 			empty[k] = int(empty.get(k, 0)) + 1
 	var high := 0
 	var high_unpoliced := 0
+	var worst := 0.0
+	var worst_pos := Vector2.ZERO
+	var patrol: Array = []
 	for b: Dictionary in records.values():
 		if b["abandoned"] or not _services.is_consumer(b):
 			b["crime"] = 0.0
@@ -232,6 +266,11 @@ func _update_buildings() -> void:
 			high += 1
 			if police < 0.2:
 				high_unpoliced += 1
+				if crime > worst:
+					worst = crime
+					worst_pos = b["centre"]
+			else:
+				patrol.append(b)
 	for b: Dictionary in records.values():
 		var id: int = b["id"]
 		b["land_value"] = value_at(b["centre"], int(b.get("segment", -1)), float(b.get("crime", 0.0)))
@@ -245,7 +284,12 @@ func _update_buildings() -> void:
 		if not _water_d.has(id):
 			_water_d[id] = MapWater.shared().distance(b["centre"])
 	if high_unpoliced >= int(_crime["warn_count"]):
+		EventBus.notification_located.emit(worst_pos)
 		EventBus.notification_posted.emit("crime", tr("NOTIFY_CRIME_HIGH") % high_unpoliced)
+	# Police patrols drive to the worst spots that a station covers.
+	patrol.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return float(x["crime"]) > float(y["crime"]))
+	for i in mini(patrol.size(), int(_crime.get("patrols_per_month", 2))):
+		dispatch("police", patrol[i])
 
 
 # --- Fires -----------------------------------------------------------------------------
@@ -255,9 +299,12 @@ func ignite(id: int) -> bool:
 	var b: Dictionary = _buildings.buildings.get(id, {})
 	if b.is_empty() or b["abandoned"] or _fires.has(id) or _fires.size() >= int(_fire["max_fires"]):
 		return false
-	_fires[id] = {"t": 0.0, "spread": 0.0}
+	_fires[id] = {"t": 0.0, "spread": 0.0, "truck": dispatch("fire", b), "ambulance": dispatch("health", b)}
 	_fires_dirty = true
-	EventBus.notification_posted.emit("fire", tr("NOTIFY_FIRE_STARTED"))
+	EventBus.notification_located.emit(b["centre"])
+	var sent: Vector2i = _fires[id]["truck"]
+	var coming := sent.x >= 0 or sent == DISPATCH_PENDING
+	EventBus.notification_posted.emit("fire", tr("NOTIFY_FIRE_STARTED") if coming else tr("NOTIFY_FIRE_NO_TRUCK"))
 	EventBus.sfx_requested.emit("error")
 	return true
 
@@ -271,6 +318,65 @@ func ignite_random() -> bool:
 	if ids.is_empty():
 		return false
 	return ignite(int(ids[_rng.randi_range(0, ids.size() - 1)]))
+
+
+## Sends a service vehicle (traffic.json service category: "fire",
+## "police", "health"...) from the nearest building of that service to the
+## street of building b. Vector2i(-1, -1) if there is none or no road path.
+func dispatch(category: String, b: Dictionary) -> Vector2i:
+	var vehicles: Node = get_node_or_null("../VehicleSystem")
+	var traffic: Node = get_node_or_null("../TrafficSystem")
+	if vehicles == null or traffic == null or b.is_empty():
+		return Vector2i(-1, -1)
+	var best: Dictionary = {}
+	var best_d := float(_fire.get("truck_reach_m", 2500.0))
+	for s: Dictionary in _buildings.buildings.values():
+		if s["abandoned"]:
+			continue
+		var t: Dictionary = _services.type_of(s)
+		if t.is_empty() or str(t["category"]) != category:
+			continue
+		var d := (s["centre"] as Vector2).distance_to(b["centre"])
+		if d < best_d:
+			best_d = d
+			best = s
+	if best.is_empty():
+		return Vector2i(-1, -1)
+	# Each building's own street first, then the other streets its lot touches.
+	for from_seg: int in _streets_of(best):
+		for seg: int in _streets_of(b):
+			var route: PackedInt32Array = traffic.route_between(from_seg, seg)
+			if route.is_empty():
+				continue
+			var sent: Vector2i = vehicles.spawn_service(route, category)
+			# A road path exists but the street is packed right now: try again.
+			return sent if sent.x >= 0 else DISPATCH_PENDING
+	return Vector2i(-1, -1)
+
+
+## Streets a building can be reached from (at most 3): its own, then the
+## ones its lot cells touch.
+func _streets_of(b: Dictionary) -> Array:
+	var out := []
+	var own := _segment_of(b)
+	if own >= 0:
+		out.append(own)
+	var grid: ZoneGrid = _zones.grid
+	for c: int in b.get("cells", PackedInt32Array()):
+		if out.size() >= 3:
+			break
+		if c < grid.size() and grid.segment[c] >= 0 and not out.has(grid.segment[c]):
+			out.append(grid.segment[c])
+	return out
+
+
+func _segment_of(b: Dictionary) -> int:
+	var sid := int(b.get("segment", -1))
+	if sid >= 0:
+		return sid
+	var cells: PackedInt32Array = b.get("cells", PackedInt32Array())
+	var grid: ZoneGrid = _zones.grid
+	return grid.segment[cells[0]] if not cells.is_empty() and cells[0] < grid.size() else -1
 
 
 func burning_count() -> int:
@@ -302,15 +408,38 @@ func _process(delta: float) -> void:
 		f["t"] = float(f["t"]) + game_delta
 		f["spread"] = float(f["spread"]) + game_delta
 		var cover := float(_services.coverage_of(records[id], "fire"))
-		match CityLifeRules.fire_state(float(f["t"]), cover, _fire):
+		# With a fire engine on its way the fire goes out when it arrives (and
+		# the building is lost if it comes too late); without one, the old
+		# rule by fire coverage decides.
+		var truck: Vector2i = f.get("truck", Vector2i(-1, -1))
+		if truck == DISPATCH_PENDING:
+			if float(f["t"]) >= float(_fire.get("truck_wait_seconds", 15.0)):
+				truck = Vector2i(-1, -1)
+			elif float(f["t"]) - float(f.get("retry", 0.0)) >= 1.0:
+				f["retry"] = f["t"]
+				truck = dispatch("fire", records[id])
+			f["truck"] = truck
+		var state := CityLifeRules.fire_state(float(f["t"]), cover, _fire)
+		if truck.x >= 0 or truck == DISPATCH_PENDING:
+			var vehicles: Node = get_node_or_null("../VehicleSystem")
+			var arrived: bool = truck.x >= 0 and (vehicles == null or not vehicles.vehicle_alive(truck))
+			if float(f["t"]) >= float(_fire["burn_down_seconds"]):
+				state = "down"
+			else:
+				state = "out" if arrived else "burning"
+			if arrived:
+				cover = 1.0
+		match state:
 			"out":
 				_fires.erase(id)
 				_fires_dirty = true
+				EventBus.notification_located.emit(records[id]["centre"])
 				EventBus.notification_posted.emit("fire", tr("NOTIFY_FIRE_OUT"))
 				continue
 			"down":
 				_fires.erase(id)
 				_fires_dirty = true
+				EventBus.notification_located.emit(records[id]["centre"])
 				_buildings.burn(id)
 				EventBus.notification_posted.emit("fire", tr("NOTIFY_FIRE_DOWN"))
 				continue
@@ -447,6 +576,7 @@ func earthquake() -> int:
 	var shake: Array = _dis["earthquake_shake"]
 	_shake_left = float(shake[1])
 	EventBus.camera_shake_requested.emit(float(shake[0]), float(shake[1]))
+	EventBus.notification_located.emit(centre)
 	EventBus.notification_posted.emit("disaster", tr("NOTIFY_EARTHQUAKE") % damaged)
 	EventBus.sfx_requested.emit("bulldoze")
 	return damaged
@@ -463,6 +593,7 @@ func _floods() -> void:
 
 func flood() -> int:
 	var hit := 0
+	var first_hit := Vector2.ZERO
 	for b: Dictionary in _buildings.buildings.values():
 		if b["abandoned"] or not _services.is_consumer(b):
 			continue
@@ -474,10 +605,13 @@ func flood() -> int:
 		if d > float(_dis["flood_distance_m"]) or MapWater.shared().coast_distance(b["centre"]) <= d + 1.0:
 			continue
 		b["flooded"] = int(_dis["flood_months"])
+		if hit == 0:
+			first_hit = b["centre"]
 		hit += 1
 		if _rng.randf() < float(_dis["flood_abandon_chance"]):
 			_buildings.burn(id)
 	if hit > 0:
+		EventBus.notification_located.emit(first_hit)
 		EventBus.notification_posted.emit("disaster", tr("NOTIFY_FLOOD") % hit)
 	return hit
 
@@ -666,11 +800,15 @@ func save_state() -> Dictionary:
 	for id: int in _fires:
 		fires[str(id)] = float((_fires[id] as Dictionary)["t"])
 	return {"missions": missions.duplicate(true), "tutorial": tutorial_step, "disasters": disasters_enabled,
-		"fires": fires, "roads_at_start": _roads_at_start}
+		"fires": fires, "roads_at_start": _roads_at_start, "history": history.duplicate(true)}
 
 
 func load_state(state: Dictionary) -> void:
 	missions = (state.get("missions", []) as Array).duplicate(true)
+	history = {}
+	var saved_history: Dictionary = state.get("history", {})
+	for key: String in saved_history:
+		history[key] = PackedFloat32Array(saved_history[key])
 	# Cities from before the tutorial existed are past their first steps.
 	tutorial_step = int(state.get("tutorial", -1))
 	disasters_enabled = bool(state.get("disasters", true))
@@ -678,7 +816,7 @@ func load_state(state: Dictionary) -> void:
 	_fires.clear()
 	var fires: Dictionary = state.get("fires", {})
 	for key: String in fires:
-		_fires[int(key)] = {"t": float(fires[key]), "spread": 0.0}
+		_fires[int(key)] = {"t": float(fires[key]), "spread": 0.0, "truck": DISPATCH_PENDING}
 	_fires_dirty = true
 	last_stats = {"loaded": true}
 	_collect_places()

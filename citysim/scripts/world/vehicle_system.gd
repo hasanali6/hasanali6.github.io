@@ -91,6 +91,7 @@ var _dwell := PackedFloat32Array()
 var _dwell_s := PackedFloat32Array()  # lane distance of the stop ahead on this road, -1 if none
 var _half := PackedFloat32Array()  # half the vehicle length
 var _ver := PackedInt32Array()
+var _life := PackedInt32Array()          # bumped when a vehicle id is freed (handles from spawn_service)
 var _color := PackedColorArray()
 var _second := PackedColorArray()
 var _beacon := PackedByteArray()
@@ -805,26 +806,67 @@ func _look_for(trip: int) -> Array:
 	return [_model_index[model], paint, paint, 0]
 
 
-func _spawn(trip: int, route: PackedInt32Array) -> void:
+## Sends one service vehicle ("fire", "police", "health", ...: the keys of
+## traffic.json service_models) along a road route, lights flashing.
+## Returns Vector2i(id, version) to follow it with vehicle_alive, or
+## Vector2i(-1, -1) when it could not be placed.
+func spawn_service(route: PackedInt32Array, category: String) -> Vector2i:
+	var models: Dictionary = _cfg["models"]
+	var name: String = (models["service_models"] as Dictionary).get(category, "")
+	if name == "" or not _model_index.has(name) or route.is_empty():
+		return Vector2i(-1, -1)
+	var colors: Array = _cfg["service_paint"][category]
+	var look := [_model_index[name], DataLoader.to_color(colors[0]), DataLoader.to_color(colors[1]), 1]
+	# Each try picks another lane and spot, so a busy street rarely stops it.
+	var v := -1
+	for attempt in 6:
+		v = _spawn(-1, route, look)
+		if v >= 0:
+			break
+	return Vector2i(v, _life[v]) if v >= 0 else Vector2i(-1, -1)
+
+
+## True while the vehicle spawn_service returned is still driving.
+func vehicle_alive(id: Vector2i) -> bool:
+	return id.x >= 0 and id.x < _alive.size() and _alive[id.x] == 1 and _life[id.x] == id.y
+
+
+## Where a vehicle is now (for following it with the camera), or null.
+func vehicle_position(id: Vector2i) -> Variant:
+	if not vehicle_alive(id):
+		return null
+	# The GPU places vehicles; here the same spot is found on the CPU from
+	# the piece's evenly spaced samples and the distance driven along it.
+	var lg: LaneGeometry = _traffic.lanes
+	var pid := _piece[id.x]
+	var pts := lg.points(pid)
+	if pts.is_empty():
+		return null
+	var f := clampf(_pos(id.x) / maxf(lg.piece_length[pid], 0.001), 0.0, 1.0) * float(pts.size() - 1)
+	var k := mini(int(f), pts.size() - 1)
+	return pts[k].lerp(pts[mini(k + 1, pts.size() - 1)], f - float(k))
+
+
+func _spawn(trip: int, route: PackedInt32Array, look_given: Array = []) -> int:
 	var lg: LaneGeometry = _traffic.lanes
 	var first := route[0]
 	var lanes: int = _seg_lanes.get(first >> 1, 0)
 	if lanes <= 0:
-		return
+		return -1
 	var lane := _choose_lane(route, 0, _rng.randi_range(0, lanes - 1), lanes)
 	var pid := _lane_piece(first, lane)
 	if pid < 0:
-		return
+		return -1
 	var length := lg.piece_length[pid]
 	var margin := float(_veh["spawn_margin"])
-	var look := _look_for(trip)
+	var look := look_given if not look_given.is_empty() else _look_for(trip)
 	var model: int = look[0]
 	var s := _free_spot(pid, length * _rng.randf_range(margin, 1.0 - margin), _half_by_model[model])
 	if s < 0.0:
-		return
+		return -1
 	var slot := _take_slot(model)
 	if slot < 0:
-		return
+		return -1
 	var v := _new_id()
 	_alive[v] = 1
 	_model[v] = model
@@ -863,6 +905,7 @@ func _spawn(trip: int, route: PackedInt32Array) -> void:
 	_resolve(pid)
 	_schedule(v)
 	_write(v)
+	return v
 
 
 ## A start position on a lane clear of the vehicles already there, or -1.
@@ -973,6 +1016,7 @@ func _despawn(v: int, resolve: bool = true) -> void:
 	_blocked.erase(v)
 	_alive[v] = 0
 	_ver[v] += 1
+	_life[v] += 1
 	_release_slot(_model[v], _slot[v])
 	_free_ids.append(v)
 	active -= 1
@@ -1013,6 +1057,7 @@ func _new_id() -> int:
 	_dwell_s.append(-1.0)
 	_half.append(2.3)
 	_ver.append(0)
+	_life.append(0)
 	_color.append(Color.WHITE)
 	_second.append(Color.WHITE)
 	_beacon.append(0)

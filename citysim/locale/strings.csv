@@ -418,7 +418,7 @@ TUT_MISSIONS,"Soldaki kupa düğmesi: görevleri tamamla, para ödülü kazan!",
 TUT_FINISHED,"Öğretici bitti, artık şehir senin! Görevler için kupaya bak.","Tutorial done, the city is yours! See the trophy for missions."
 TUT_SKIPPED,Öğretici kapatıldı (Görevler kartından yeniden başlatabilirsin).,Tutorial closed (restart it from the Missions card).
 NOTIFY_CRIME_HIGH,Suç artıyor: %d binada polis yok! Karakol kur.,Crime is rising: %d buildings have no police! Build a police station.
-NOTIFY_FIRE_STARTED,Yangın çıktı! İtfaiye yetişmezse bina yanacak.,"A fire broke out! If firefighters can't reach it, the building will burn down."
+NOTIFY_FIRE_STARTED,Yangın çıktı! İtfaiye aracı yolda.,A fire broke out! A fire engine is on its way.
 NOTIFY_FIRE_OUT,İtfaiye yangını söndürdü.,Firefighters put the fire out.
 NOTIFY_FIRE_DOWN,Bina yanıp yıkıldı! Yakına itfaiye istasyonu kur.,A building burned down! Build a fire station nearby.
 NOTIFY_EARTHQUAKE,"Deprem! %d bina hasar gördü, yangınlar çıktı.","Earthquake! %d buildings damaged, fires broke out."
@@ -469,3 +469,33 @@ SAVES_IMPORTED,Şehir içe aktarıldı: listede 'İçe aktarılan' satırından 
 SAVES_IMPORTED_ROW,İçe aktarılan,Imported
 SAVES_IMPORT_BAD,Bu dosya bir şehir kaydı değil ya da oyunun daha yeni bir sürümünden.,"This file is not a city save, or comes from a newer game version."
 SAVES_IMPORT_FAILED,İçe aktarılamadı (dosyaya yazılamadı).,Import failed (could not write the file).
+NOTIFY_FIRE_NO_TRUCK,"Yangın çıktı! Yakında itfaiye yok, bina yanabilir.","A fire broke out! No fire station nearby, the building may burn down."
+LOG_TITLE,Olaylar,Events
+LOG_EMPTY,Henüz bir olay yok.,No events yet.
+LOG_GO,Git,Go
+UNDO_DONE_ZONE,İmar geri alındı,Zoning undone
+ECON_TAB_GRAPHS,Grafikler,Charts
+CHART_POPULATION,Nüfus,Population
+CHART_BALANCE,Kasa,Treasury
+CHART_NET,Aylık net,Monthly net
+CHART_HAPPINESS,Mutluluk,Happiness
+CHART_CRIME,Suç,Crime
+CHART_LAND_VALUE,Arsa değeri,Land value
+CHART_DEMAND_R,Konut talebi,Housing demand
+CHART_DEMAND_C,Ticari talep,Shop demand
+CHART_DEMAND_I,Sanayi talebi,Industry demand
+CHART_TRAFFIC,İşe gidiş (dk),Commute (min)
+CHART_SPAN,Son %d ay,Last %d months
+CHART_NOW,Şimdi: %s,Now: %s
+CHART_NOT_ENOUGH,Grafik için en az 2 ay oynamak lazım.,Play at least 2 months to see a chart.
+BUILDING_WHO,Yetişkin %d · çocuk %d · yaşlı %d,Adults %d · children %d · seniors %d
+BUILDING_WORK,Çalışan %d · işsiz %d,Working %d · jobless %d
+BUILDING_EDU,Eğitim: ilkokul %d · lise %d · üniversite %d,Education: primary %d · high school %d · university %d
+INFO_DEMOLISH,Yık,Demolish
+SETTINGS_BATTERY,"Pil tasarrufu (30 FPS, hafif gölge)","Battery saver (30 FPS, lighter shadows)"
+NOTIFY_BATTERY_ON,Pil tasarrufu açık: 30 FPS,Battery saver on: 30 FPS
+NOTIFY_BATTERY_OFF,Pil tasarrufu kapalı,Battery saver off
+SETTINGS_PHOTO,Fotoğraf modu,Photo mode
+NOTIFY_PHOTO_MODE,"Fotoğraf modu: arayüz gizli. Mavi düğme fotoğraf çeker, X çıkar.","Photo mode: interface hidden. Blue button takes a picture, X leaves."
+NOTIFY_PHOTO_SAVED,Fotoğraf kaydedildi: %s,Picture saved: %s
+NOTIFY_PHOTO_FAILED,Fotoğraf kaydedilemedi.,Could not save the picture.
