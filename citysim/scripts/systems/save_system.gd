@@ -1,3 +1,4 @@
+class_name SaveSystem
 extends Node
 ## Saves and restores the whole city. Autosaves every few game months and
 ## whenever the app is sent to the background or closed (Android may kill a
@@ -11,6 +12,11 @@ const SAVE_DIR := "user://saves/"
 const AUTOSAVE := "user://saves/autosave.save"
 const PENDING := "user://saves/pending_load.txt"
 const SLOT_COUNT := 3
+## A save brought in from another device (Kayitlar -> Ice aktar); it is
+## listed with the slots and only replaces the city when loaded on purpose.
+const IMPORTED := "user://saves/imported.save"
+## Folder (inside Documents) where exported cities go.
+const EXPORT_FOLDER := "SehirSim"
 
 @export var road_network_path: NodePath
 @export var zone_system_path: NodePath
@@ -80,12 +86,20 @@ func save_game(path: String = AUTOSAVE) -> bool:
 	var life: Node = get_parent().get_node_or_null("CityLifeSystem")
 	if life != null:
 		state["life"] = life.save_state()
-	var file := FileAccess.open(path, FileAccess.WRITE)
+	# Write to a temporary file first and keep the previous save as .bak: a
+	# crash or a full disk in the middle of writing never costs the city.
+	var tmp := path + ".tmp"
+	var file := FileAccess.open(tmp, FileAccess.WRITE)
 	if file == null:
-		push_error("SaveSystem: cannot write %s" % path)
+		push_error("SaveSystem: cannot write %s" % tmp)
 		return false
 	file.store_var(state)
 	file.close()
+	if FileAccess.file_exists(path):
+		DirAccess.copy_absolute(path, path + ".bak")
+	if DirAccess.rename_absolute(tmp, path) != OK:
+		DirAccess.copy_absolute(tmp, path)
+		DirAccess.remove_absolute(tmp)
 	var meta := {
 		"saved_unix": state["saved_unix"], "population": int(citizens.population), "balance": EconomySystem.balance,
 		"level": ProgressionSystem.level, "date": TimeSystem.get_date_text(),
@@ -99,13 +113,25 @@ func save_game(path: String = AUTOSAVE) -> bool:
 	return true
 
 
+## Reads a save file brought up to the current version ({} if unusable).
+static func read_state(path: String) -> Dictionary:
+	return SaveFormat.read_state(path, GameData.integer("game/save_version"))
+
+
 func load_game(path: String = AUTOSAVE) -> bool:
 	if not FileAccess.file_exists(path):
 		return false
-	var file := FileAccess.open(path, FileAccess.READ)
-	var state: Variant = file.get_var()
-	if typeof(state) != TYPE_DICTIONARY or int(state.get("version", -1)) != GameData.integer("game/save_version"):
-		push_warning("SaveSystem: incompatible save ignored")
+	var state := read_state(path)
+	if state.is_empty() and FileAccess.file_exists(path + ".bak"):
+		push_warning("SaveSystem: %s unreadable, using the backup" % path)
+		state = read_state(path + ".bak")
+	if state.is_empty():
+		# Never let the next autosave overwrite a city we could not read:
+		# move it aside so it can still be recovered.
+		var keep := path.get_basename() + "_okunamadi_%d.save" % int(Time.get_unix_time_from_system())
+		DirAccess.rename_absolute(path, keep)
+		push_warning("SaveSystem: unreadable save kept as %s" % keep)
+		EventBus.notification_posted.emit("save", tr("NOTIFY_SAVE_UNREADABLE"))
 		return false
 	_loading = true
 	TimeSystem.load_state(state["time"])
@@ -157,6 +183,8 @@ func list_saves() -> Array:
 	var out := [{"key": "auto", "path": AUTOSAVE}]
 	for s in range(1, SLOT_COUNT + 1):
 		out.append({"key": "slot", "slot": s, "path": slot_path(s)})
+	if FileAccess.file_exists(IMPORTED):
+		out.append({"key": "imported", "path": IMPORTED})
 	for entry: Dictionary in out:
 		var path: String = entry["path"]
 		entry["exists"] = FileAccess.file_exists(path)
@@ -190,3 +218,88 @@ func new_city() -> void:
 	ProgressionSystem.reset_state()
 	WeatherSystem.reset_state()
 	get_tree().reload_current_scene()
+
+
+# --- Moving a city between devices --------------------------------------------------
+
+## Folder exported cities go to: Documents/SehirSim (on Android the shared
+## Documents folder, reachable from any file manager).
+static func export_dir() -> String:
+	var docs := OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
+	if docs == "":
+		docs = OS.get_user_data_dir()
+	return docs.path_join(EXPORT_FOLDER)
+
+
+## Saves the city now and copies it to export_dir() as
+## sehir_YYYY-MM-DD_HH-MM.save. Returns the file's path, or "" on failure.
+func export_city() -> String:
+	if not save_game():
+		return ""
+	var dir := export_dir()
+	DirAccess.make_dir_recursive_absolute(dir)
+	var stamp := Time.get_datetime_string_from_system(false, true).replace(":", "-").replace(" ", "_").left(16)
+	var target := dir.path_join("sehir_%s.save" % stamp)
+	var bytes := FileAccess.get_file_as_bytes(AUTOSAVE)
+	var f := FileAccess.open(target, FileAccess.WRITE)
+	if f == null or bytes.is_empty():
+		push_warning("SaveSystem: cannot export to %s (%s)" % [target, error_string(FileAccess.get_open_error())])
+		return ""
+	f.store_buffer(bytes)
+	f.close()
+	return target
+
+
+## Copies a city file from another device into the "imported" entry of the
+## save list (the current city is not touched until it is loaded). Returns
+## "" when it worked, else a translation key saying why not.
+func import_city(source: String) -> String:
+	var state := read_state(source)
+	if state.is_empty():
+		return "SAVES_IMPORT_BAD"
+	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	var bytes := FileAccess.get_file_as_bytes(source)
+	var f := FileAccess.open(IMPORTED, FileAccess.WRITE)
+	if f == null:
+		return "SAVES_IMPORT_FAILED"
+	f.store_buffer(bytes)
+	f.close()
+	var econ: Dictionary = state.get("economy", {})
+	var people := 0
+	var cit: Dictionary = state.get("citizens", {})
+	if cit.has("alive"):
+		var alive: PackedByteArray = cit["alive"]
+		for i in alive.size():
+			if alive[i] != 0:
+				people += int(cit["adults"][i]) + int(cit["children"][i]) + int(cit["seniors"][i])
+	var meta := {
+		"saved_unix": int(state.get("saved_unix", Time.get_unix_time_from_system())),
+		"population": people,
+		"balance": int(econ.get("balance", 0)),
+		"level": int((state.get("progression", {}) as Dictionary).get("level", 0)),
+	}
+	var mf := FileAccess.open(meta_path(IMPORTED), FileAccess.WRITE)
+	if mf != null:
+		mf.store_string(JSON.stringify(meta))
+	EventBus.saves_changed.emit()
+	return ""
+
+
+## City files found where a transfer usually lands (exports, Downloads),
+## newest first: [{path, name, unix}].
+static func importable_files() -> Array:
+	var out := []
+	var seen := {}
+	for dir: String in [export_dir(), OS.get_system_dir(OS.SYSTEM_DIR_DOWNLOADS), OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)]:
+		if dir == "" or not DirAccess.dir_exists_absolute(dir):
+			continue
+		for name in DirAccess.get_files_at(dir):
+			if not name.ends_with(".save"):
+				continue
+			var path := dir.path_join(name)
+			if seen.has(path):
+				continue
+			seen[path] = true
+			out.append({"path": path, "name": name, "unix": int(FileAccess.get_modified_time(path))})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["unix"]) > int(b["unix"]))
+	return out

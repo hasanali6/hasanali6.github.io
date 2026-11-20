@@ -521,6 +521,15 @@ araba durur.
 - Otomatik kayıt her ay ve uygulama arka plana geçince yapılır. Açılışta en son
   otomatik kayıt yüklenir.
 - Yüklemek için "Yükle"ye iki kez dokun. Kaydedilmemiş ilerleme gider.
+- **Şehir kaybolmaz:** her kayıtta bir önceki kayıt `.bak` olarak saklanır; kayıt
+  bozulursa yedekten açılır. İkisi de okunamazsa dosya silinmez, `_okunamadi`
+  adıyla kenara alınır. Oyunun yeni sürümleri eski kayıtları dönüştürerek açar.
+- **Telefon ↔ bilgisayar:** Kayıtlar → **Dışa aktar** şehri `Belgeler/SehirSim`
+  klasörüne `sehir_tarih.save` olarak yazar (PC'de klasör açılır). Dosyayı diğer
+  cihaza taşı (kablo, Drive, WhatsApp…), `Belgeler/SehirSim` ya da
+  `İndirilenler` klasörüne koy, orada Kayıtlar → **İçe aktar** → dosyanın
+  yanındaki **Al**. Şehir listede "İçe aktarılan" satırına gelir, **Yükle** ile
+  açılır. (Dosya seçme penceresi açılırsa oradan da seçebilirsin.)
 
 ---
 

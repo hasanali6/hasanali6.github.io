@@ -457,3 +457,15 @@ ZONE_NO_DEMAND_IND_POP,"Sanayi talebi yok: fabrikalar için en az %d nüfus laz�
 ZONE_NO_DEMAND_IND,"Sanayi talebi yok (S çubuğu boş): yeterince fabrika var, nüfus artınca dolar","No industrial demand (empty I bar): enough factories for now"
 ZONE_NO_DEMAND_OFF_POP,"Ofis talebi yok: ofisler için en az %d nüfus ve eğitimli işçi lazım","No office demand: offices need at least %d people and educated workers"
 ZONE_NO_DEMAND_OFF,"Ofis talebi yok (O çubuğu boş): lise/üniversite mezunu işçi lazım","No office demand (empty O bar): needs high-school/university graduates"
+NOTIFY_SAVE_UNREADABLE,"Kayıt okunamadı; silinmedi, saves klasöründe '_okunamadi' adıyla saklandı.",The save could not be read; it was kept in the saves folder as '_okunamadi'.
+SAVES_EXPORT,Dışa aktar (başka cihaza),Export (to another device)
+SAVES_IMPORT,İçe aktar,Import
+SAVES_EXPORTED,"Şehir kaydedildi: %s  (bu dosyayı diğer cihaza taşı, orada İçe aktar)",City saved to: %s  (move this file to the other device and Import there)
+SAVES_EXPORT_FAILED,Dışa aktarılamadı (dosyaya yazılamadı).,Export failed (could not write the file).
+SAVES_FOUND,Bulunan şehir dosyaları (Belgeler/SehirSim ve İndirilenler):,City files found (Documents/SehirSim and Downloads):
+SAVES_NONE_FOUND,Belgeler/SehirSim ya da İndirilenler'de .save dosyası bulunamadı. Dosyayı oraya koyup tekrar dene.,No .save file in Documents/SehirSim or Downloads. Put the file there and try again.
+SAVES_TAKE,Al,Take
+SAVES_IMPORTED,Şehir içe aktarıldı: listede 'İçe aktarılan' satırından Yükle.,City imported: load it from the 'Imported' row.
+SAVES_IMPORTED_ROW,İçe aktarılan,Imported
+SAVES_IMPORT_BAD,Bu dosya bir şehir kaydı değil ya da oyunun daha yeni bir sürümünden.,"This file is not a city save, or comes from a newer game version."
+SAVES_IMPORT_FAILED,İçe aktarılamadı (dosyaya yazılamadı).,Import failed (could not write the file).

@@ -14,6 +14,7 @@ var _touch: float
 var _rows: VBoxContainer
 var _armed: String = ""
 var _armed_at: float = -INF
+var _files: VBoxContainer
 
 
 func _init(save_system: Node, font_size: int, min_touch: float) -> void:
@@ -26,6 +27,20 @@ func _init(save_system: Node, font_size: int, min_touch: float) -> void:
 	_rows = VBoxContainer.new()
 	_rows.add_theme_constant_override("separation", 10)
 	content.add_child(_rows)
+	# Moving the city between the phone and the PC.
+	var move := HBoxContainer.new()
+	move.add_theme_constant_override("separation", 10)
+	var export_b := _button("SAVES_EXPORT")
+	export_b.pressed.connect(_export)
+	move.add_child(export_b)
+	var import_b := _button("SAVES_IMPORT")
+	import_b.pressed.connect(_import)
+	move.add_child(import_b)
+	content.add_child(move)
+	_files = VBoxContainer.new()
+	_files.add_theme_constant_override("separation", 6)
+	_files.visible = false
+	content.add_child(_files)
 	var hint := UiStyle.label("SAVES_HINT", font_size - 8)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(hint)
@@ -36,8 +51,83 @@ func _init(save_system: Node, font_size: int, min_touch: float) -> void:
 
 func open() -> void:
 	_armed = ""
+	_files.visible = false
 	_refresh()
 	card.visible = true
+
+
+func _button(text: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(220, _touch * 0.7)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return b
+
+
+func _say(text: String) -> void:
+	EventBus.notification_posted.emit("save", text)
+
+
+## Saves the city and copies it to Documents/SehirSim; the PC also opens
+## that folder. Move the file to the other device (cable, Drive, WhatsApp...)
+## and use Ice aktar there.
+func _export() -> void:
+	var path: String = _save.export_city()
+	if path == "":
+		_say(TranslationServer.translate("SAVES_EXPORT_FAILED"))
+		return
+	_say(TranslationServer.translate("SAVES_EXPORTED") % path)
+	if OS.get_name() in ["Windows", "macOS", "Linux"]:
+		OS.shell_open(path.get_base_dir())
+
+
+## Picks a city file: the system's file picker when there is one, and in any
+## case a list of the city files found in Documents/SehirSim and Downloads.
+func _import() -> void:
+	_show_found_files()
+	if DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_DIALOG_FILE):
+		DisplayServer.file_dialog_show(TranslationServer.translate("SAVES_IMPORT"), SaveSystem.export_dir(), "", false,
+			DisplayServer.FILE_DIALOG_MODE_OPEN_FILE, PackedStringArray(["*.save"]),
+			func(ok: bool, paths: PackedStringArray, _filter: int) -> void:
+				if ok and not paths.is_empty():
+					_import_file(paths[0]))
+
+
+func _show_found_files() -> void:
+	for child in _files.get_children():
+		_files.remove_child(child)
+		child.queue_free()
+	var found: Array = SaveSystem.importable_files()
+	var title := UiStyle.label("SAVES_FOUND" if not found.is_empty() else "SAVES_NONE_FOUND", _font - 8)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_files.add_child(title)
+	for i in mini(found.size(), 5):
+		var entry: Dictionary = found[i]
+		var row := HBoxContainer.new()
+		var name := UiStyle.label(str(entry["name"]), _font - 8)
+		name.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(name)
+		var take := Button.new()
+		take.text = "SAVES_TAKE"
+		take.focus_mode = Control.FOCUS_NONE
+		take.custom_minimum_size = Vector2(130, _touch * 0.6)
+		var path: String = entry["path"]
+		take.pressed.connect(func() -> void: _import_file(path))
+		row.add_child(take)
+		_files.add_child(row)
+	_files.visible = true
+
+
+func _import_file(path: String) -> void:
+	var err: String = _save.import_city(path)
+	if err != "":
+		_say(TranslationServer.translate(err))
+		return
+	_files.visible = false
+	_say(TranslationServer.translate("SAVES_IMPORTED"))
+	_refresh()
 
 
 func _refresh() -> void:
@@ -47,7 +137,7 @@ func _refresh() -> void:
 	for entry: Dictionary in _save.list_saves():
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
-		var name := "SAVES_AUTO" if entry["key"] == "auto" else TranslationServer.translate("SAVES_SLOT") % int(entry["slot"])
+		var name := "SAVES_AUTO" if entry["key"] == "auto" else ("SAVES_IMPORTED_ROW" if entry["key"] == "imported" else TranslationServer.translate("SAVES_SLOT") % int(entry["slot"]))
 		var text := TranslationServer.translate(name)
 		var meta: Dictionary = entry["meta"]
 		if not entry["exists"]:

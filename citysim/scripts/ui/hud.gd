@@ -239,6 +239,31 @@ func _notification(what: int) -> void:
 		_on_back_requested()
 
 
+## PC: Esc closes the open panel (never quits), B opens the build menu,
+## L the layers, G the missions, H hides the interface (photo).
+func _unhandled_key_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo or key.ctrl_pressed:
+		return
+	match key.physical_keycode:
+		KEY_ESCAPE:
+			_on_back_requested(false)
+		KEY_B:
+			_set_tray_open(not _tray.visible)
+		KEY_L:
+			if _overlay_panel.visible:
+				_close_overlay_panel()
+			else:
+				_open_overlay_panel()
+		KEY_G:
+			_missions.card.visible = not _missions.card.visible
+			if _missions.card.visible:
+				_missions.open()
+		_:
+			return
+	get_viewport().set_input_as_handled()
+
+
 func show_toast(text: String) -> void:
 	_toast_label.text = text
 	_toast_panel.visible = true
@@ -1422,7 +1447,7 @@ func _show_location(world_pos: Vector3) -> void:
 	_info_panel.visible = true
 
 
-func _on_back_requested() -> void:
+func _on_back_requested(can_quit: bool = true) -> void:
 	if _transit_panel.panel.visible:
 		_close_transit_panel()
 		return
@@ -1450,10 +1475,15 @@ func _on_back_requested() -> void:
 	if _cheats.card.visible:
 		_cheats.card.visible = false
 		return
+	if _missions.card.visible:
+		_missions.card.visible = false
+		return
 	if _settings_panel.visible or _info_panel.visible or _tray.visible:
 		_settings_panel.visible = false
 		_info_panel.visible = false
 		_set_tray_open(false)
+		return
+	if not can_quit:
 		return
 	var now := Time.get_ticks_msec() / 1000.0
 	if now - _last_back_press < BACK_EXIT_WINDOW:

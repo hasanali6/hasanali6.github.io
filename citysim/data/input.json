@@ -7,5 +7,10 @@
   "velocity_smoothing": 0.35,
   "mouse_wheel_zoom_step": 1.12,
   "mouse_rotate_rad_per_px": 0.006,
-  "mouse_tilt_px_scale": 1.0
+  "mouse_tilt_px_scale": 1.0,
+  "key_pan_px_per_s": 900.0,
+  "key_fast_multiplier": 2.5,
+  "key_rotate_rad_per_s": 1.6,
+  "key_tilt_px_per_s": 260.0,
+  "key_zoom_per_s": 2.2
 }

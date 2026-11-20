@@ -49,6 +49,7 @@ func _initialize() -> void:
 	_test_highway_bridge()
 	_test_resources()
 	_test_city_life()
+	_test_save_files()
 	print("Tests: %d checks, %d failed" % [_checks, _failures])
 	quit(_failures)
 
@@ -1048,3 +1049,28 @@ func _test_city_life() -> void:
 	_check(CityLifeRules.mission_reward(100000, mc) == int(mc["reward_max"]), "mission: reward is capped")
 	_check(not CityLifeRules.tutorial_done("road", {"roads_built": 0}) and CityLifeRules.tutorial_done("road", {"roads_built": 1}), "tutorial: road step")
 	_check(CityLifeRules.tutorial_done("jobs", {"com_cells": 4, "ind_cells": 4}) and not CityLifeRules.tutorial_done("jobs", {"com_cells": 4}), "tutorial: jobs step needs both")
+
+
+func _test_save_files() -> void:
+	var dir := "user://test_saves"
+	DirAccess.make_dir_recursive_absolute(dir)
+	var path := dir + "/city.save"
+	var state := {"version": 1, "time": {"minute": 600.0}, "roads": {"nodes": []}, "economy": {"balance": 1234}}
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_var(state)
+	f.close()
+	var back := SaveFormat.read_state(path, 1)
+	_check(not back.is_empty() and int((back["economy"] as Dictionary)["balance"]) == 1234, "save: a city file reads back")
+	var older := SaveFormat.read_state(path, 3)
+	_check(int(older.get("version", 0)) == 3, "save: an older save is brought up to the current version")
+	_check(SaveFormat.read_state(path, 0).is_empty(), "save: a save from a newer game is refused, not changed")
+	var junk := FileAccess.open(dir + "/junk.save", FileAccess.WRITE)
+	junk.store_var({"hello": 1})
+	junk.close()
+	_check(SaveFormat.read_state(dir + "/junk.save", 1).is_empty(), "save: a file that is not a city is refused")
+	var empty := FileAccess.open(dir + "/empty.save", FileAccess.WRITE)
+	empty.close()
+	_check(SaveFormat.read_state(dir + "/empty.save", 1).is_empty(), "save: an empty file is refused")
+	_check(SaveFormat.read_state(dir + "/missing.save", 1).is_empty(), "save: a missing file is refused")
+	for name in DirAccess.get_files_at(dir):
+		DirAccess.remove_absolute(dir + "/" + name)

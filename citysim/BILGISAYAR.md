@@ -55,6 +55,25 @@ koyup `gelistir.bat`'ı çalıştırman da olur.)
 | Tekerlek | Zoom |
 | Sol tık basılı tut | Konum / bina bilgisi |
 
+| Klavye | İş |
+|---|---|
+| W A S D / oklar | Kaydır (Shift ile hızlı) |
+| Q / E | Sola / sağa döndür |
+| R / F | Eğ |
+| + / − (PageUp / PageDown) | Yakınlaştır / uzaklaştır |
+| Boşluk | Durdur / devam |
+| 1 / 2 / 3 | Hız 1× / 2× / 3× |
+| Ctrl+Z | Geri al |
+| Esc | Açık paneli kapat |
+| B / L / G | İnşa menüsü / Katmanlar / Görevler |
+
+## Şehri telefon ile bilgisayar arasında taşımak
+
+Ayarlar → Kayıtlar → **Dışa aktar**: şehir `Belgeler\SehirSim\sehir_tarih.save`
+olarak yazılır ve klasör açılır. Dosyayı telefona at (kablo, Drive, WhatsApp),
+telefonda `Belgeler/SehirSim` ya da `İndirilenler` klasörüne koy → Kayıtlar →
+**İçe aktar** → **Al** → "İçe aktarılan" satırından **Yükle**. Tersi de aynı.
+
 ## Nerede ne var
 
 | Klasör | İçerik |
