@@ -561,6 +561,17 @@ araba durur.
 - **Gölgeler sakin:** gökyüzü renkleri saate göre değişir ama gölgeler gün
   boyu öğle güneşinin etrafında dar bir yayda, çok yavaş döner; yakınlaştırıp
   uzaklaştırırken de gölge alanı sık sık değişmez, böylece titremezler.
+- **Bina ve ağaç çeşitliliği:**
+  - Evler dört tipte: yan kalkanlı, sokağa bakan kalkanlı, verandalı ve geniş arsada L plan.
+  - Evlerin yarısının önünde çit (ya da beyaz bahçe duvarı) ve çiçek tarhı var.
+  - Apartmanlarda balkonlar, çatı korkuluğu ve yan duvarda klima kutuları var.
+  - Dükkânlarda renkli tabelalar var; tabelalar gece yanar.
+  - Duvar tonları binadan binaya biraz değişir, bazıları solmuş görünür.
+  - Ormanlarda ve bahçelerde ince uzun kavaklar da var.
+- **Uzak detay:** küçük parçalar (baca, klima, balkon, tabela) uzakta gizlenir;
+  büyük parçalar daha uzağa kadar kalır.
+  - Mesafe kaliteye göre değişir: Düşük 260 m, Orta 420 m, Yüksek 650 m.
+  - Pil modunda 260 m.
 - **Pil modu:** 30 FPS sınırı, tek kademe gölge, parıltı ve yağmur/kar
   parçacıkları kapalı. Telefon ısınınca ya da şarj azalınca aç.
 - **Fotoğraf modu:** arayüz gizlenir, kamerayı serbestçe gezdirirsin. 📷 ile

@@ -11,7 +11,7 @@ extends Node3D
 ## trees changed.
 
 const TREE_SHADER := preload("res://assets/materials/tree_low.gdshader")
-const KINDS: PackedStringArray = ["pine", "round"]
+const KINDS: PackedStringArray = ["pine", "round", "poplar"]
 
 @export var terrain_path: NodePath
 @export var road_network_path: NodePath
@@ -99,6 +99,10 @@ func _generate_forest() -> void:
 					if _rng.randf() > density * factor:
 						continue
 					var kind := 0 if _rng.randf() < pine_share else 1
+					# Some broadleaf spots are poplars, picked by position so the
+					# random sequence (and saved cut trees) stays the same.
+					if kind == 1 and _poplar_at(p):
+						kind = 2
 					_add_tree(p, kind, _rng.randf_range(float(srange[0]), float(srange[1])))
 
 
@@ -119,6 +123,10 @@ func _add_tree(p: Vector2, kind: int, s: float) -> void:
 	var trees: PackedInt32Array = _chunk_trees.get(chunk, PackedInt32Array())
 	trees.append(i)
 	_chunk_trees[chunk] = trees
+
+
+func _poplar_at(p: Vector2) -> bool:
+	return fposmod(p.x * 0.131 + p.y * 0.297, 1.0) < float(_cfg.get("poplar_share", 0.2))
 
 
 func _random_color(kind: int) -> Color:
@@ -337,7 +345,8 @@ func _yard_trees() -> Array:
 		for k in count:
 			var side := -1.0 if k % 2 == 0 else 1.0
 			var p: Vector2 = back + dir * side * (float(b["width"]) * 0.5 - 2.5)
-			out.append([1, p, s * (0.85 + 0.1 * k), Color.html(palette[(int(b["id"]) + k) % palette.size()])])
+			var kind := 2 if _poplar_at(p) else 1
+			out.append([kind, p, s * (0.85 + 0.1 * k), Color.html(palette[(int(b["id"]) + k) % palette.size()])])
 	return out
 
 
@@ -357,7 +366,7 @@ func _rebuild_dirty() -> void:
 
 
 func _rebuild_chunk(chunk: Vector2i) -> void:
-	var lists := {0: [], 1: []}
+	var lists := {0: [], 1: [], 2: []}
 	for i in _chunk_trees.get(chunk, PackedInt32Array()):
 		if _road_block[i] == 0 and _lot_block[i] == 0 and _cut_block[i] == 0:
 			(lists[_kind[i]] as Array).append([_pos[i], _scale[i], _color[i]])
@@ -445,6 +454,25 @@ func _build_meshes() -> void:
 	round_tree.surface_set_material(0, trunk_mat)
 	round_tree.surface_set_material(1, foliage)
 	_meshes["round"] = round_tree
+
+	# Poplar: a slim column of leaves on a short trunk.
+	var poplar := ArrayMesh.new()
+	_append_flat(poplar, _cylinder(0.2, 0.14, 2.0, 6), Transform3D(Basis(), Vector3(0, 1.0, 0)))
+	var column := SphereMesh.new()
+	column.radius = 1.0
+	column.height = 2.0
+	column.radial_segments = 8
+	column.rings = 6
+	st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(-1)
+	st.append_from(column, 0, Transform3D(Basis().scaled(Vector3(1.35, 3.6, 1.35)), Vector3(0, 5.2, 0)))
+	st.append_from(column, 0, Transform3D(Basis().scaled(Vector3(0.9, 1.6, 0.9)), Vector3(0.35, 8.0, 0.2)))
+	st.generate_normals()
+	st.commit(poplar)
+	poplar.surface_set_material(0, trunk_mat)
+	poplar.surface_set_material(1, foliage)
+	_meshes["poplar"] = poplar
 
 
 func _cylinder(bottom: float, top: float, height: float, segments: int) -> CylinderMesh:

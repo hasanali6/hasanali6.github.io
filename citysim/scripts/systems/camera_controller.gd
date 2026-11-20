@@ -82,6 +82,11 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam != null:
+		# Shaders hide small far details by distance to the player's camera
+		# (not to the shadow camera, so far parts still cast their shadows).
+		RenderingServer.global_shader_parameter_set("view_position", cam.global_position)
 	if _fling.length() > _fling_min_speed:
 		_pan_by_screen(_fling * delta)
 		_fling *= exp(-_fling_decay * delta)

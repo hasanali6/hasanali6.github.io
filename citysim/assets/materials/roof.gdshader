@@ -6,8 +6,12 @@ global uniform float wetness;
 global uniform float snow_cover;
 
 global uniform float surface_detail;
+global uniform vec3 view_position;
 
 uniform float roughness = 0.85;
+// Pieces about 2 m across vanish beyond this distance; bigger ones further
+// out in proportion (up to 12x), so only clutter goes.
+uniform float detail_hide_distance = 100000.0;
 uniform bool tiles = false;
 uniform sampler2D tile_tex : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D tile_normal : hint_normal, filter_linear_mipmap, repeat_enable;
@@ -24,6 +28,10 @@ void vertex() {
 	// slopes are lit as slopes (and not as near-vertical walls).
 	vec3 s = vec3(length(MODEL_MATRIX[0].xyz), length(MODEL_MATRIX[1].xyz), length(MODEL_MATRIX[2].xyz));
 	NORMAL = normalize(NORMAL / max(s * s, vec3(1e-6)));
+	float big = max(s.x, max(s.y, s.z));
+	if (length(view_position - MODEL_MATRIX[3].xyz) > detail_hide_distance * clamp(big * 0.5, 1.0, 12.0)) {
+		VERTEX = vec3(0.0);
+	}
 }
 
 void fragment() {

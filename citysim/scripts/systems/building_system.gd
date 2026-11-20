@@ -36,6 +36,7 @@ const LOT_SHADER := preload("res://assets/materials/lot_ground.gdshader")
 const CONTACT_SHADER := preload("res://assets/materials/contact_shadow.gdshader")
 const ROOF_SHADER := preload("res://assets/materials/roof.gdshader")
 const BEACON_SHADER := preload("res://assets/materials/beacon.gdshader")
+const SIGN_SHADER := preload("res://assets/materials/shop_sign.gdshader")
 const LOT_GARDEN := 0
 const LOT_PLAZA := 1
 const LOT_PARKING := 2
@@ -60,6 +61,7 @@ var _rules: Dictionary
 var _next_id: int = 1
 var _tick: int = 0
 var _meshes: Dictionary = {}      # mesh key -> MultiMeshInstance3D
+var _detail_mats: Array[ShaderMaterial] = []   # materials whose small far pieces hide by distance
 var _instances: Dictionary = {}   # building id -> Array of [mesh key, instance index]
 var _manual_ids: Array[int] = []      # hand-placed buildings (see building_at)
 var _life: Node = null                  # CityLifeSystem (land value), if in the scene
@@ -102,6 +104,7 @@ func _ready() -> void:
 	for c: String in _vis["industry_wall_palette"]:
 		_industry_palette.append(Color.html(c))
 	_build_meshes()
+	EventBus.graphics_preset_changed.connect(func(_p: String) -> void: _apply_detail_distance())
 	EventBus.sim_tick.connect(_on_tick)
 	EventBus.month_changed.connect(_on_month)
 	EventBus.zone_cells_rebuilt.connect(_on_cells_rebuilt)
@@ -1009,6 +1012,29 @@ func _build_meshes() -> void:
 	chimney.rings = 1
 	chimney.material = plain
 	_add_multimesh("chimney", chimney, true, false)
+	_detail_mats.append(plain)
+	# Balcony: floor slab with a parapet on three sides. Width along x is per
+	# instance (unit), depth and height are in metres.
+	var balcony := ArrayMesh.new()
+	var bst := SurfaceTool.new()
+	bst.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for piece: Array in [[Vector3(1.0, 0.14, 1.0), Vector3(0, 0.07, 0.5)], [Vector3(1.0, 0.9, 0.06), Vector3(0, 0.59, 0.97)],
+			[Vector3(0.03, 0.9, 1.0), Vector3(-0.485, 0.59, 0.5)], [Vector3(0.03, 0.9, 1.0), Vector3(0.485, 0.59, 0.5)]]:
+		var bx := BoxMesh.new()
+		bx.size = piece[0]
+		bst.append_from(bx, 0, Transform3D(Basis(), piece[1]))
+	bst.commit(balcony)
+	balcony.surface_set_material(0, plain)
+	_add_multimesh("balcony", balcony, true, false)
+	# Shop sign boards, lit at night.
+	var sign_mat := ShaderMaterial.new()
+	sign_mat.shader = SIGN_SHADER
+	var sign := BoxMesh.new()
+	sign.material = sign_mat
+	_add_multimesh("sign", sign, true, true)
+	(_meshes["sign"] as MultiMeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_detail_mats.append(sign_mat)
+	_apply_detail_distance()
 
 	var beacon_mat := ShaderMaterial.new()
 	beacon_mat.shader = BEACON_SHADER
@@ -1027,6 +1053,14 @@ func _build_meshes() -> void:
 	# Plumes and rotors move in their shaders, beyond their mesh bounds.
 	(_meshes["smoke"] as MultiMeshInstance3D).extra_cull_margin = 40.0
 	(_meshes["rotor"] as MultiMeshInstance3D).extra_cull_margin = 4.0
+
+
+## Small rooftop and facade clutter vanishes beyond the quality preset's
+## detail distance (bigger pieces further out, see roof.gdshader).
+func _apply_detail_distance() -> void:
+	var dist := float(GraphicsSettings.get_value("detail_draw_distance_m"))
+	for mat: ShaderMaterial in _detail_mats:
+		mat.set_shader_parameter("detail_hide_distance", dist)
 
 
 func _noise_texture() -> NoiseTexture2D:
@@ -1171,8 +1205,18 @@ func _context(b: Dictionary, rise: float) -> Dictionary:
 		"front_edge": centre + f * (lot_d * 0.5 - float(_growth["front_setback_m"])),
 		"margin": float(_growth["lot_margin_m"]), "e": maxf(ease(rise, 0.4), 0.02), "rng": rng,
 		"spread": float(_vis["contact_spread_m"]),
-		"wall": _wall_palette[rng.randi_range(0, _wall_palette.size() - 1)],
+		"wall": _weathered(_wall_palette[rng.randi_range(0, _wall_palette.size() - 1)], float(b["seed"])),
 	}
+
+
+## Each building's walls a little lighter or darker; about one in five a bit
+## faded and dusty.
+func _weathered(c: Color, seed: float) -> Color:
+	var out := c * lerpf(0.94, 1.06, fposmod(seed * 5.77, 1.0))
+	if fposmod(seed * 3.19, 1.0) < 0.2:
+		out = out.lerp(Color(0.62, 0.58, 0.52), 0.15)
+	out.a = 1.0
+	return out
 
 
 func _basis(ctx: Dictionary, w: float, h: float, d: float) -> Basis:
@@ -1207,28 +1251,86 @@ func _parts_kenney(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> 
 	var pos: Vector2 = ctx["front_edge"] - ctx["f"] * (s * 0.5)
 	parts.append(_part(b["style"], _basis(ctx, s, s * ctx["e"], s), pos, 0.0, _tint(b, Color.WHITE), Color()))
 	_contact(parts, ctx, pos, s * 0.9, s * 0.9)
+	if str(b["style"]) in ["kenney_a", "kenney_d"]:
+		# Small shops (the models have their own awnings): a sign sticking
+		# out from a front corner, readable down the street.
+		var e: float = ctx["e"]
+		var k := 1.0 if fposmod(float(b["seed"]) * 2.9, 1.0) < 0.5 else -1.0
+		var at: Vector2 = pos + ctx["f"] * (s * 0.5 + 0.85) + ctx["side"] * (s * 0.5 - 0.5) * k
+		var color := _vivid(SIGN_COLORS[int(float(b["seed"]) * 7.0) % SIGN_COLORS.size()])
+		parts.append(_part("sign", Basis(ctx["fz"] * 1.5, Vector3.UP * 1.1 * e, -(ctx["dx"] as Vector3) * 0.14), at, s * 0.62 * e,
+			color, Color(float(b["seed"]), 0, 0, 0)))
 
 
 func _parts_house(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> void:
 	var rng: RandomNumberGenerator = ctx["rng"]
-	var w := minf(ctx["lot_w"] - ctx["margin"] * 2.0, 12.0)
+	var avail: float = minf(ctx["lot_w"] - ctx["margin"] * 2.0, 14.0)
 	# A one-square lot (8 m) keeps a narrow front yard for the car.
 	var d := minf(ctx["lot_d"] * (0.62 if float(ctx["lot_d"]) < 9.0 else 0.55), 10.0)
 	var e: float = ctx["e"]
-	var h := int(b["floors"]) * float(_vis["house_floor_height_m"])
-	var pos: Vector2 = ctx["front_edge"] - ctx["f"] * (d * 0.5 + 0.2)
-	parts.append(_part("house", _basis(ctx, w, h * e, d), pos, h * e * 0.5, ctx["wall"], Color(b["seed"], 0.45, 2.2, 0.0)))
+	var floor_h := float(_vis["house_floor_height_m"])
+	var h := int(b["floors"]) * floor_h
+	var seed := float(b["seed"])
+	# Plan by seed: 0 side gable, 1 gable to the street, 2 porch, 3 L-plan
+	# (needs a wide lot, else it falls back to the porch).
+	var plan := int(fposmod(seed * 3.71, 1.0) * 4.0)
+	if plan == 3 and avail < 9.5:
+		plan = 2
+	var w := minf(avail, 12.0) if plan != 3 else avail * 0.6
+	var shift := 0.0 if plan != 3 else -(avail - w) * 0.5
+	var pos: Vector2 = ctx["front_edge"] - ctx["f"] * (d * 0.5 + 0.2) + ctx["side"] * shift
+	parts.append(_part("house", _basis(ctx, w, h * e, d), pos, h * e * 0.5, ctx["wall"], Color(seed, 0.45, 2.2, 0.0)))
 	var roof := _roof_palette[rng.randi_range(0, _roof_palette.size() - 1)]
 	var rh := minf(w, d) * 0.4
-	parts.append(_part("house_roof", _basis(ctx, w + 0.6, rh * e, d + 0.6), pos, h * e, roof, Color()))
-	var chimney_pos: Vector2 = pos + ctx["side"] * (w * 0.28) - ctx["f"] * (d * 0.18)
-	parts.append(_part("roof_box", _basis(ctx, 0.7, (rh + 0.8) * e, 0.7), chimney_pos, h * e + (rh + 0.8) * e * 0.5, Color(0.62, 0.36, 0.3), Color()))
+	if plan == 1:
+		# Ridge running back from the street: the gable end faces the road.
+		parts.append(_part("house_roof", Basis(ctx["fz"] * (d + 0.6), Vector3.UP * rh * e, -(ctx["dx"] as Vector3) * (w + 0.6)),
+			pos, h * e, roof, Color()))
+	else:
+		parts.append(_part("house_roof", _basis(ctx, w + 0.6, rh * e, d + 0.6), pos, h * e, roof, Color()))
+	# Most houses have a chimney, on either side.
+	if fposmod(seed * 5.3, 1.0) < 0.75:
+		var cs := 0.28 if fposmod(seed * 9.1, 1.0) < 0.5 else -0.28
+		var chimney_pos: Vector2 = pos + ctx["side"] * (w * cs) - ctx["f"] * (d * 0.18)
+		parts.append(_part("roof_box", _basis(ctx, 0.7, (rh + 0.8) * e, 0.7), chimney_pos, h * e + (rh + 0.8) * e * 0.5, Color(0.62, 0.36, 0.3), Color()))
+	var trim := Color(0.93, 0.92, 0.88)
+	if plan == 2:
+		# Porch: a thin roof on two posts in front of the door.
+		var pw := w * 0.62
+		var porch: Vector2 = pos + ctx["f"] * (d * 0.5 + 0.75)
+		var ph := minf(floor_h - 0.3, h)
+		parts.append(_part("roof_box", _basis(ctx, pw, 0.16 * e, 1.6), porch, (ph + 0.08) * e, roof.darkened(0.15), Color()))
+		for k in [-1.0, 1.0]:
+			parts.append(_part("roof_box", _basis(ctx, 0.18, ph * e, 0.18), porch + ctx["side"] * (pw * 0.5 - 0.2) * k + ctx["f"] * 0.6,
+				ph * e * 0.5, trim, Color()))
+	elif plan == 3:
+		# L-plan: a one-storey wing beside the house, reaching further back,
+		# its roof ridge running away from the street.
+		var ww := avail - w
+		var wd := minf(d * 1.3, float(ctx["lot_d"]) - 1.0)
+		var wing: Vector2 = ctx["front_edge"] - ctx["f"] * (wd * 0.5 + 0.2) + ctx["side"] * (avail * 0.5 - ww * 0.5)
+		var wh := floor_h
+		parts.append(_part("house", _basis(ctx, ww, wh * e, wd), wing, wh * e * 0.5, ctx["wall"], Color(seed, 0.45, 2.2, 0.0)))
+		parts.append(_part("house_roof", Basis(ctx["fz"] * (wd + 0.5), Vector3.UP * ww * 0.42 * e, -(ctx["dx"] as Vector3) * (ww + 0.5)),
+			wing, wh * e, roof, Color()))
+		_contact(parts, ctx, wing, ww, wd)
 	_contact(parts, ctx, pos, w, d)
+	# Front garden: a low hedge with a gap for the path, and a flower bed.
+	if fposmod(seed * 2.17, 1.0) < 0.55 and float(ctx["lot_w"]) >= 7.0:
+		var edge: Vector2 = (ctx["centre"] as Vector2) + ctx["f"] * (float(ctx["lot_d"]) * 0.5 - 0.35)
+		var hw := (float(ctx["lot_w"]) - 2.6) * 0.5
+		var hedge := _vivid(Color(0.24, 0.45, 0.22)) if fposmod(seed * 4.3, 1.0) < 0.6 else trim
+		var hh := 0.75 if hedge != trim else 0.6
+		for k in [-1.0, 1.0]:
+			parts.append(_part("roof_box", _basis(ctx, hw, hh * e, 0.4), edge + ctx["side"] * (hw * 0.5 + 0.65) * k, hh * e * 0.5, hedge, Color()))
+		var bed: Color = _vivid(FLOWER_COLORS[int(seed * 11.0) % FLOWER_COLORS.size()])
+		var bed_pos: Vector2 = pos + ctx["f"] * (d * 0.5 + 0.55) - ctx["side"] * (w * 0.5 - 1.0)
+		parts.append(_part("roof_box", _basis(ctx, 1.6, 0.3 * e, 0.7), bed_pos, 0.15 * e, bed, Color()))
 	# Most lived-in houses with a yard behind have a car parked there.
-	if int(b["occupants"]) > 0 and fposmod(float(b["seed"]) * 7.13, 1.0) < 0.8 and float(ctx["full_d"]) - float(ctx["lot_d"]) > 5.0:
-		var cu := clampf(w * 0.22, 0.0, 3.0)
+	if int(b["occupants"]) > 0 and fposmod(seed * 7.13, 1.0) < 0.8 and float(ctx["full_d"]) - float(ctx["lot_d"]) > 5.0:
+		var cu := clampf(w * 0.22, 0.0, 3.0) + shift
 		var cv: float = -float(ctx["lot_d"]) * 0.5 - 3.0
-		var paint: Color = PARKED_COLORS[int(float(b["seed"]) * 13.0) % PARKED_COLORS.size()]
+		var paint: Color = PARKED_COLORS[int(seed * 13.0) % PARKED_COLORS.size()]
 		ServiceModels._put(parts, ctx, "roof_box", cu, cv, 1.8, 0.9, 4.2, paint, 0.3, Color(), true)
 		ServiceModels._put(parts, ctx, "roof_box", cu - 0.25, cv, 1.55, 0.6, 2.1, Color(0.2, 0.24, 0.3), 1.2, Color(), true)
 
@@ -1243,8 +1345,13 @@ func _parts_apartment(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) 
 	parts.append(_part("apartment", _basis(ctx, w, h * e, d), pos, h * e * 0.5, ctx["wall"],
 		Color(b["seed"], rng.randf_range(0.4, 0.7), rng.randf_range(2.2, 3.2), 0.0)))
 	_roof_kit(ctx, parts, pos, w, d, h, true)
-	if str(b["zone_key"]) == "mixed":
+	_parapet(ctx, parts, pos, w, d, h, (ctx["wall"] as Color).darkened(0.18))
+	var shops := str(b["zone_key"]) == "mixed"
+	_balconies(b, ctx, parts, pos, w, d, 3.0, 2 if shops else 1, int(b["floors"]))
+	_wall_units(b, ctx, parts, pos, w, d, 3.0, int(b["floors"]))
+	if shops:
 		_awning(ctx, parts, pos, w, d)
+		_shop_sign(b, ctx, parts, pos + ctx["f"] * (d * 0.5 + 0.1), w * 0.55, 4.4)
 	_contact(parts, ctx, pos, w, d)
 
 
@@ -1301,6 +1408,9 @@ func _parts_tower(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary]) -> v
 			parts.append(_part("beacon", _basis(ctx, 1.0, e, 1.0), corner, (h + 0.5) * e, Color.WHITE, Color(float(b["seed"]) * 0.137, 0, 0, 0)))
 	if not office and str(b["zone_key"]) in ["com_high", "mixed"]:
 		_awning(ctx, parts, pos, w, d)
+		_shop_sign(b, ctx, parts, pos + ctx["f"] * (d * 0.5 + 0.1), w * 0.5, ground + 0.9)
+	elif not office and floors < 12:
+		_balconies(b, ctx, parts, tpos, tw, td, floor_h, 1, mini(floors - 1, 8), podium)
 	_contact(parts, ctx, pos, w, d)
 
 
@@ -1411,6 +1521,7 @@ func _roof_kit(ctx: Dictionary, parts: Array[Dictionary], pos: Vector2, w: float
 			(h + 1.3) * e, Color(0.55, 0.42, 0.32), Color()))
 
 
+const FLOWER_COLORS: Array[Color] = [Color(0.86, 0.32, 0.45), Color(0.95, 0.78, 0.25), Color(0.62, 0.42, 0.82), Color(0.92, 0.45, 0.3)]
 const AWNING_COLORS: Array[Color] = [Color(0.85, 0.25, 0.22), Color(0.2, 0.52, 0.85), Color(0.95, 0.62, 0.18), Color(0.22, 0.65, 0.4)]
 
 
@@ -1419,6 +1530,69 @@ func _awning(ctx: Dictionary, parts: Array[Dictionary], pos: Vector2, w: float, 
 	var color := AWNING_COLORS[rng.randi_range(0, AWNING_COLORS.size() - 1)]
 	var e: float = ctx["e"]
 	parts.append(_part("roof_box", _basis(ctx, w * 0.92, 0.25, 1.5), pos + ctx["f"] * (d * 0.5 + 0.75), 3.6 * e, color, Color()))
+
+
+## Low wall around the roof edge.
+func _parapet(ctx: Dictionary, parts: Array[Dictionary], pos: Vector2, w: float, d: float, h: float, color: Color) -> void:
+	var e: float = ctx["e"]
+	var y := (h + 0.35) * e
+	for k in [-1.0, 1.0]:
+		parts.append(_part("roof_box", _basis(ctx, w, 0.7 * e, 0.25), pos + ctx["f"] * (d * 0.5 - 0.12) * k, y, color, Color()))
+		parts.append(_part("roof_box", _basis(ctx, 0.25, 0.7 * e, d - 0.5), pos + ctx["side"] * (w * 0.5 - 0.12) * k, y, color, Color()))
+
+
+## Balcony stacks on the street face, one balcony per floor above the
+## ground floor (at most 7 floors), in `stacks` columns.
+func _balconies(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary], pos: Vector2, w: float, d: float,
+		floor_h: float, stacks: int, floors: int, ground: float = -1.0) -> void:
+	if floors < 2 or w < 6.0:
+		return
+	var seed := float(b["seed"])
+	if fposmod(seed * 6.7, 1.0) < 0.25:
+		return  # some blocks have none
+	var e: float = ctx["e"]
+	var bw := w * (0.62 if stacks == 1 else 0.3)
+	var depth := 1.1
+	# White balconies on dark walls, dark metal ones on light walls.
+	var light := (ctx["wall"] as Color).get_luminance() < 0.55
+	var color := Color(0.9, 0.9, 0.87) if light else _vivid(Color(0.3, 0.32, 0.35))
+	var base := floor_h if ground < 0.0 else ground
+	var face: Vector2 = pos + ctx["f"] * (d * 0.5)
+	for k in mini(floors - 1, 7):
+		var y := (base + k * floor_h) * e
+		for c in stacks:
+			var u := 0.0 if stacks == 1 else (w * 0.25) * (-1.0 if c == 0 else 1.0)
+			parts.append(_part("balcony", Basis(ctx["dx"] * bw, Vector3.UP * e, ctx["fz"] * depth), face + ctx["side"] * u, y, color, Color()))
+
+
+## Air-conditioning units on a side wall, at a few random floors.
+func _wall_units(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary], pos: Vector2, w: float, d: float, floor_h: float, floors: int) -> void:
+	var seed := float(b["seed"])
+	var e: float = ctx["e"]
+	var side := 1.0 if fposmod(seed * 3.3, 1.0) < 0.5 else -1.0
+	for k in 3:
+		var fl := 1 + int(fposmod(seed * (2.1 + k * 1.7), 1.0) * maxf(floors - 1, 1))
+		var v := (fposmod(seed * (4.9 + k * 2.3), 1.0) - 0.5) * d * 0.7
+		var p: Vector2 = pos + ctx["side"] * (w * 0.5 + 0.3) * side + ctx["f"] * v
+		parts.append(_part("roof_box", _basis(ctx, 0.6, 0.6 * e, 0.9), p, (fl * floor_h + 0.6) * e, Color(0.86, 0.87, 0.88), Color()))
+
+
+const SIGN_COLORS: Array[Color] = [Color(0.85, 0.2, 0.2), Color(0.15, 0.4, 0.8), Color(0.12, 0.55, 0.35), Color(0.95, 0.68, 0.12),
+	Color(0.55, 0.25, 0.7), Color(0.12, 0.12, 0.14)]
+
+
+## A shop sign board on the street face, centred on `front`, at height y.
+func _shop_sign(b: Dictionary, ctx: Dictionary, parts: Array[Dictionary], front: Vector2, w: float, y: float) -> void:
+	var seed := float(b["seed"])
+	var color := _vivid(SIGN_COLORS[int(seed * 7.0) % SIGN_COLORS.size()])
+	var e: float = ctx["e"]
+	parts.append(_part("sign", _basis(ctx, minf(w, 9.0), 0.9 * e, 0.16), front + ctx["f"] * 0.08, y * e, color, Color(seed, 0, 0, 0)))
+
+
+## Instance colours reach the plain shaders as linear values, so a colour
+## picked by eye comes out washed out; this keeps it as picked.
+func _vivid(c: Color) -> Color:
+	return c.srgb_to_linear()
 
 
 func _tint(b: Dictionary, color: Color) -> Color:
