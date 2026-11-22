@@ -12,6 +12,7 @@ extends Node3D
 
 const TREE_SHADER := preload("res://assets/materials/tree_low.gdshader")
 const KINDS: PackedStringArray = ["pine", "round", "poplar"]
+const SHADOW_OFFSET := 10   # chunk entry keys of the shadow-only copies
 
 @export var terrain_path: NodePath
 @export var road_network_path: NodePath
@@ -376,15 +377,19 @@ func _rebuild_chunk(chunk: Vector2i) -> void:
 	if not _chunks.has(chunk):
 		var entry := {}
 		for k in KINDS.size():
-			var mmi := MultiMeshInstance3D.new()
-			mmi.name = "Trees_%s_%d_%d" % [KINDS[k], chunk.x, chunk.y]
-			var mm := MultiMesh.new()
-			mm.transform_format = MultiMesh.TRANSFORM_3D
-			mm.use_colors = true
-			mm.mesh = _meshes[KINDS[k]]
-			mmi.multimesh = mm
-			add_child(mmi)
-			entry[k] = mmi
+			# The tree as seen, and a much simpler copy that only casts its
+			# shadow (SHADOW_OFFSET + k): shadows cost a fraction of the
+			# triangles of the full trees.
+			for pass_k in [k, SHADOW_OFFSET + k]:
+				var mmi := MultiMeshInstance3D.new()
+				mmi.name = "Trees_%s_%s_%d_%d" % [KINDS[k], "shadow" if pass_k >= SHADOW_OFFSET else "look", chunk.x, chunk.y]
+				var mm := MultiMesh.new()
+				mm.transform_format = MultiMesh.TRANSFORM_3D
+				mm.use_colors = true
+				mm.mesh = _meshes[KINDS[k] + ("_shadow" if pass_k >= SHADOW_OFFSET else "")]
+				mmi.multimesh = mm
+				add_child(mmi)
+				entry[pass_k] = mmi
 		_chunks[chunk] = entry
 		_apply_graphics_to(entry)
 	var entry: Dictionary = _chunks[chunk]
@@ -399,6 +404,10 @@ func _rebuild_chunk(chunk: Vector2i) -> void:
 			var yaw := fposmod(p.x * 0.37 + p.y * 0.71, TAU)
 			mm.set_instance_transform(n, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(s, s, s)), Vector3(p.x, 0.0, p.y)))
 			mm.set_instance_color(n, t[2])
+		var smm := (entry[SHADOW_OFFSET + k] as MultiMeshInstance3D).multimesh
+		smm.instance_count = list.size()
+		if list.size() > 0:
+			smm.buffer = mm.buffer
 
 
 func _apply_graphics(_preset: String) -> void:
@@ -409,10 +418,15 @@ func _apply_graphics(_preset: String) -> void:
 func _apply_graphics_to(entry: Dictionary) -> void:
 	var dist := float(GraphicsSettings.get_value("tree_draw_distance_m"))
 	var shadows := bool(GraphicsSettings.get_value("tree_shadows"))
-	for mmi: MultiMeshInstance3D in entry.values():
+	for pass_k: int in entry:
+		var mmi: MultiMeshInstance3D = entry[pass_k]
 		mmi.visibility_range_end = dist
 		mmi.visibility_range_end_margin = dist * 0.1
-		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if pass_k >= SHADOW_OFFSET:
+			mmi.visible = shadows
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+		else:
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _build_meshes() -> void:
@@ -423,14 +437,16 @@ func _build_meshes() -> void:
 	foliage.shader = TREE_SHADER
 	foliage.set_shader_parameter("sway", float(_cfg["sway"]))
 
+	# Low poly on purpose: trees are most of what the GPU draws in a city
+	# view. Trunk ends sit inside the leaves or the ground, so they have no caps.
 	var pine := ArrayMesh.new()
-	_append_flat(pine, _cylinder(0.24, 0.16, 2.2, 6), Transform3D(Basis(), Vector3(0, 1.1, 0)))
+	_append_flat(pine, _cylinder(0.24, 0.16, 2.2, 5, false), Transform3D(Basis(), Vector3(0, 1.1, 0)))
 	var cones := [[2.5, 3.4, 1.3], [2.0, 3.0, 3.4], [1.35, 2.6, 5.3]]
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_smooth_group(-1)
 	for c: Array in cones:
-		st.append_from(_cylinder(float(c[0]), 0.0, float(c[1]), 7), 0, Transform3D(Basis(), Vector3(0, float(c[2]) + float(c[1]) * 0.5, 0)))
+		st.append_from(_cylinder(float(c[0]), 0.0, float(c[1]), 6), 0, Transform3D(Basis(), Vector3(0, float(c[2]) + float(c[1]) * 0.5, 0)))
 	st.generate_normals()
 	st.commit(pine)
 	pine.surface_set_material(0, trunk_mat)
@@ -438,17 +454,12 @@ func _build_meshes() -> void:
 	_meshes["pine"] = pine
 
 	var round_tree := ArrayMesh.new()
-	_append_flat(round_tree, _cylinder(0.26, 0.2, 2.6, 6), Transform3D(Basis(), Vector3(0, 1.3, 0)))
-	var ball := SphereMesh.new()
-	ball.radius = 2.6
-	ball.height = 4.6
-	ball.radial_segments = 8
-	ball.rings = 5
+	_append_flat(round_tree, _cylinder(0.26, 0.2, 2.6, 5, false), Transform3D(Basis(), Vector3(0, 1.3, 0)))
 	st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_smooth_group(-1)
-	st.append_from(ball, 0, Transform3D(Basis(), Vector3(0, 4.6, 0)))
-	st.append_from(ball, 0, Transform3D(Basis().scaled(Vector3(0.62, 0.62, 0.62)), Vector3(1.2, 5.6, 0.5)))
+	st.append_from(_sphere(2.6, 4.6, 7, 4), 0, Transform3D(Basis(), Vector3(0, 4.6, 0)))
+	st.append_from(_sphere(2.6, 4.6, 6, 3), 0, Transform3D(Basis().scaled(Vector3(0.62, 0.62, 0.62)), Vector3(1.2, 5.6, 0.5)))
 	st.generate_normals()
 	st.commit(round_tree)
 	round_tree.surface_set_material(0, trunk_mat)
@@ -457,26 +468,45 @@ func _build_meshes() -> void:
 
 	# Poplar: a slim column of leaves on a short trunk.
 	var poplar := ArrayMesh.new()
-	_append_flat(poplar, _cylinder(0.2, 0.14, 2.0, 6), Transform3D(Basis(), Vector3(0, 1.0, 0)))
-	var column := SphereMesh.new()
-	column.radius = 1.0
-	column.height = 2.0
-	column.radial_segments = 8
-	column.rings = 6
+	_append_flat(poplar, _cylinder(0.2, 0.14, 2.0, 5, false), Transform3D(Basis(), Vector3(0, 1.0, 0)))
 	st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_smooth_group(-1)
-	st.append_from(column, 0, Transform3D(Basis().scaled(Vector3(1.35, 3.6, 1.35)), Vector3(0, 5.2, 0)))
-	st.append_from(column, 0, Transform3D(Basis().scaled(Vector3(0.9, 1.6, 0.9)), Vector3(0.35, 8.0, 0.2)))
+	st.append_from(_sphere(1.0, 2.0, 6, 4), 0, Transform3D(Basis().scaled(Vector3(1.35, 3.6, 1.35)), Vector3(0, 5.2, 0)))
+	st.append_from(_sphere(1.0, 2.0, 6, 3), 0, Transform3D(Basis().scaled(Vector3(0.9, 1.6, 0.9)), Vector3(0.35, 8.0, 0.2)))
 	st.generate_normals()
 	st.commit(poplar)
 	poplar.surface_set_material(0, trunk_mat)
 	poplar.surface_set_material(1, foliage)
 	_meshes["poplar"] = poplar
 
+	# Shadow casters: one rough shape per kind with the tree's outline.
+	var caster := StandardMaterial3D.new()
+	var shapes := {
+		"pine": [_cylinder(2.3, 0.0, 6.6, 5), Transform3D(Basis(), Vector3(0, 1.3 + 3.3, 0))],
+		"round": [_sphere(2.7, 5.0, 5, 3), Transform3D(Basis(), Vector3(0, 4.8, 0))],
+		"poplar": [_sphere(1.0, 2.0, 5, 3), Transform3D(Basis().scaled(Vector3(1.35, 4.2, 1.35)), Vector3(0, 5.8, 0))],
+	}
+	for kind: String in shapes:
+		var shadow_mesh := ArrayMesh.new()
+		_append_flat(shadow_mesh, shapes[kind][0], shapes[kind][1])
+		shadow_mesh.surface_set_material(0, caster)
+		_meshes[kind + "_shadow"] = shadow_mesh
 
-func _cylinder(bottom: float, top: float, height: float, segments: int) -> CylinderMesh:
+
+func _sphere(radius: float, height: float, segments: int, rings: int) -> SphereMesh:
+	var m := SphereMesh.new()
+	m.radius = radius
+	m.height = height
+	m.radial_segments = segments
+	m.rings = rings
+	return m
+
+
+func _cylinder(bottom: float, top: float, height: float, segments: int, caps: bool = true) -> CylinderMesh:
 	var c := CylinderMesh.new()
+	c.cap_top = caps
+	c.cap_bottom = caps
 	c.bottom_radius = bottom
 	c.top_radius = top
 	c.height = height
