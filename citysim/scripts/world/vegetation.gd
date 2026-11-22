@@ -13,6 +13,7 @@ extends Node3D
 const TREE_SHADER := preload("res://assets/materials/tree_low.gdshader")
 const KINDS: PackedStringArray = ["pine", "round", "poplar"]
 const SHADOW_OFFSET := 10   # chunk entry keys of the shadow-only copies
+const FAR_OFFSET := 20      # chunk entry keys of the simple far-away copies
 
 @export var terrain_path: NodePath
 @export var road_network_path: NodePath
@@ -380,13 +381,16 @@ func _rebuild_chunk(chunk: Vector2i) -> void:
 			# The tree as seen, and a much simpler copy that only casts its
 			# shadow (SHADOW_OFFSET + k): shadows cost a fraction of the
 			# triangles of the full trees.
-			for pass_k in [k, SHADOW_OFFSET + k]:
+			# Far chunks (FAR_OFFSET + k) draw the same trees with the rough
+			# shapes in leaf colours.
+			for pass_k in [k, SHADOW_OFFSET + k, FAR_OFFSET + k]:
+				var suffix := "_far" if pass_k >= FAR_OFFSET else ("_shadow" if pass_k >= SHADOW_OFFSET else "")
 				var mmi := MultiMeshInstance3D.new()
-				mmi.name = "Trees_%s_%s_%d_%d" % [KINDS[k], "shadow" if pass_k >= SHADOW_OFFSET else "look", chunk.x, chunk.y]
+				mmi.name = "Trees_%s%s_%d_%d" % [KINDS[k], suffix, chunk.x, chunk.y]
 				var mm := MultiMesh.new()
 				mm.transform_format = MultiMesh.TRANSFORM_3D
 				mm.use_colors = true
-				mm.mesh = _meshes[KINDS[k] + ("_shadow" if pass_k >= SHADOW_OFFSET else "")]
+				mm.mesh = _meshes[KINDS[k] + suffix]
 				mmi.multimesh = mm
 				add_child(mmi)
 				entry[pass_k] = mmi
@@ -404,10 +408,11 @@ func _rebuild_chunk(chunk: Vector2i) -> void:
 			var yaw := fposmod(p.x * 0.37 + p.y * 0.71, TAU)
 			mm.set_instance_transform(n, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(s, s, s)), Vector3(p.x, 0.0, p.y)))
 			mm.set_instance_color(n, t[2])
-		var smm := (entry[SHADOW_OFFSET + k] as MultiMeshInstance3D).multimesh
-		smm.instance_count = list.size()
-		if list.size() > 0:
-			smm.buffer = mm.buffer
+		for copy_k in [SHADOW_OFFSET + k, FAR_OFFSET + k]:
+			var cmm := (entry[copy_k] as MultiMeshInstance3D).multimesh
+			cmm.instance_count = list.size()
+			if list.size() > 0:
+				cmm.buffer = mm.buffer
 
 
 func _apply_graphics(_preset: String) -> void:
@@ -418,14 +423,21 @@ func _apply_graphics(_preset: String) -> void:
 func _apply_graphics_to(entry: Dictionary) -> void:
 	var dist := float(GraphicsSettings.get_value("tree_draw_distance_m"))
 	var shadows := bool(GraphicsSettings.get_value("tree_shadows"))
+	var lod := minf(float(GraphicsSettings.get_value("tree_lod_distance_m")), dist)
 	for pass_k: int in entry:
 		var mmi: MultiMeshInstance3D = entry[pass_k]
 		mmi.visibility_range_end = dist
 		mmi.visibility_range_end_margin = dist * 0.1
-		if pass_k >= SHADOW_OFFSET:
+		if pass_k >= FAR_OFFSET:
+			mmi.visibility_range_begin = lod
+			mmi.visibility_range_begin_margin = 40.0
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		elif pass_k >= SHADOW_OFFSET:
 			mmi.visible = shadows
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 		else:
+			mmi.visibility_range_end = lod
+			mmi.visibility_range_end_margin = 40.0
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
@@ -492,6 +504,10 @@ func _build_meshes() -> void:
 		_append_flat(shadow_mesh, shapes[kind][0], shapes[kind][1])
 		shadow_mesh.surface_set_material(0, caster)
 		_meshes[kind + "_shadow"] = shadow_mesh
+		var far_mesh := ArrayMesh.new()
+		_append_flat(far_mesh, shapes[kind][0], shapes[kind][1])
+		far_mesh.surface_set_material(0, foliage)
+		_meshes[kind + "_far"] = far_mesh
 
 
 func _sphere(radius: float, height: float, segments: int, rings: int) -> SphereMesh:
