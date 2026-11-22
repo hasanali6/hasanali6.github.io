@@ -576,6 +576,10 @@ araba durur.
   - Dükkânlarda renkli tabelalar var; tabelalar gece yanar.
   - Duvar tonları binadan binaya biraz değişir, bazıları solmuş görünür.
   - Ormanlarda ve bahçelerde ince uzun kavaklar da var.
+- **Ağaçlar hafif çizilir:**
+  - Gölgelerini basit bir gölge şekli verir.
+  - Uzaktaki ağaçlar (Orta kalitede 450 m'den sonra) kaba şekille çizilir.
+  - Büyük şehirde ekrandaki üçgen sayısı yaklaşık üçte bire indi.
 - **Uzak detay:** küçük parçalar (baca, klima, balkon, tabela) uzakta gizlenir;
   büyük parçalar daha uzağa kadar kalır.
   - Mesafe kaliteye göre değişir: Düşük 260 m, Orta 420 m, Yüksek 650 m.
