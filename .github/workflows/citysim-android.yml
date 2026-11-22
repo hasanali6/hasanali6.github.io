@@ -119,7 +119,7 @@ jobs:
           GL_DIR="$RUNNER_TEMP/citysim-gl"
           cp -r "$PROJECT_DIR" "$GL_DIR"
           sed -i 's|^renderer/rendering_method.mobile=.*|renderer/rendering_method.mobile="gl_compatibility"|' "$GL_DIR/project.godot"
-          sed -i 's|^package/unique_name=.*|package/unique_name="io.github.hasanali6.sehirsim.gl"|; s|^package/name=.*|package/name="Şehir Sim (GL)"|' "$GL_DIR/export_presets.cfg"
+          sed -i 's|^package/unique_name=.*|package/unique_name="io.github.hasanali6.sehirsim.gl"|; s|^package/name=.*|package/name="City Land (GL)"|' "$GL_DIR/export_presets.cfg"
           ~/godot/godot --headless --path "$GL_DIR" --import
           ~/godot/godot --headless --path "$GL_DIR" --export-debug "Android" "$GITHUB_WORKSPACE/$PROJECT_DIR/export/SehirSim-GL.apk"
           test -s "$PROJECT_DIR/export/SehirSim-GL.apk"

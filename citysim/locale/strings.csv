@@ -1,5 +1,5 @@
 keys,tr,en
-APP_TITLE,Şehir Simülasyonu,City Simulation
+APP_TITLE,City Land,City Land
 LABEL_BUILD,İnşa Et,Build
 LABEL_PERF,FPS %d · GPU %.1f ms · CPU %.1f ms · %s · 3D %d%%,FPS %d · GPU %.1f ms · CPU %.1f ms · %s · 3D %d%%
 TOOL_ROADS,Yollar,Roads

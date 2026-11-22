@@ -9,7 +9,7 @@ Outputs:
   assets/branding/icon_192.png                  Android launcher icon
   assets/branding/icon_fg_432.png               Android adaptive foreground
   assets/branding/icon_bg_432.png               Android adaptive background
-  assets/branding/logo.png                      "ŞEHİR SİM" 3D title (transparent)
+  assets/branding/logo.png                      "CITY LAND" 3D title (transparent)
   assets/branding/splash.png                    boot splash: scene + title
 
 The title is set here in the game's own font (Nunito, heaviest weight), so
@@ -23,7 +23,7 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 SRC = os.path.join(ROOT, "assets", "branding", "source")
 OUT = os.path.join(ROOT, "assets", "branding")
 FONT = os.path.join(ROOT, "assets", "ui", "fonts", "Nunito-Variable.ttf")
-TITLE = "ŞEHİR SİM"
+TITLE = "CITY LAND"
 
 
 def rounded(img: Image.Image, radius_frac: float) -> Image.Image:
