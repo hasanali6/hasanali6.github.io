@@ -9,6 +9,7 @@ extends RefCounted
 const ROTOR_SHADER := preload("res://assets/materials/rotor.gdshader")
 const SOLAR_SHADER := preload("res://assets/materials/solar_panel.gdshader")
 const SMOKE_SHADER := preload("res://assets/materials/smoke.gdshader")
+const FACADE_PANEL_SHADER := preload("res://assets/materials/facade_panel.gdshader")
 
 ## Lot ground look per style (lot_ground.gdshader kinds).
 const LOT_KINDS := {
@@ -109,7 +110,19 @@ static func build_meshes(add: Callable) -> PackedStringArray:
 	quad.size = Vector2.ONE
 	quad.material = smoke_mat
 	add.call("smoke", quad, true, true)
-	return PackedStringArray(["smoke", "basin"])
+
+	# Street faces painted from AI front elevations (tools/make_facades.py).
+	for entry: Array in [["front_school", "res://assets/textures/facade_school.png", Vector2(8.0, 4.0)],
+			["front_hospital", "res://assets/textures/facade_hospital.png", Vector2(10.0, 9.0)]]:
+		var mat := ShaderMaterial.new()
+		mat.shader = FACADE_PANEL_SHADER
+		mat.set_shader_parameter("facade_tex", load(entry[1]))
+		mat.set_shader_parameter("window_grid", entry[2])
+		var face := QuadMesh.new()
+		face.size = Vector2.ONE
+		face.material = mat
+		add.call(entry[0], face, true, false)
+	return PackedStringArray(["smoke", "basin", "front_school", "front_hospital"])
 
 
 ## Surface of revolution around y from (radius, y) points listed bottom to
@@ -400,8 +413,9 @@ static func parts(b: Dictionary, ctx: Dictionary, out: Array[Dictionary]) -> voi
 			_shadow(out, ctx, 0, -2, 20, 24)
 			_put(out, ctx, "roof_box", 0, 3.5, 7, 0.12, 2.2, RED, h1)
 			_put(out, ctx, "roof_box", 0, 3.5, 2.2, 0.12, 7, RED, h1)
-			_put(out, ctx, "roof_box", 0, 10.08, 3.2, 0.9, 0.16, RED, h1 - 4.0)
-			_put(out, ctx, "roof_box", 0, 10.08, 0.9, 3.2, 0.16, RED, h1 - 5.15)
+			# AI street face (with its red cross and name); the art's raised
+			# middle block rises a little above the roof line.
+			_put(out, ctx, "front_hospital", 0, 10.06, 20, h1 * 1.078, 1, Color.WHITE)
 			_put(out, ctx, "tank", -3.5, -8.5, 9.4, 0.2, 9.4, WHITE, 12)
 			_put(out, ctx, "tank", -3.5, -8.5, 8.4, 0.26, 8.4, Color(0.3, 0.31, 0.34), 12)
 			for k in 2:
@@ -413,7 +427,8 @@ static func parts(b: Dictionary, ctx: Dictionary, out: Array[Dictionary]) -> voi
 			_put(out, ctx, "apartment", 0, 7, 14, 7, 8, Color(0.8, 0.44, 0.32), 0, _facade(s, 0.55, 2.6))
 			_put(out, ctx, "house_roof", 0, 7, 14.6, 2.6, 8.6, Color(0.52, 0.28, 0.24), 7)
 			_shadow(out, ctx, 0, 7, 14, 8)
-			_put(out, ctx, "roof_box", 4, 11.6, 4, 0.3, 1.4, Color(0.95, 0.75, 0.2), 2.8)
+			# AI street face: brick, windows, door and the OKUL sign.
+			_put(out, ctx, "front_school", 0, 11.06, 14, 7, 1, Color.WHITE)
 			_flag(out, ctx, -7.2, 11.4, 9)
 		"svc_highschool":
 			_put(out, ctx, "apartment", -1, 7, 20, 10.5, 8, Color(0.84, 0.52, 0.36), 0, _facade(s, 0.55, 2.8))
