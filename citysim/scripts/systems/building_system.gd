@@ -64,6 +64,9 @@ var _meshes: Dictionary = {}      # mesh key -> MultiMeshInstance3D
 var _detail_mats: Array[ShaderMaterial] = []   # materials whose small far pieces hide by distance
 var _instances: Dictionary = {}   # building id -> Array of [mesh key, instance index]
 var _manual_ids: Array[int] = []      # hand-placed buildings (see building_at)
+## While a building is being dragged to a new place, footprint() treats its
+## own squares as free (it may move onto part of its old lot).
+var moving_id: int = -1
 var _life: Node = null                  # CityLifeSystem (land value), if in the scene
 var _rising: Dictionary = {}      # building id -> progress 0..1
 var _rise_seconds: float
@@ -654,7 +657,7 @@ func footprint(item: Dictionary, cell: int, need_road: bool = true) -> Dictionar
 			if j < 0:
 				ok = false
 				out["error"] = "BUILD_ERR_SPACE"
-			elif grid.building[j] != ZoneGrid.FREE:
+			elif grid.building[j] != ZoneGrid.FREE and grid.building[j] != moving_id:
 				ok = false
 				out["error"] = "BUILD_ERR_TAKEN"
 			elif not j in cells:
@@ -669,7 +672,7 @@ func footprint(item: Dictionary, cell: int, need_road: bool = true) -> Dictionar
 				continue
 			var rel := grid.centers[j] - centre
 			if absf(rel.dot(dir)) < hw and absf(rel.dot(f)) < hd:
-				if grid.building[j] != ZoneGrid.FREE:
+				if grid.building[j] != ZoneGrid.FREE and grid.building[j] != moving_id:
 					ok = false
 					out["error"] = "BUILD_ERR_TAKEN"
 					break
@@ -769,6 +772,81 @@ func place(item: Dictionary, cell: int) -> int:
 	return id
 
 
+## A building moved by hand: the same lot size laid with its front-left
+## square on `cell`, facing the road it touches there. It keeps its id and
+## everything inside (people, jobs, level, look). The old squares are freed:
+## a hand-placed building's zoning goes with it, a grown building's stays so
+## the old spot can grow again. Returns the record undo needs, or {} when the
+## building does not fit there.
+func move_building(id: int, cell: int) -> Dictionary:
+	if not buildings.has(id):
+		return {}
+	var b: Dictionary = buildings[id]
+	var item := {"lot": [int(b["lot"].x), int(b["lot"].y)]}
+	var keep := moving_id
+	moving_id = id
+	var fp := footprint(item, cell)
+	moving_id = keep
+	if not fp["ok"]:
+		return {}
+	var grid: ZoneGrid = _zones.grid
+	var before := {"kind": "move", "id": id, "cells": b["cells"], "centre": b["centre"], "front": b["front"], "dir": b["dir"],
+		"lot": b["lot"], "width": b["width"], "depth": b["depth"], "zones": {}}
+	var lot: PackedInt32Array = fp["cells"]
+	for c: int in lot:
+		before["zones"][c] = grid.zone[c]
+	for c: int in b["cells"]:
+		before["zones"][c] = grid.zone[c]
+		grid.building[c] = ZoneGrid.FREE
+		if b["manual"]:
+			grid.zone[c] = ZoneGrid.UNZONED
+	_set_lot(b, lot, fp["centre"], fp["front"], fp["dir"], Vector2i(int(fp["w"]), int(fp["d"])))
+	return before
+
+
+## Puts a moved building back where it stood (undo). False if its old
+## squares have been taken since.
+func move_back(rec: Dictionary) -> bool:
+	var id := int(rec["id"])
+	if not buildings.has(id):
+		return false
+	var grid: ZoneGrid = _zones.grid
+	for c: int in rec["cells"]:
+		if c >= grid.size() or (grid.building[c] != ZoneGrid.FREE and grid.building[c] != id):
+			return false
+	var b: Dictionary = buildings[id]
+	for c: int in b["cells"]:
+		grid.building[c] = ZoneGrid.FREE
+	var zones: Dictionary = rec["zones"]
+	for c: int in zones:
+		grid.zone[c] = int(zones[c])
+	_set_lot(b, rec["cells"], rec["centre"], rec["front"], rec["dir"], rec["lot"])
+	b["width"] = rec["width"]
+	b["depth"] = rec["depth"]
+	return true
+
+
+func _set_lot(b: Dictionary, lot: PackedInt32Array, centre: Vector2, front: Vector2, dir: Vector2, size: Vector2i) -> void:
+	var grid: ZoneGrid = _zones.grid
+	var id := int(b["id"])
+	for c: int in lot:
+		grid.building[c] = id
+		grid.zone[c] = int(b["zone"])   # as place() does (unzoned for services)
+	b["cells"] = lot
+	b["centre"] = centre
+	b["front"] = front
+	b["dir"] = dir
+	b["lot"] = size
+	b["width"] = size.x * grid.cell_size
+	b["depth"] = size.y * grid.cell_size
+	b.erase("segment")   # the services pass finds its new street
+	_rising.erase(id)
+	_part_cache.erase(id)   # cached parts carry the old position
+	_render_all()
+	EventBus.zones_changed.emit()
+	EventBus.buildings_changed.emit()
+
+
 ## Resource richness under the lot and, for ore and oil, the deposit that
 ## will run out.
 func _init_extractor(b: Dictionary, type: String) -> void:
@@ -797,6 +875,7 @@ func _on_long_press(world_pos: Vector3) -> void:
 		for item: Dictionary in GameData.value("catalog/production"):
 			if item["style"] == b["style"]:
 				name_key = str(item["name_key"])
+	EventBus.building_held.emit(id)
 	EventBus.building_inspected.emit({
 		"id": id, "zone_key": name_key, "service": b.get("service", ""),
 		"level": b["level"], "floors": b["floors"], "width": b["width"], "depth": b["depth"],

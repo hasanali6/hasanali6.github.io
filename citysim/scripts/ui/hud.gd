@@ -186,6 +186,10 @@ func _ready() -> void:
 
 	EventBus.speed_changed.connect(_on_speed_changed)
 	EventBus.ground_long_pressed.connect(_on_ground_long_pressed)
+	# Dragging a held building away: its card makes room for the preview.
+	EventBus.building_drag.connect(func(phase: int, _p: Vector2, _id: int) -> void:
+		if phase == GestureTracker.Pointer.DOWN:
+			_info_panel.visible = false)
 	EventBus.notification_posted.connect(func(c: String, text: String) -> void:
 		show_toast(text)
 		_log_note(c, text))

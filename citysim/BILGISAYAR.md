@@ -54,6 +54,7 @@ koyup `gelistir.bat`'ı çalıştırman da olur.)
 | Sağ tık sürükle | Döndür ve eğ |
 | Tekerlek | Zoom |
 | Sol tık basılı tut | Konum / bina bilgisi |
+| Binada sol tık basılı tut + sürükle | Binayı taşı (bırakınca ✓) |
 
 | Klavye | İş |
 |---|---|

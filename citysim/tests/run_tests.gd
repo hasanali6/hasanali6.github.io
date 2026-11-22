@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_gesture_tilt()
 	_test_map_grid()
 	_test_gesture_capture()
+	_test_gesture_hold_drag()
 	_test_road_types()
 	_test_road_straight()
 	_test_road_crossing()
@@ -223,6 +224,47 @@ func _test_gesture_capture() -> void:
 	g.touch_pressed(0, Vector2(10, 10))
 	g.touch_pressed(1, Vector2(200, 10))
 	_check(events.size() == 2 and events[1][0] == GestureTracker.Pointer.CANCEL, "second finger cancels the tool stroke")
+
+
+func _test_gesture_hold_drag() -> void:
+	var g := GestureTracker.new(_input_config())
+	var events := []
+	var pans := [0]
+	g.hold_pointer.connect(func(phase: int, _p: Vector2) -> void: events.append(phase))
+	g.pan.connect(func(_d: Vector2) -> void: pans[0] += 1)
+	# A building under the finger: the long-press listener arms the drag.
+	g.long_press.connect(func(_p: Vector2) -> void: g.hold_drag = true)
+	g.touch_pressed(0, Vector2(100, 100))
+	for i in 20:
+		g.update(0.05)
+	g.touch_moved(0, Vector2(103, 100))
+	_check(events.is_empty(), "a small wobble after the hold does not start a drag")
+	g.touch_moved(0, Vector2(160, 100))
+	g.touch_moved(0, Vector2(220, 120))
+	g.touch_released(0, Vector2(220, 120))
+	_check(events == [GestureTracker.Pointer.DOWN, GestureTracker.Pointer.MOVE, GestureTracker.Pointer.MOVE, GestureTracker.Pointer.UP],
+		"hold then drag gives held-pointer events (%s)" % str(events))
+	_check(pans[0] == 0, "dragging a held building does not pan the camera")
+	# Not armed (no building there): the same moves pan as before.
+	var g2 := GestureTracker.new(_input_config())
+	var pans2 := [0]
+	var held2 := [0]
+	g2.pan.connect(func(_d: Vector2) -> void: pans2[0] += 1)
+	g2.hold_pointer.connect(func(_ph: int, _p: Vector2) -> void: held2[0] += 1)
+	g2.touch_pressed(0, Vector2(100, 100))
+	for i in 20:
+		g2.update(0.05)
+	g2.touch_moved(0, Vector2(160, 100))
+	g2.touch_released(0, Vector2(160, 100))
+	_check(pans2[0] > 0 and held2[0] == 0, "an unarmed hold then drag still pans")
+	# A second finger cancels the drag.
+	events.clear()
+	g.touch_pressed(0, Vector2(100, 100))
+	for i in 20:
+		g.update(0.05)
+	g.touch_moved(0, Vector2(160, 100))
+	g.touch_pressed(1, Vector2(300, 100))
+	_check(events.back() == GestureTracker.Pointer.CANCEL, "second finger cancels the building drag")
 
 
 func _roads() -> Dictionary:

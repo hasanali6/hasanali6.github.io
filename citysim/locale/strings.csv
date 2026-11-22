@@ -499,3 +499,6 @@ SETTINGS_PHOTO,Fotoğraf modu,Photo mode
 NOTIFY_PHOTO_MODE,"Fotoğraf modu: arayüz gizli. Mavi düğme fotoğraf çeker, X çıkar.","Photo mode: interface hidden. Blue button takes a picture, X leaves."
 NOTIFY_PHOTO_SAVED,Fotoğraf kaydedildi: %s,Picture saved: %s
 NOTIFY_PHOTO_FAILED,Fotoğraf kaydedilemedi.,Could not save the picture.
+MOVE_BUILDING,Binayı taşı,Move building
+NOTIFY_MOVED,Bina taşındı. Geri al ile eski yerine döner.,Building moved. Undo puts it back.
+UNDO_DONE_MOVE,Bina eski yerine taşındı,Building moved back

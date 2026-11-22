@@ -109,6 +109,10 @@ signal sfx_requested(sfx_name: String)
 
 # --- World queries resolved by the camera ---
 signal ground_long_pressed(world_pos: Vector3)
+## A long press landed on a building: holding on and dragging moves it.
+signal building_held(id: int)
+## Dragging a held building (GestureTracker.Pointer phase, finger position).
+signal building_drag(phase: int, screen_pos: Vector2, id: int)
 
 # --- Settings / UI ---
 signal graphics_preset_changed(preset: String)

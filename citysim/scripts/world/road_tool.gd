@@ -308,6 +308,9 @@ func undo_last() -> void:
 			_rezone_exact(entry["cells"])
 			for rec: Dictionary in entry.get("lost", []):
 				_buildings.undo_demolish(rec)
+		# A moved building goes back where it stood.
+		"move":
+			ok = _buildings.move_back(entry)
 		"placed":
 			ok = _buildings.buildings.has(int(entry["id"]))
 			if ok:
@@ -330,6 +333,8 @@ func undo_last() -> void:
 		done_key = "UNDO_DONE_BUILD"
 	elif str(entry["kind"]) == "zone":
 		done_key = "UNDO_DONE_ZONE"
+	elif str(entry["kind"]) == "move":
+		done_key = "UNDO_DONE_MOVE"
 	EventBus.notification_posted.emit("roads", tr(done_key))
 
 

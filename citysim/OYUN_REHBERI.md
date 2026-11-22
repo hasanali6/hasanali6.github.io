@@ -38,6 +38,7 @@ dakika sürer. Aylık bütçe her gün sonunda kapanır. Hız: Dur / 1x / 2x / 3
 | Soldaki ⟲ ⟳ düğmeleri | Kamerayı 45° çevirir |
 | Soldaki ˄ ˅ düğmeleri | Bakış açısını yükseltir / alçaltır |
 | Uzun bas | Binada bina bilgisi, yolda yol bilgisi, boş arazide konum |
+| Binaya uzun bas, parmağı kaldırmadan sürükle | **Binayı taşı**: kareler parmağı takip eder (yeşil = sığar), bırakınca ✓ / ✗ sorulur |
 | Geri tuşu | Açık paneli kapatır; iki kez basınca çıkar |
 
 **İnşa / Kamera düğmesi:** bir araç açıkken (yol, imar, bina, ulaşım, bölge,
@@ -197,6 +198,13 @@ genişletirken (Yükselt) de aynı kural geçerli.
   boyanır. Aldığın iade parası geri ödenir.
 - **İmar:** bir parmak vuruşuyla boyadığın ya da sildiğin imar eski haline
   döner. Silgiyle yıkılan binalar da geri gelir.
+- **Taşıma:** taşınan bina eski yerine döner.
+
+**Bina taşıma** (ücretsiz, her bina):
+- Bina içindekilerle (sakinler, işler, seviye) birlikte gider.
+- Elle koyduğun binanın eski yerindeki imar silinir.
+- İmardan çıkan binanın eski yeri imarlı kalır; oraya yeni bina büyüyebilir.
+- Gittiği yerin imarı binanın imarı olur.
 
 Art arda 20 işleme kadar geri gidebilirsin (en yenisinden başlayarak). Yerinde
 artık başka bir şey varsa o işlem geri alınamaz.

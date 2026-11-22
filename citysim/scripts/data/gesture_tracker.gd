@@ -11,6 +11,9 @@ extends RefCounted
 ## Tilt has its own buttons in the HUD.
 ## With capture_single on (a build tool is active) one finger produces tool
 ## pointer events instead of pan/tap/long press; two fingers still navigate.
+## Hold and drag: when a listener of long_press sets hold_drag (the finger is
+## on a building), moving that finger afterwards emits hold_pointer events
+## (DOWN once it leaves the spot, MOVE, UP / CANCEL) instead of panning.
 
 signal pan(screen_delta: Vector2)
 signal pan_released(screen_velocity: Vector2)
@@ -20,11 +23,14 @@ signal tilt(screen_delta_y: float)
 signal tap(screen_pos: Vector2)
 signal long_press(screen_pos: Vector2)
 signal pointer(phase: int, screen_pos: Vector2)
+signal hold_pointer(phase: int, screen_pos: Vector2)
 
 enum Mode { NONE, PAN, CAPTURE, TWO_UNDECIDED, PINCH_ROTATE, TILT }
 enum Pointer { DOWN, MOVE, UP, CANCEL }
 
 var capture_single: bool = false
+var hold_drag: bool = false
+var _holding: bool = false
 
 var long_press_seconds: float
 var tap_max_move_px: float
@@ -63,6 +69,10 @@ func _init(config: Dictionary) -> void:
 
 
 func reset() -> void:
+	if _holding:
+		hold_pointer.emit(Pointer.CANCEL, Vector2.ZERO)
+	hold_drag = false
+	_holding = false
 	_touches.clear()
 	_mode = Mode.NONE
 	_velocity = Vector2.ZERO
@@ -82,6 +92,8 @@ func touch_pressed(index: int, pos: Vector2) -> void:
 				pointer.emit(Pointer.DOWN, pos)
 				return
 			_mode = Mode.PAN
+			hold_drag = false
+			_holding = false
 			_press_time = _clock
 			_press_pos = pos
 			_moved_far = false
@@ -91,6 +103,10 @@ func touch_pressed(index: int, pos: Vector2) -> void:
 		2:
 			if _mode == Mode.CAPTURE:
 				pointer.emit(Pointer.CANCEL, pos)
+			if _holding:
+				hold_pointer.emit(Pointer.CANCEL, pos)
+			hold_drag = false
+			_holding = false
 			_mode = Mode.TWO_UNDECIDED
 			_moved_far = true  # a second finger cancels tap / long press
 			_begin_two_finger()
@@ -104,12 +120,16 @@ func touch_released(index: int, pos: Vector2) -> void:
 		0:
 			if _mode == Mode.CAPTURE:
 				pointer.emit(Pointer.UP, pos)
+			elif _holding:
+				hold_pointer.emit(Pointer.UP, pos)
 			elif _mode == Mode.PAN:
 				if not _moved_far and not _long_press_fired and _clock - _press_time < long_press_seconds:
 					tap.emit(pos)
 				elif _moved_far:
 					pan_released.emit(_velocity)
 			_mode = Mode.NONE
+			hold_drag = false
+			_holding = false
 		1:
 			# Continue panning with the remaining finger, without a tap.
 			# While a tool is active the leftover finger does nothing.
@@ -128,6 +148,13 @@ func touch_moved(index: int, pos: Vector2) -> void:
 	_touches[index] = pos
 	if _mode == Mode.CAPTURE:
 		pointer.emit(Pointer.MOVE, pos)
+	elif _touches.size() == 1 and _mode == Mode.PAN and hold_drag and _long_press_fired:
+		# Dragging what was held: the camera stays still.
+		if not _holding and pos.distance_to(_press_pos) > tap_max_move_px:
+			_holding = true
+			hold_pointer.emit(Pointer.DOWN, pos)
+		if _holding:
+			hold_pointer.emit(Pointer.MOVE, pos)
 	elif _touches.size() == 1 and _mode == Mode.PAN:
 		if pos.distance_to(_press_pos) > tap_max_move_px:
 			_moved_far = true

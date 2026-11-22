@@ -17,6 +17,7 @@ var _key_rotate: float
 var _key_tilt: float
 var _key_zoom: float
 var _last_speed: int = 1
+var _held_id: int = -1
 
 
 func _ready() -> void:
@@ -41,6 +42,11 @@ func _ready() -> void:
 	tracker.tap.connect(EventBus.tapped.emit)
 	tracker.long_press.connect(EventBus.long_pressed.emit)
 	tracker.pointer.connect(EventBus.tool_pointer.emit)
+	tracker.hold_pointer.connect(func(phase: int, pos: Vector2) -> void:
+		EventBus.building_drag.emit(phase, pos, _held_id))
+	EventBus.building_held.connect(func(id: int) -> void:
+		_held_id = id
+		tracker.hold_drag = true)
 	EventBus.build_tool_selected.connect(func(tool: String, _options: Dictionary) -> void:
 		_tool = tool
 		if tool == "" and camera_mode:

@@ -5,6 +5,8 @@ extends Node3D
 ## releasing leaves the preview standing and asks ✓ / ✗ (confirm_pending).
 ## Placed buildings join the economy like grown ones.
 ## Pumps, sewage outlets and treatment plants must stand next to water.
+## Moving: hold a building, then drag it (EventBus.building_drag); the same
+## preview follows the finger and releasing asks ✓ / ✗ before it moves.
 
 @export var building_system_path: NodePath
 @export var zone_system_path: NodePath
@@ -18,6 +20,7 @@ var _snap_radius: float
 var _water_reach: float
 var _valid: bool = false
 var _pending_cell: int = -1   # a placement waiting for ✓ / ✗
+var _move_id: int = -1        # building being dragged to a new place
 var _preview: MeshInstance3D
 var _ok_mat: StandardMaterial3D
 var _bad_mat: StandardMaterial3D
@@ -38,6 +41,7 @@ func _ready() -> void:
 	add_child(_preview)
 	EventBus.build_tool_selected.connect(_on_tool_selected)
 	EventBus.tool_pointer.connect(_on_pointer)
+	EventBus.building_drag.connect(_on_building_drag)
 
 
 func _material(color: Color, alpha: float) -> StandardMaterial3D:
@@ -80,8 +84,65 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 				_preview.visible = false
 
 
+func _on_building_drag(phase: int, screen_pos: Vector2, id: int) -> void:
+	match phase:
+		GestureTracker.Pointer.DOWN:
+			if _pending_cell >= 0:
+				cancel_pending()
+			var b: Dictionary = _buildings.buildings.get(id, {})
+			if b.is_empty():
+				return
+			_move_id = id
+			_item = {"lot": [int(b["lot"].x), int(b["lot"].y)], "cost": 0, "name_key": "MOVE_BUILDING"}
+			_buildings.moving_id = id
+			_preview_at(screen_pos)
+		GestureTracker.Pointer.MOVE:
+			if _move_id >= 0:
+				_preview_at(screen_pos)
+		GestureTracker.Pointer.UP:
+			if _move_id < 0:
+				return
+			_preview_at(screen_pos)
+			if _cell >= 0 and _valid:
+				_pending_cell = _cell
+				EventBus.road_preview_changed.emit({"active": false})
+				EventBus.road_proposal_changed.emit({"active": true, "node": "BuildTool", "label": "MOVE_BUILDING", "cost": 0})
+			else:
+				if _cell >= 0:
+					EventBus.sfx_requested.emit("error")
+				_end_move()
+		GestureTracker.Pointer.CANCEL:
+			_end_move()
+
+
+func _end_move() -> void:
+	_move_id = -1
+	_buildings.moving_id = -1
+	if not _active:
+		_item = {}
+	_preview.visible = false
+	EventBus.road_preview_changed.emit({"active": false})
+
+
 func confirm_pending() -> void:
 	if _pending_cell < 0:
+		return
+	if _move_id >= 0:
+		var id := _move_id
+		var cell := _pending_cell
+		_pending_cell = -1
+		_buildings.moving_id = -1
+		var rec: Dictionary = _buildings.move_building(id, cell)
+		if rec.is_empty():
+			EventBus.sfx_requested.emit("error")
+		else:
+			EventBus.sfx_requested.emit("build_place")
+			EventBus.notification_posted.emit("info", tr("NOTIFY_MOVED"))
+			var rt: Node = get_parent().get_node_or_null("RoadTool")
+			if rt != null:
+				rt.remember(rec)
+		_end_move()
+		EventBus.road_proposal_changed.emit({"active": false})
 		return
 	_cell = _pending_cell
 	_valid = not _buildings.lot_for(_item, _cell).is_empty() and EconomySystem.can_afford(int(_item["cost"]))
@@ -93,6 +154,8 @@ func confirm_pending() -> void:
 
 func cancel_pending() -> void:
 	_pending_cell = -1
+	if _move_id >= 0:
+		_end_move()
 	_preview.visible = false
 	EventBus.road_proposal_changed.emit({"active": false})
 
