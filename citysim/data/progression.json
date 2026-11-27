@@ -7,7 +7,7 @@
         "zone:res_low", "zone:com_low", "zone:industry",
         "item:house", "item:shop_a", "item:shop_b", "item:workshop", "item:park_trees",
         "svc:coal_plant", "svc:wind_turbine", "svc:water_pump", "svc:sewage_outlet",
-        "svc:clinic", "svc:elementary", "svc:police", "svc:fire_station", "svc:landfill", "svc:cemetery",
+        "svc:clinic", "svc:elementary", "svc:police", "svc:fire_station", "svc:landfill", "svc:cemetery", "svc:snow_depot",
         "item:playground", "item:beach", "item:beach_cafe"
       ]
     },

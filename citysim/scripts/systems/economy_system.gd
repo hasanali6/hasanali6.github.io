@@ -212,6 +212,10 @@ func _settle() -> void:
 	expenses["recycling"] = float(_districts.get("recycling", 0.0))
 	expenses["parks"] = float(_leisure.get("upkeep", 0.0))
 	expenses["loan"] = instalment
+	# Winter: heating public buildings and streets, more under thick snow.
+	var heat: Dictionary = GameData.section("economy/heating")
+	var winter := 1.0 if WeatherSystem.season == "winter" else 0.0
+	expenses["heating"] = _population * float(heat["per_person"]) * (winter + WeatherSystem.snow_cover * float(heat["snow_extra"]))
 	var total_in := 0.0
 	for v: float in income.values():
 		total_in += v

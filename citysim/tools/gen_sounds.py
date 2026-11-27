@@ -2,8 +2,9 @@
 
 Ambient beds are built in the frequency domain, so they loop seamlessly;
 events placed on them (cars, birds, drops) wrap around the loop end. Effects
-are short synthesised hits. The music is a gentle 64 s loop. Needs numpy and
-ffmpeg (libvorbis). Run:  python3 tools/gen_sounds.py
+are short synthesised hits. The music is three gentle loops (calm, morning,
+evening) played in turn. Needs numpy and ffmpeg (libvorbis).
+Run:  python3 tools/gen_sounds.py   (or: python3 tools/gen_sounds.py music_extra)
 """
 import os
 import subprocess
@@ -283,8 +284,82 @@ def music():
     write_ogg("music_calm.ogg", np.stack([left, right], axis=1), rate, 2)
 
 
+def music_track(name, bpm, chords, arp, bars=20, lead=12, melody_every=8, seed=7):
+    """Another loop in the style of music(): pad, electric piano chords and
+    arpeggios and a short melody, over its own chords and tempo."""
+    local = np.random.default_rng(seed)
+    rate = 44100
+    beat = 60.0 / bpm
+    n = int(round(rate * beat * 4 * bars))
+    left = np.zeros(n)
+    right = np.zeros(n)
+
+    def midi(m):
+        return 440.0 * 2 ** ((m - 69) / 12.0)
+
+    def epiano(freq, dur, vel):
+        m = int(rate * dur)
+        t = np.arange(m) / rate
+        x = np.sin(2 * np.pi * freq * t) + 0.25 * np.sin(2 * np.pi * freq * 2 * t) * np.exp(-t * 3.0)
+        x += 0.08 * np.sin(2 * np.pi * freq * 3.01 * t) * np.exp(-t * 6.0)
+        return x * env(m, 0.004, dur * 0.45, rate) * vel
+
+    def pad(freq, dur, vel):
+        m = int(rate * dur)
+        t = np.arange(m) / rate
+        x = np.sin(2 * np.pi * freq * t) + 0.5 * np.sin(2 * np.pi * freq * 1.003 * t) + 0.3 * np.sin(2 * np.pi * freq * 2.0 * t)
+        a = np.clip(t / 1.2, 0, 1) * np.clip((dur - t) / 1.2, 0, 1)
+        return x * a * vel
+
+    def put(x, start, pan):
+        add_wrapped(left, x * (1.0 - pan), start)
+        add_wrapped(right, x * pan, start)
+
+    for bar in range(bars):
+        chord = chords[bar % len(chords)]
+        t_bar = bar * 4 * beat
+        put(pad(midi(chord[0] - 12), 4 * beat, 0.15), int(t_bar * rate), 0.5)
+        for m in chord[1:4]:
+            put(pad(midi(m), 4 * beat, 0.045), int(t_bar * rate), 0.35 + 0.1 * (m % 3))
+        for m in chord[1:]:
+            put(epiano(midi(m), beat * 3.5, 0.09), int(t_bar * rate), 0.45)
+        if bar >= 2:
+            steps = len(arp)
+            for k in range(steps):
+                if arp[k] < 0:
+                    continue
+                note = chord[arp[k]] + (lead if bar % 8 >= 4 else 0)
+                put(epiano(midi(note), beat * 1.5, 0.065 + 0.02 * (k % 2 == 0)),
+                    int((t_bar + k * beat * 4.0 / steps) * rate), 0.25 + 0.5 * (k / max(steps - 1, 1)))
+        if bar % melody_every in (4, 5, 6):
+            picks = local.permutation([1, 2, 3, 4])[:4]
+            for k, idx in enumerate(picks):
+                put(epiano(midi(chord[idx] + 12), beat * 2.0, 0.085), int((t_bar + k * beat) * rate), 0.6)
+    for delay, gain in ((0.23, 0.25), (0.41, 0.15), (0.67, 0.08)):
+        d = int(rate * delay)
+        left += np.roll(right, d) * gain
+        right += np.roll(left, d) * gain
+    write_ogg(name, np.stack([left, right], axis=1), rate, 2)
+
+
+def music_extra():
+    # Bright morning: Fmaj7 - G6 - Em7 - Am7 at 92 bpm, busier arpeggio.
+    music_track("music_morning.ogg", 92.0,
+                [[41, 48, 52, 57, 60], [43, 50, 55, 59, 64], [40, 47, 50, 55, 59], [45, 52, 55, 60, 64]],
+                [0, 3, 2, 4, 1, 3, 2, 4], seed=11)
+    # Slow evening: Dm9 - G7 - Cmaj7 - Am7 at 66 bpm, sparse arpeggio.
+    music_track("music_evening.ogg", 66.0,
+                [[38, 45, 50, 53, 57], [43, 50, 53, 57, 59], [36, 43, 47, 52, 55], [45, 52, 55, 60, 64]],
+                [0, -1, 2, -1, 3, -1, 4, 2], bars=16, seed=23)
+
+
 if __name__ == "__main__":
+    import sys
     os.makedirs(OUT, exist_ok=True)
+    if sys.argv[1:] == ["music_extra"]:
+        # Only the extra music: leaves the other sounds exactly as they are.
+        music_extra()
+        sys.exit(0)
     amb_city()
     amb_birds()
     amb_night()
@@ -292,3 +367,4 @@ if __name__ == "__main__":
     amb_wind()
     sfx()
     music()
+    music_extra()

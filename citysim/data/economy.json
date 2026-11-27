@@ -155,6 +155,10 @@
     "residential_by_education": true,
     "city_share": 0.12
   },
+  "heating": {
+    "per_person": 0.45,
+    "snow_extra": 0.6
+  },
   "budget": {
     "road_upkeep_per_m_per_cost": 0.012,
     "subsidy_base": 5000,

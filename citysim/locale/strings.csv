@@ -513,3 +513,7 @@ NOTIFY_ACCIDENT_CLEARED,Kaza yeri temizlendi; yol açıldı.,The accident is cle
 TRANSIT_EDIT_STOPS,Durakları düzenle,Edit stops
 TRANSIT_SAVE_STOPS,Kaydet,Save
 NOTIFY_LINE_EDITED,%s hattının durakları güncellendi.,Stops of line %s updated.
+SVC_CAT_SNOW,Kar küreme,Snow ploughing
+SVC_SNOW,Kar küreme garajı,Snow plough depot
+ECON_OUT_HEATING,Isınma (kış),Heating (winter)
+NOTIFY_SNOW_ROADS,"Karlı yollar yavaş: kar küreme garajı kur, kapsadığı yollar açık kalır.","Snowy roads are slow: build a snow plough depot, the roads it covers stay clear."

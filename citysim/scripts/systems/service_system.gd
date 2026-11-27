@@ -70,6 +70,7 @@ var _best_next: Dictionary = {}
 # Utility pass in progress.
 var _supply: Dictionary = {}             # network id -> {power, water, sewage, polluted, *_used}
 var _supply_done: Dictionary = {}        # the last finished pass's _supply
+var _snow_told: bool = false
 var _pass_ids := PackedInt32Array()
 var _pass_pos: int = -1
 var _pass_icons: Dictionary = {}
@@ -549,6 +550,18 @@ func building_details(id: int) -> Dictionary:
 
 func _on_month(_m: int) -> void:
 	var records: Dictionary = _buildings.buildings
+	# Thick snow and no plough depot: say once per winter what helps.
+	if WeatherSystem.snow_cover > 0.3 and _population > 300 and not _snow_told:
+		var depot := false
+		for b: Dictionary in records.values():
+			if str(type_of(b).get("category", "")) == "snow":
+				depot = true
+				break
+		if not depot:
+			_snow_told = true
+			EventBus.notification_posted.emit("services", tr("NOTIFY_SNOW_ROADS"))
+	if WeatherSystem.season != "winter":
+		_snow_told = false
 	var grid: ZoneGrid = _zones.grid
 	# People each service building served -> its efficiency next month.
 	var served := {}

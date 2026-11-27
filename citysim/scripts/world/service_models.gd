@@ -16,7 +16,7 @@ const LOT_KINDS := {
 	"svc_coal": 7, "svc_gas": 7, "svc_wind": 8, "svc_solar": 7, "svc_pump": 3, "svc_outlet": 3,
 	"svc_treatment": 3, "svc_clinic": 1, "svc_hospital": 1, "svc_school": 4, "svc_highschool": 4,
 	"svc_university": 8, "svc_police": 2, "svc_fire": 3, "svc_landfill": 5, "svc_incinerator": 3,
-	"svc_cemetery": 6, "svc_crematorium": 8,
+	"svc_cemetery": 6, "svc_crematorium": 8, "svc_snow": 2,
 }
 ## Meshes whose origin is at their base instead of their centre.
 const BASE_ORIGIN := ["house_roof"]
@@ -459,6 +459,18 @@ static func parts(b: Dictionary, ctx: Dictionary, out: Array[Dictionary]) -> voi
 			_shadow(out, ctx, 0, -3, 13, 9)
 			for k in 2:
 				_car(out, ctx, -3.0 + k * 2.6, 4.8, Color(0.95, 0.95, 0.97), Color(0.15, 0.35, 0.9))
+		"svc_snow":
+			# Snow plough depot: a garage, a salt dome and two orange ploughs.
+			var steel := Color(0.56, 0.64, 0.72)
+			_put(out, ctx, "office", -2.5, -3, 10, 6.5, 8, steel, 0, _facade(s, 0.3, 3.0))
+			_put(out, ctx, "roof_box", -2.5, -3, 10.3, 0.5, 8.3, steel.darkened(0.2), 6.5)
+			_put(out, ctx, "dome", 4.5, -3.5, 6.5, 4.5, 6.5, Color(0.86, 0.86, 0.84), 0)
+			_shadow(out, ctx, -0.5, -3, 15, 9)
+			var orange := Color(0.95, 0.5, 0.08)
+			_truck(out, ctx, -4.5, 4.6, orange)
+			_truck(out, ctx, 0.5, 4.6, orange)
+			for k in 2:
+				_put(out, ctx, "roof_box", -4.5 + k * 5.0, 8.7, 2.8, 0.9, 0.3, Color(0.3, 0.32, 0.36), 0.2)
 		"svc_fire":
 			var red := Color(0.8, 0.18, 0.14)
 			_put(out, ctx, "apartment", -1.5, -2, 12, 8, 11, red, 0, _facade(s, 0.4, 2.6))

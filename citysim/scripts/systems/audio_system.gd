@@ -17,6 +17,9 @@ var volumes: Dictionary = {}
 
 var _cfg: Dictionary
 var _music: AudioStreamPlayer
+var _music_list: Array = []
+var _music_index: int = 0
+var _music_turns: int = 0
 var _ambient: Dictionary = {}      # key -> AudioStreamPlayer
 var _levels: Dictionary = {}       # key -> current linear level
 var _pool: Array[AudioStreamPlayer] = []
@@ -37,7 +40,14 @@ func _ready() -> void:
 	settings.load(GraphicsSettings.SETTINGS_PATH)
 	for bus: String in BUSES:
 		set_volume(bus, float(settings.get_value("audio", bus, float(_cfg["default_volume"][bus]))), false)
-	_music = _player(str(_cfg["music"]), "Music", true)
+	# Music: a playlist, each piece played a couple of times round, then the
+	# next one (a single string in audio.json still works).
+	var music: Variant = _cfg["music"]
+	_music_list = music if music is Array else [music]
+	_music_index = randi() % _music_list.size()
+	_music = _player(str(_music_list[_music_index]), "Music", false)
+	_music_turns = int(_cfg.get("music_repeats", 2))
+	_music.finished.connect(_next_music)
 	_music.play()
 	for key: String in _cfg["ambient"]:
 		var entry: Dictionary = _cfg["ambient"][key]
@@ -63,6 +73,18 @@ func _notification(what: int) -> void:
 		AudioServer.set_bus_mute(0, true)
 	elif what == NOTIFICATION_APPLICATION_RESUMED or what == NOTIFICATION_APPLICATION_FOCUS_IN:
 		AudioServer.set_bus_mute(0, false)
+
+
+func _next_music() -> void:
+	_music_turns -= 1
+	if _music_turns <= 0 and _music_list.size() > 1:
+		_music_index = (_music_index + 1) % _music_list.size()
+		var stream := _stream(str(_music_list[_music_index]))
+		if stream is AudioStreamOggVorbis:
+			(stream as AudioStreamOggVorbis).loop = false
+		_music.stream = stream
+		_music_turns = int(_cfg.get("music_repeats", 2))
+	_music.play()
 
 
 func _player(file: String, bus: String, loop: bool) -> AudioStreamPlayer:

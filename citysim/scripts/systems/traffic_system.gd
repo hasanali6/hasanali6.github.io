@@ -526,7 +526,11 @@ func lane_speed(seg_id: int, dir: int) -> float:
 	if s < 0:
 		return 10.0
 	var f := _factors[s * 2 + dir] if results_current() else 1.0
-	return graph.seg_speed[s] * f * WeatherSystem.speed
+	var weather := WeatherSystem.speed
+	if WeatherSystem.snow_cover > 0.1 and _services != null:
+		# Roads a snow plough depot covers are kept clear.
+		weather = lerpf(weather, 1.0, 0.75 * float(_services.segment_coverage(seg_id, "snow")))
+	return graph.seg_speed[s] * f * weather
 
 
 ## 0..1 traffic noise along a road (less where trucks are banned).

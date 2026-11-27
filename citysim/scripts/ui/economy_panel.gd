@@ -173,7 +173,7 @@ func _build_budget() -> VBoxContainer:
 func _expense_keys() -> Array:
 	var keys := ["roads"]
 	keys.append_array(_categories.keys())
-	keys.append_array(["transit", "parks", "recycling", "loan"])
+	keys.append_array(["transit", "parks", "recycling", "heating", "loan"])
 	return keys
 
 
