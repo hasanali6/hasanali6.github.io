@@ -381,20 +381,25 @@ Aynı sayfada `SehirSim-GL.apk` da var: aynı oyunun OpenGL (Compatibility) sür
 - 1x hızda bir oyun günü (= 1 ay) 6 gerçek dakika (`data/time.json` → `real_seconds_per_day_at_1x`).
 - Mobile renderer'da FSR yok (yalnızca Forward+), bu yüzden düşük ayarlarda bilinear ölçekleme kullanılıyor.
 
-## Bilinen eksikler / sonraki fazlara kalanlar
-- **Görsel cila ve ses (Faz 9):** dokular ve sesler sentetik (taranmış fotoğraf/kayıt değil, nedeni yukarıda). Bina modelleri hâlâ prosedürel kutu + Kenney kiti; gerçek bina modelleri yok. Gece ışıkları emisyonla, binalara gerçek ışık düşmüyor (mobil bütçe). Ses 3B konumlu değil (araç sesi tek tek duyulmaz), tek müzik parçası var. Su yüzeyi ve araçlarda yeni doku yok.
-- **İlerleme, kayıt, hava (Faz 8):** harita karoları tek tek satın alınmıyor; açık alan kilometre taşlarıyla kare olarak büyüyor. Kilitlemeler sadece yeni inşaatı etkiler; eski kayıttaki caddeler/bulvarlar yerinde kalır. Bulut kaydı ve şehir adı yok. Kaza, sel, yıldırım yok; su yüzeyinde yağmur halkaları yok. Kar trafikte yolları kapatmaz, kar küreme aracı yok. Mevsimler ekonomiyi (ısınma, turizm) etkilemiyor.
-- **Toplu taşıma ve bölgeler (Faz 7):** metro, tren, liman ve şehir dışı bağlantıları yok (dış bağlantılar ve otoyol sonraki fazlarda). Aktarma yok: bir yolculuk tek hatla yapılır. Yolcular sayısal; durakta bekleyen ya da araca binen yaya görünmüyor. Otobüs ve tramvay diğer trafikle aynı sağ şeritte gider (ayrı otobüs/tramvay şeridi yok) ve U dönüşü yapamaz, bu yüzden her hat bir döngü olmalı. Var olan hattın durakları düzenlenemez; sil ve yeniden çiz. Tramvay için ayrı ray yolu yok, cadde/bulvarda asfalta gömülü ray çizilir. Hat ve politika ücretleri ilk ayar; denge oynanarak ayarlanacak (küçük kasabada hatlar zarar eder, bu bilinçli). Bölgeler sadece politika içindir, bölge başına vergi yok. Yüksek bina yasağı var olan yüksek binaları yıkmaz, sadece büyümeyi durdurur.
-- **Trafik (Faz 6):** kaza ve yağmurda rota değişimi yok (hava Faz 8). Kavşakta çarpışma kontrolü yok: aynı fazda karşıdan sola dönenle düz giden üst üste geçebilir; ışıksız sokak kavşaklarında öncelik kuralı yok, araçlar durmadan geçer. Şerit değiştirme kavşakta yapılır, yol ortasında değil. Yayalar, bisikletler ve park etmiş araçlar yok; araçlar varınca bina önünde durup kaybolur. İş seçimi hâlâ kuş uçuşu mesafeye bakar. Yol düzenlenince değişen yollardaki araçlar kaybolur ve yeni atama bitene kadar (büyük şehirde telefonda 5–10 sn) yeni araç çıkmaz.
-- **Hizmetler (Faz 5):** ambulans, çöp kamyonu, itfaiye aracı gibi hizmet araçları yolda gezmiyor (araçlar ve trafik Faz 6); kapsama şimdilik yol mesafesiyle hesaplanıyor. Elektrik direkleri ve su boruları görünmüyor, yolları izledikleri varsayılıyor. Çöp alanı ve mezarlık boşaltılamıyor; dolunca yenisi gerekir. Yangın binayı anında harabeye çevirir (söndürme yok). Su kirliliği mesafeye bakar, nehrin akış yönü yok. Rüzgâr türbinleri yola bakar, rüzgâr yönü yok; güneş santrali gece de üretir (hava durumu ve gün-gece üretimi Faz 8).
-- **Yollar:** serbest el çizimi, tünel, otoyol rampaları/kavşak köprüleri ve çıkmaz sokak dönüş cebi yok; köprüler suya yakın alçak tabliyeli (yükseltilmiş viyadük yok); trafik ışıkları sadece cadde/bulvar kavşaklarında. Kavşak köşeleri çok dar açılarda sadeleşir.
-- **Binalar:** Kenney kitinde sadece 5 bina modeli var; çeşitlilik kod ile üretilen binalarla sağlanıyor. Kenney'nin büyük ücretsiz şehir paketleri (kenney.nl) repoya eklenirse kolayca bağlanır. Binalar imarla kendiliğinden gelir; istersen katalogdan elle de yerleştirilir.
-- **Doku siteleri:** ambientCG ve Poly Haven bu geliştirme ortamından erişilemedi. Yol ve kaldırım dokuları shader ile üretildi, ek dosya yok. Kenney'nin ücretsiz (CC0) şehir modelleri Faz 3'te binalar için kullanılacak.
-- Harita boş başlar; inşa araçları (yol çizme) Faz 2'de gelir. Referans bloklar sadece ışık testi için ve varsayılan kapalı.
-- Dinamik çözünürlük GPU darboğazını çözer; FPS düşüklüğü CPU kaynaklıysa (ileride kalabalık simülasyon) çözünürlük düşürmek işe yaramaz — o iş Faz 6'daki simülasyon LOD'unun.
-- Ağaçlar düşük poligonlu yer tutucu; gerçek ağaçlar için LOD + uzakta billboard (impostor) gerekecek — 1000'lerce ağaçta bu şart.
-- Yağmur/kar ve mevsim renkleri yok (Faz 8); sokak lambaları ve araçlar var.
-- Nehir ve göller var (yol ve imar suya girmez), ama arazi yüksekliği yok; şehir alanı düz.
-- Tek kayıt yuvası var (otomatik kayıt); birden çok şehir ve bulut kaydı yok.
-- Listedeki diğer sistemler (RoadNetwork, ZoneSystem, …) ilgili fazlarda eklenecek; boş taslak dosya bırakılmadı.
-- Gölge kalitesi kamera mesafesine göre otomatik ayarlanıyor; çok uzak harita görünümünde gölgeler yumuşar (bilinçli mobil tercih).
+## Bilinen eksikler (güncel, Kasım 2026)
+- **Dünya:**
+  - Arazi düz (yükselti yok); karayolu tüneli yok; tek harita var.
+  - Üst geçitler tek katlı.
+- **Binalar:** kodla kurulan hacimler + birkaç Kenney modeli. Okul ve hastanenin
+  sokak cephesi yapay zekâ görseli; diğerleri prosedürel.
+- **Trafik:**
+  - Işıksız kavşaklarda çakışan yolu olan araç bekler; ama 5 sn'den sonra
+    geçer (akış öncelikli), yani nadiren iç içe geçme kalır.
+  - Ayrı otobüs şeridi yok; şerit değiştirme kavşakta yapılır.
+  - Yol düzenlenince değişen yollardaki araçlar kaybolur.
+- **Toplu taşıma:**
+  - En fazla bir aktarma.
+  - Yolcular sayısal; durakta bekleyen yaya görünmüyor.
+  - Metro trenleri yer altında olduğu için çizilmiyor.
+- **Hizmetler:** su boruları sadece Su katmanında görünür. Elektrik direkleri
+  elektrikli yol ağında, lambaların karşısında durur.
+- **Yayalar** süs amaçlı; bisiklet yok.
+- **Sesler** sentetik ve 3B konumlu değil; müzik üç parçalı bir çalma listesi.
+- **Performans:** telefonda darboğazı görmek için FPS satırına dokun →
+  Performans kartı. Ağaçlar düşük poligonlu; gölgeleri basit şekillerle,
+  uzaktakiler kaba şekille çizilir.

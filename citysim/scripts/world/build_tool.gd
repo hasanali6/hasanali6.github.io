@@ -106,7 +106,7 @@ func _on_building_drag(phase: int, screen_pos: Vector2, id: int) -> void:
 			if _cell >= 0 and _valid:
 				_pending_cell = _cell
 				EventBus.road_preview_changed.emit({"active": false})
-				EventBus.road_proposal_changed.emit({"active": true, "node": "BuildTool", "label": "MOVE_BUILDING", "cost": 0})
+				EventBus.road_proposal_changed.emit({"active": true, "node": "BuildTool", "text": tr("MOVE_BUILDING") + "?"})
 			else:
 				if _cell >= 0:
 					EventBus.sfx_requested.emit("error")
@@ -319,8 +319,11 @@ func _preview_at(screen_pos: Vector2) -> void:
 	var hint: String = tr(_item["name_key"]) + " · " + tr("BUILD_SQUARES") % [int(_item["lot"][0]), int(_item["lot"][1])]
 	if _item.has("extractor"):
 		hint += " · " + tr("BUILD_RICHNESS") % roundi(richness * 100.0)
-	EventBus.road_preview_changed.emit({"active": true, "valid": valid, "error": error, "cost": cost,
-		"length": 0.0, "screen_pos": screen_pos, "hint": hint})
+	var info := {"active": true, "valid": valid, "error": error, "cost": cost,
+		"length": 0.0, "screen_pos": screen_pos, "hint": hint}
+	if _move_id >= 0:
+		info.erase("cost")   # moving is free: no price on the pill
+	EventBus.road_preview_changed.emit(info)
 
 
 ## A footprint-shaped outline centred on g, lined up with the nearest road

@@ -1651,7 +1651,7 @@ func _on_road_preview(info: Dictionary) -> void:
 	elif not valid:
 		_cost_label.text = tr(info.get("error", ""))
 	elif info.has("hint"):
-		_cost_label.text = "%s · %s" % [UiStyle.format_int(info["cost"]), tr(info["hint"])]
+		_cost_label.text = tr(info["hint"]) if not info.has("cost") else "%s · %s" % [UiStyle.format_int(info["cost"]), tr(info["hint"])]
 	else:
 		_cost_label.text = tr("ROAD_COST") % [UiStyle.format_int(info["cost"]), length]
 	_cost_pill.visible = true

@@ -466,7 +466,7 @@ static func parts(b: Dictionary, ctx: Dictionary, out: Array[Dictionary]) -> voi
 			_put(out, ctx, "roof_box", -2.5, -3, 10.3, 0.5, 8.3, steel.darkened(0.2), 6.5)
 			_put(out, ctx, "dome", 4.5, -3.5, 6.5, 4.5, 6.5, Color(0.86, 0.86, 0.84), 0)
 			_shadow(out, ctx, -0.5, -3, 15, 9)
-			var orange := Color(0.95, 0.5, 0.08)
+			var orange := Color(0.92, 0.36, 0.02)
 			_truck(out, ctx, -4.5, 4.6, orange)
 			_truck(out, ctx, 0.5, 4.6, orange)
 			for k in 2:
