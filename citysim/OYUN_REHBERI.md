@@ -341,6 +341,19 @@ polis lacivert, itfaiye turuncu, çöp yeşil, defin gri); evlerden kolayca ayr�
 Elektrik ve su olmayan binada uyarı ikonu çıkar. Bu durum uzun sürerse bina
 terk edilir. Kirli suyun aşağısına pompa koyma.
 
+**Elektrik direkleri:**
+- Elektriği olan sokaklarda, lambaların karşı tarafında tahta direkler ve
+  kablolar görünür.
+- Direk yoksa o yol ağına elektrik gelmiyor demektir.
+
+**Su boruları:** Katmanlar → Su'da suyu olan yollar mavi, olmayanlar kırmızı
+görünür. Borular yolların altından gider.
+
+**Dolan çöp alanı ve mezarlık:**
+- Binaya uzun bas → **Boşalt** düğmesi.
+- Ücret doluluğa göre değişir: tam dolu çöp alanı 16.000, mezarlık 9.000 para.
+- Boşalınca hemen yeniden hizmet verir.
+
 ### Ulaşım (toplu taşıma)
 - **Otobüs:** yola dokunarak durak koy, "Hattı aç".
 - **Tramvay:** sadece cadde ve bulvarlarda; asfalta gömülü ray çizilir.
@@ -541,6 +554,9 @@ araba durur.
 ---
 
 ## 10. Kayıt
+
+- **Şehrin adı:** Ayarlar'ın en üstünden yazılır. Saatin yanında görünür, kayda
+  girer, Kayıtlar listesinde de yazar.
 
 - Ayarlar → **Kayıtlar:** otomatik kayıt ve 3 yuva. Her yuvada tarih, unvan,
   nüfus ve para görünür.

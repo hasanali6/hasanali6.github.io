@@ -12,6 +12,7 @@ const DEV_UNLOCK_ALL := -2
 
 var level: int = 0
 var population: int = 0
+var city_name: String = ""
 
 var _milestones: Array = []
 var _fallback_half: float = 2000.0
@@ -21,6 +22,7 @@ func _ready() -> void:
 	_milestones = GameData.value("progression/milestones")
 	_fallback_half = GameData.num("map/playable_size_m") * 0.5
 	EventBus.city_stats_changed.connect(_on_stats)
+	city_name = str(GameData.value("game/city_name"))
 
 
 func milestones() -> Array:
@@ -128,11 +130,23 @@ func unlock_all() -> void:
 func reset_state() -> void:
 	level = 0
 	population = 0
+	set_city_name("")
 	EventBus.progression_changed.emit()
 
 
+## The player's name for the city (saved with it); blank gives the default.
+func set_city_name(value: String) -> void:
+	var clean := value.strip_edges().left(24)
+	if clean == "":
+		clean = str(GameData.value("game/city_name"))
+	if clean == city_name:
+		return
+	city_name = clean
+	EventBus.city_renamed.emit(city_name)
+
+
 func save_state() -> Dictionary:
-	return {"level": level}
+	return {"level": level, "city_name": city_name}
 
 
 ## Old saves have no entry: the level follows the saved population without
@@ -140,4 +154,5 @@ func save_state() -> Dictionary:
 func load_state(state: Dictionary, saved_population: int) -> void:
 	level = maxi(int(state.get("level", -1)), ProgressionRules.level_for(saved_population, _milestones))
 	population = saved_population
+	set_city_name(str(state.get("city_name", "")))
 	EventBus.progression_changed.emit()

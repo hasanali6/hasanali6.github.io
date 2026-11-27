@@ -102,7 +102,7 @@ func save_game(path: String = AUTOSAVE) -> bool:
 		DirAccess.remove_absolute(tmp)
 	var meta := {
 		"saved_unix": state["saved_unix"], "population": int(citizens.population), "balance": EconomySystem.balance,
-		"level": ProgressionSystem.level, "date": TimeSystem.get_date_text(),
+		"level": ProgressionSystem.level, "date": TimeSystem.get_date_text(), "city_name": ProgressionSystem.city_name,
 	}
 	var mf := FileAccess.open(meta_path(path), FileAccess.WRITE)
 	if mf != null:

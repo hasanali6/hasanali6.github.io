@@ -90,6 +90,11 @@ func _ready() -> void:
 	_net = get_node(road_network_path)
 	_zones = get_node(zone_system_path)
 	_buildings = get_node(building_system_path)
+	# Electricity poles along the powered roads.
+	var poles := PowerLines.new()
+	poles.name = "PowerLines"
+	add_child(poles)
+	poles.setup(self, _net)
 	categories = GameData.section("services/categories")
 	for t: Dictionary in GameData.value("services/types"):
 		types[str(t["id"])] = t
@@ -492,6 +497,32 @@ func utility_totals() -> Dictionary:
 			(out[kind] as Array)[0] += float(s[kind + "_used"])
 			(out[kind] as Array)[1] += float(s[kind])
 	return out
+
+
+## Price of emptying a landfill or cemetery now: its full price
+## ("empty_cost") times how full it is. 0 when there is nothing to empty.
+func empty_cost(id: int) -> int:
+	var records: Dictionary = _buildings.buildings
+	if not records.has(id):
+		return 0
+	var t := type_of(records[id])
+	if t.is_empty() or float(t.get("storage", 0.0)) <= 0.0:
+		return 0
+	return roundi(float(t.get("empty_cost", 0.0)) * clampf(float(_storage.get(id, 0.0)) / float(t["storage"]), 0.0, 1.0))
+
+
+## Empties a landfill or cemetery (pays empty_cost): it serves again at once.
+func empty_storage(id: int) -> bool:
+	var cost := empty_cost(id)
+	if cost <= 0 or not EconomySystem.try_spend(cost):
+		return false
+	var t := type_of(_buildings.buildings[id])
+	_storage[id] = 0.0
+	_load[id] = 1.0
+	_coverage_dirty = true
+	_mark_dirty(true)
+	EventBus.notification_posted.emit("services", tr("NOTIFY_EMPTIED") % tr(str(t["name_key"])))
+	return true
 
 
 ## Details of one service building for the info card.

@@ -140,6 +140,8 @@ func _refresh() -> void:
 		var name := "SAVES_AUTO" if entry["key"] == "auto" else ("SAVES_IMPORTED_ROW" if entry["key"] == "imported" else TranslationServer.translate("SAVES_SLOT") % int(entry["slot"]))
 		var text := TranslationServer.translate(name)
 		var meta: Dictionary = entry["meta"]
+		if str(meta.get("city_name", "")) != "":
+			text += " · " + str(meta["city_name"])
 		if not entry["exists"]:
 			text += "\n" + TranslationServer.translate("SAVES_EMPTY")
 		elif not meta.is_empty():

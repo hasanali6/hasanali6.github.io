@@ -51,6 +51,8 @@ var _population_label: Label
 var _happiness_label: Label
 var _money_label: Label
 var _perf_label: Label
+var _city_label: Label
+var _city_name_edit: LineEdit
 var _perf_card: PanelContainer
 var _perf_text: Label
 var _perf_timer: float = 0.0
@@ -92,6 +94,8 @@ var _saves: SavesPanel
 var _cheats: CheatsPanel
 var _missions: MissionsPanel
 var _info_demolish: Button
+var _info_empty: Button
+var _empty_ready: bool = false
 var _photo_ui: Control
 var _info_building: int = -1
 var _log_card: PanelContainer
@@ -394,6 +398,15 @@ func _build_time_controls() -> Control:
 	var clock_row := HBoxContainer.new()
 	clock_row.add_theme_constant_override("separation", 12)
 	clock_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_city_label = _label("", FONT_SIZE - 2)
+	_city_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_city_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.45))
+	_city_label.text = ProgressionSystem.city_name
+	EventBus.city_renamed.connect(func(n: String) -> void:
+		_city_label.text = n
+		if _city_name_edit != null and not _city_name_edit.has_focus():
+			_city_name_edit.text = n)
+	clock_row.add_child(_city_label)
 	_clock_label = _label("", FONT_SIZE + 6)
 	_clock_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	_date_label = _label("", FONT_SIZE - 4)
@@ -846,6 +859,17 @@ func _card(title_key: String, width: float) -> Array:
 func _build_settings_panel() -> PanelContainer:
 	var parts := _card("SETTINGS_TITLE", 560)
 	var content: VBoxContainer = parts[1]
+	content.add_child(_label("SETTINGS_CITY_NAME", FONT_SIZE - 2))
+	_city_name_edit = LineEdit.new()
+	_city_name_edit.text = ProgressionSystem.city_name
+	_city_name_edit.max_length = 24
+	_city_name_edit.custom_minimum_size.y = MIN_TOUCH * 0.8
+	_city_name_edit.add_theme_font_size_override("font_size", FONT_SIZE - 2)
+	_city_name_edit.text_submitted.connect(func(t: String) -> void:
+		ProgressionSystem.set_city_name(t)
+		_city_name_edit.release_focus())
+	_city_name_edit.focus_exited.connect(func() -> void: ProgressionSystem.set_city_name(_city_name_edit.text))
+	content.add_child(_city_name_edit)
 	content.add_child(_label("SETTINGS_QUALITY", FONT_SIZE - 2))
 	var q_row := HBoxContainer.new()
 	q_row.add_theme_constant_override("separation", 10)
@@ -994,6 +1018,20 @@ func _build_info_panel() -> PanelContainer:
 		_info_panel.visible = false
 		get_parent().get_node("RoadTool").ask_demolish(_info_building))
 	(parts[1] as VBoxContainer).add_child(_info_demolish)
+	# Landfills and cemeteries: empty them for a price.
+	_info_empty = Button.new()
+	_info_empty.focus_mode = Control.FOCUS_NONE
+	_info_empty.custom_minimum_size.y = MIN_TOUCH * 0.7
+	_info_empty.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_info_empty.visible = false
+	_info_empty.pressed.connect(func() -> void:
+		if _service_system().empty_storage(_info_building):
+			EventBus.sfx_requested.emit("build_place")
+			_info_panel.visible = false
+		else:
+			EventBus.sfx_requested.emit("error")
+			show_toast(tr("ROAD_ERR_MONEY")))
+	(parts[1] as VBoxContainer).add_child(_info_empty)
 	return parts[0]
 
 
@@ -1231,6 +1269,8 @@ func _on_road_inspected(info: Dictionary) -> void:
 func _show_info(lines: PackedStringArray, building: bool = true) -> void:
 	_info_title.text = "BUILDING_INFO_TITLE"
 	_info_demolish.visible = building and _info_building >= 0
+	_info_empty.visible = building and _empty_ready
+	_empty_ready = false
 	_info_label.text = "\n".join(lines)
 	_settings_panel.visible = false
 	_set_tray_open(false)
@@ -1260,6 +1300,10 @@ func _service_info(info: Dictionary, lines: PackedStringArray) -> void:
 		lines.append(tr("SVC_INFO_RADIUS") % (float(d["radius"]) / 1000.0))
 	if float(d["storage_max"]) > 0.0:
 		lines.append(tr("SVC_INFO_STORAGE") % [UiStyle.format_int(roundi(float(d["storage"]))), UiStyle.format_int(roundi(float(d["storage_max"])))])
+		var cost: int = _service_system().empty_cost(int(info.get("id", -1)))
+		if cost > 0:
+			_info_empty.text = tr("INFO_EMPTY") % UiStyle.format_int(cost)
+			_empty_ready = true
 	if float(d["load"]) < 0.99:
 		lines.append(tr("SVC_INFO_OVERLOADED") % roundi(float(d["load"]) * 100.0))
 

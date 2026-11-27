@@ -229,7 +229,8 @@
       "upkeep": 550,
       "radius": 2600.0,
       "capacity": 6000,
-      "storage": 240000
+      "storage": 240000,
+      "empty_cost": 16000
     },
     {
       "id": "incinerator",
@@ -253,7 +254,8 @@
       "upkeep": 320,
       "radius": 2200.0,
       "capacity": 8000,
-      "storage": 2500
+      "storage": 2500,
+      "empty_cost": 9000
     },
     {
       "id": "crematorium",
@@ -268,6 +270,10 @@
       "pollution": [160.0, 0.25]
     }
   ],
+  "power_lines": {
+    "spacing_m": 42.0,
+    "pole_height_m": 7.5
+  },
   "consumption": {
     "power_per_household": 0.0015,
     "power_per_job": 0.002,

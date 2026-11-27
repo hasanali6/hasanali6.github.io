@@ -111,6 +111,8 @@ signal sfx_requested(sfx_name: String)
 signal ground_long_pressed(world_pos: Vector3)
 ## A long press landed on a building: holding on and dragging moves it.
 signal building_held(id: int)
+## The player renamed the city.
+signal city_renamed(name: String)
 ## Dragging a held building (GestureTracker.Pointer phase, finger position).
 signal building_drag(phase: int, screen_pos: Vector2, id: int)
 

@@ -16,6 +16,9 @@ const MID := Color(0.98, 0.8, 0.22)
 const GOOD := Color(0.26, 0.8, 0.36)
 const NONE := Color(0.6, 0.62, 0.66)
 const PROVIDER := Color(0.25, 0.5, 0.95)
+## Layers that colour the roads themselves (traffic load; power cables and
+## water pipes, which follow the roads).
+const ROAD_LAYERS := ["traffic", "power", "water"]
 const REFRESH_SECONDS := 1.0
 const DIM_SPEED := 4.0
 const CELL_ALPHA := 0.62
@@ -126,7 +129,7 @@ func _refresh() -> void:
 	_dirty = false
 	_since_refresh = 0.0
 	var mm := _cells.multimesh
-	if current != "traffic":
+	if not current in ROAD_LAYERS:
 		_roads.multimesh.instance_count = 0
 		_roads_dirty = true
 	if _res_quad != null:
@@ -187,6 +190,9 @@ func _refresh() -> void:
 	for id: int in records:
 		tints[id] = _building_color(records[id])
 	_buildings.set_overlay_tint(tints)
+	if current in ROAD_LAYERS:
+		# Cables and pipes run under the roads: supplied networks in blue.
+		_refresh_roads()
 
 
 ## Map-wide resource tint, built once: each pixel takes the colour of the
@@ -240,8 +246,12 @@ func _refresh_roads() -> void:
 	for i in _road_seg.size():
 		var sid := _road_seg[i]
 		if not colors.has(sid):
-			var ratio: float = _traffic.segment_ratio(sid)
-			colors[sid] = ramp(1.0 - clampf(ratio / 1.1, 0.0, 1.0))
+			if current == "traffic":
+				var ratio: float = _traffic.segment_ratio(sid)
+				colors[sid] = ramp(1.0 - clampf(ratio / 1.1, 0.0, 1.0))
+			else:
+				var supply: Dictionary = _services._supply_done.get(_services.network_of_segment.get(sid, -1), {})
+				colors[sid] = PROVIDER if not supply.is_empty() and float(supply[current]) > 0.0 else BAD
 		var col: Color = colors[sid]
 		var o := i * 16 + 12
 		_road_buffer[o] = col.r
