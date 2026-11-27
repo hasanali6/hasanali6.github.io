@@ -544,8 +544,8 @@ kapatılır; Görevler kartından "Öğreticiyi baştan başlat" ile geri gelir.
 - **Işıksız kavşaklar** (en az 3 kollu, cadde ya da bulvarın kesişmediği):
   - Yolu kesişen ya da aynı şeride giren bir araç kavşağın içindeyse diğerleri
     çizgide bekler.
-  - Önce gelen önce geçer.
-  - Kimse 12 saniyeden fazla beklemez (kilitlenme olmaz).
+  - Kavşağın yarısını geçen araç artık kimseyi bekletmez.
+  - Kimse 5 saniyeden fazla beklemez (kilitlenme olmaz, trafik akar).
 - **Kaza:**
   - Ara sıra yoğun bir şeritte bir araç dörtlüleri yanıp sönerek durur ve
     şeridi bir süre kapatır.
