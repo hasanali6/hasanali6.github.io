@@ -108,6 +108,7 @@ var _blocked: Dictionary = {}      # vehicle id -> true while the lane ahead is 
 var _yield_nodes: Dictionary = {}  # road node id -> true (3+ legs, no lights)
 var _conn_occ: Dictionary = {}     # road node id -> Array of vehicle ids on its connectors
 var _yield_since: Dictionary = {}  # vehicle id -> traffic time it started waiting at a junction
+var _waiting_at: Dictionary = {}   # road node id -> {vehicle id: true} waiting at its line
 var _conflicts: Dictionary = {}    # Vector2i(connector, connector) -> bool
 # Breakdowns and crashes: vehicle id -> traffic time the lane opens again.
 var _accidents: Dictionary = {}
@@ -291,6 +292,7 @@ func _on_lanes_rebuilt() -> void:
 	_blocked.clear()
 	_conn_occ.clear()
 	_yield_since.clear()
+	_waiting_at.clear()
 	var by_lane := {}
 	for v in _alive.size():
 		if _alive[v] == 0:
@@ -580,14 +582,34 @@ func _junction_busy(v: int, c: int) -> bool:
 	var nid: int = (key as Vector3i).x
 	if not _yield_nodes.has(nid):
 		return false
+	var since := float(_yield_since.get(v, _time))
+	if _time - since >= float((_cfg["junction_yield"] as Dictionary)["max_wait_s"]):
+		return false   # waited too long: go (nothing can lock up)
+	var busy := false
 	for w: int in _conn_occ.get(nid, []):
-		if w == v or _alive[w] == 0 or _on_conn[w] == 0:
-			continue
-		if _connectors_conflict(c, _piece[w]):
-			if not _yield_since.has(v):
-				_yield_since[v] = _time
-			return _time - float(_yield_since[v]) < float((_cfg["junction_yield"] as Dictionary)["max_wait_s"])
-	return false
+		if w != v and _alive[w] == 1 and _on_conn[w] == 1 and _connectors_conflict(c, _piece[w]):
+			busy = true
+			break
+	# Whoever has waited longer at this junction goes first (no one starves
+	# while a stream keeps coming from one side).
+	if not busy:
+		var waiters: Dictionary = _waiting_at.get(nid, {})
+		for w: int in waiters.keys():
+			if w == v:
+				continue
+			if _alive[w] == 0 or _on_conn[w] == 1 or not _blocked.has(w):
+				waiters.erase(w)
+				continue
+			if float(_yield_since.get(w, _time)) < since and _connectors_conflict(c, _npiece[w]):
+				busy = true
+				break
+	if busy:
+		if not _yield_since.has(v):
+			_yield_since[v] = _time
+		if not _waiting_at.has(nid):
+			_waiting_at[nid] = {}
+		(_waiting_at[nid] as Dictionary)[v] = true
+	return busy
 
 
 func _connectors_conflict(a: int, b: int) -> bool:
@@ -613,6 +635,8 @@ func _occupy(v: int, c: int) -> void:
 	if not _conn_occ.has(nid):
 		_conn_occ[nid] = []
 	(_conn_occ[nid] as Array).append(v)
+	if _waiting_at.has(nid):
+		(_waiting_at[nid] as Dictionary).erase(v)
 
 
 func _leave_junction(v: int) -> void:
