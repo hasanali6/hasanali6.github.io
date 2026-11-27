@@ -599,7 +599,7 @@ func _junction_busy(v: int, c: int) -> bool:
 			break
 	# Whoever has waited longer at this junction goes first (no one starves
 	# while a stream keeps coming from one side).
-	if not busy:
+	if not busy and bool((_cfg["junction_yield"] as Dictionary).get("fair_order", true)):
 		var waiters: Dictionary = _waiting_at.get(nid, {})
 		for w: int in waiters.keys():
 			if w == v:

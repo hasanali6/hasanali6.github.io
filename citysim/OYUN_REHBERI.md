@@ -337,6 +337,7 @@ polis lacivert, itfaiye turuncu, çöp yeşil, defin gri); evlerden kolayca ayr�
 | Güvenlik | Karakol (11.000), itfaiye (11.000) |
 | Çöp | Depolama alanı (9.000, dolar), yakma tesisi (30.000) |
 | Defin | Mezarlık (7.000, dolar), krematoryum (16.000) |
+| Kar küreme | Kar küreme garajı (8.000 / 380): karda yolları açık tutar |
 
 Elektrik ve su olmayan binada uyarı ikonu çıkar. Bu durum uzun sürerse bina
 terk edilir. Kirli suyun aşağısına pompa koyma.
@@ -384,6 +385,16 @@ görünür. Borular yolların altından gider.
 - İnsanlar arabayı (yol süresi + park yeri + otopark ücreti) toplu taşımayla
   (yürüme + bekleme + yolculuk + bilet) karşılaştırır. Ucuz olanı seçerler.
   Hat doluysa fazlası arabaya döner.
+- **Aktarma:**
+  - İki hattın durakları birbirine 160 m'den yakınsa yolcular bir kez hat
+    değiştirebilir.
+  - Aktarma iki bilet ve ~4 dakika ek süre demek; direkt hat varsa o seçilir.
+  - Aktarmalı yolcu iki hatta da sayılır.
+- **Durakları düzenle:**
+  - Hattı seç → **Durakları düzenle**.
+  - Yeni durak hattın en az dolanacağı yere eklenir; var olan durağa dokununca
+    silinir.
+  - **Kaydet** ile hat güncellenir. Sadece eklenen durakların parası alınır.
 
 ### Bölgeler ve politikalar
 Haritaya köşe köşe dokunarak bölge çiz, ilk köşeye dokununca kapanır. Adını
@@ -529,6 +540,17 @@ kapatılır; Görevler kartından "Öğreticiyi baştan başlat" ile geri gelir.
 - İşe gidiş 15 dakikayı geçince mutluluk düşer. Yoğun yol kenarındaki evlere
   gürültü cezası gelir.
 - Yağmurda araçlar %12, karda %20 yavaşlar ve yollar daha çabuk tıkanır.
+  Kavşak dönüşleri de yavaşlar.
+- **Işıksız kavşaklar** (en az 3 kollu, cadde ya da bulvarın kesişmediği):
+  - Yolu kesişen ya da aynı şeride giren bir araç kavşağın içindeyse diğerleri
+    çizgide bekler.
+  - Önce gelen önce geçer.
+  - Kimse 12 saniyeden fazla beklemez (kilitlenme olmaz).
+- **Kaza:**
+  - Ara sıra yoğun bir şeritte bir araç dörtlüleri yanıp sönerek durur ve
+    şeridi bir süre kapatır.
+  - Polis ve ambulans yola çıkar.
+  - Olaylar listesinde **Git** ile yerine gidilir; süre bitince yol açılır.
 
 ---
 
@@ -549,6 +571,11 @@ araba durur.
   - Sonbaharda ağaçlar sararır.
 - **Oyuna etkisi:** bulutta güneş santrali az, rüzgârda türbin biraz fazla
   üretir; trafik yavaşlar.
+- **Kış:**
+  - Bütçeye **ısınma** gideri eklenir (kişi başına; kar kalınsa daha fazla).
+  - **Kar küreme garajı** (Hizmetler, 8.000): kapsadığı yollar karda neredeyse
+    normal hızda kalır.
+  - Kar kalın, garaj yoksa bir kez uyarı gelir.
 - Ayarlar → "Hava durumu" ile yağmur ve kar kapatılabilir.
 
 ---
@@ -610,6 +637,8 @@ araba durur.
   ekran görüntüsü `Resimler/SehirSim` klasörüne kaydedilir, ✕ ya da geri tuşu
   ile çıkarsın.
 - **Ses:** Müzik / Efekt / Ortam kaydırıcıları.
+  - Müzikte üç parça sırayla çalar (sakin, sabah, akşam); her biri iki tur
+    döner.
 - **Ortam sesleri:** alçakta kuşlar ve trafik, gece cırcır böcekleri, yağmur,
   yükseklerde rüzgâr.
 - **Hileler (serbest mod):** Ayarlar → Kayıt satırındaki **Hileler** düğmesi.
