@@ -40,7 +40,8 @@
     "duration_s": 75.0
   },
   "junction_yield": {
-    "max_wait_s": 12.0
+    "max_wait_s": 12.0,
+    "clear_fraction": 0.6
   },
   "lights": {
     "min_legs": 3,

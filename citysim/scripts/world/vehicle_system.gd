@@ -586,8 +586,15 @@ func _junction_busy(v: int, c: int) -> bool:
 	if _time - since >= float((_cfg["junction_yield"] as Dictionary)["max_wait_s"]):
 		return false   # waited too long: go (nothing can lock up)
 	var busy := false
+	var lg2: LaneGeometry = _traffic.lanes
+	var clear_at := float((_cfg["junction_yield"] as Dictionary)["clear_fraction"])
 	for w: int in _conn_occ.get(nid, []):
-		if w != v and _alive[w] == 1 and _on_conn[w] == 1 and _connectors_conflict(c, _piece[w]):
+		if w == v or _alive[w] == 0 or _on_conn[w] == 0:
+			continue
+		# Most of the way through, it is past the crossing point: no longer in the way.
+		if _pos(w) > lg2.piece_length[_piece[w]] * clear_at:
+			continue
+		if _connectors_conflict(c, _piece[w]):
 			busy = true
 			break
 	# Whoever has waited longer at this junction goes first (no one starves
