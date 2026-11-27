@@ -56,6 +56,12 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	PerfMeter.begin("day_night")
+	_frame_work(_delta)
+	PerfMeter.end("day_night")
+
+
+func _frame_work(_delta: float) -> void:
 	_update_lighting(false)
 	_update_shadow_distance()
 

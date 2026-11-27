@@ -71,6 +71,12 @@ func _apply_capture() -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("input")
+	_frame_work(delta)
+	PerfMeter.end("input")
+
+
+func _frame_work(delta: float) -> void:
 	tracker.update(delta)
 	_keyboard_camera(delta)
 

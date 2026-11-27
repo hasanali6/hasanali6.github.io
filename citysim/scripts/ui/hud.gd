@@ -51,6 +51,9 @@ var _population_label: Label
 var _happiness_label: Label
 var _money_label: Label
 var _perf_label: Label
+var _perf_card: PanelContainer
+var _perf_text: Label
+var _perf_timer: float = 0.0
 var _speed_buttons: Array[Button] = []
 var _build_button: Button
 var _tray: PanelContainer
@@ -179,6 +182,8 @@ func _ready() -> void:
 	_place(_missions.card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
 	_log_card = _build_log_card()
 	_place(_log_card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+	_perf_card = _build_perf_card()
+	_place(_perf_card, Vector2(0.5, 0.5), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
 	_tutorial = _build_tutorial()
 	_place(_tutorial, Vector2(0.5, 0), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_END, Vector2(0, 230))
 	EventBus.life_changed.connect(_refresh_tutorial)
@@ -232,17 +237,29 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("hud")
+	_frame_work(delta)
+	PerfMeter.end("hud")
+
+
+func _frame_work(delta: float) -> void:
 	# Only touch label text when it changes; re-layout every frame is wasted work.
 	_set_text(_clock_label, TimeSystem.get_clock_text())
 	_set_text(_date_label, TimeSystem.get_date_text())
-	if _perf_label.visible:
+	_perf_timer -= delta
+	if _perf_card.visible and _perf_timer <= 0.0:
+		_fill_perf()
+	if _perf_label.visible and _perf_timer <= 0.0:
 		var hz := GraphicsSettings.get_refresh_hz()
 		_set_text(_perf_label, tr("LABEL_PERF") % [
 			Engine.get_frames_per_second(), GraphicsSettings.get_gpu_ms(), GraphicsSettings.get_cpu_ms(),
 			("%d Hz" % roundi(hz)) if hz > 0.0 else "? Hz", roundi(GraphicsSettings.get_render_scale() * 100.0)])
+	if _perf_timer <= 0.0:
+		# Numbers that change every frame re-lay out the label: a few times a second is plenty.
+		_perf_timer = 0.3
 	if _tutorial_label != null and _tutorial_label.text != "":
 		# The tutorial steps aside while a menu card is open.
-		var card_open := _settings_panel.visible or _info_panel.visible or _economy.card.visible or _missions.card.visible \
+		var card_open := _settings_panel.visible or _info_panel.visible or _economy.card.visible or _missions.card.visible or _perf_card.visible \
 			or _saves.card.visible or _cheats.card.visible or _cost_pill.visible or _confirm_bar.visible or _log_card.visible
 		_tutorial.visible = not card_open
 	if _toast_timer > 0.0:
@@ -619,7 +636,45 @@ func _build_tray() -> PanelContainer:
 func _build_perf_label() -> Label:
 	var l := _label("", FONT_SIZE - 8)
 	l.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	# A tap on the numbers opens the breakdown of where the frame time goes.
+	l.mouse_filter = Control.MOUSE_FILTER_STOP
+	l.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			_open_perf())
 	return l
+
+
+func _build_perf_card() -> PanelContainer:
+	var parts := _card("PERF_TITLE", 700)
+	var content: VBoxContainer = parts[1]
+	content.add_child(_label("PERF_HINT", FONT_SIZE - 6))
+	_perf_text = _label("", FONT_SIZE - 6)
+	_perf_text.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	content.add_child(_perf_text)
+	var card: PanelContainer = parts[0]
+	card.visibility_changed.connect(func() -> void:
+		PerfMeter.detailed = card.visible)
+	return card
+
+
+func _open_perf() -> void:
+	PerfMeter.reset()
+	_perf_card.visible = true
+	_perf_timer = 0.0
+
+
+func _fill_perf() -> void:
+	var lines := PackedStringArray()
+	var prims := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)
+	var draws := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+	lines.append(tr("PERF_HEAD") % [Engine.get_frames_per_second(), GraphicsSettings.get_gpu_ms(),
+		Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, roundi(GraphicsSettings.get_render_scale() * 100.0),
+		draws, roundi(prims / 1000.0), GraphicsSettings.current_preset])
+	var rows: Array = PerfMeter.report()
+	for i in mini(rows.size(), 16):
+		var r: Array = rows[i]
+		lines.append("%6.1f ms/sn  %5.2f ms  (%5.1f)  %s" % [r[1], r[2], r[3], r[0]])
+	_perf_text.text = "\n".join(lines)
 
 
 func _build_toast() -> PanelContainer:
@@ -1666,6 +1721,9 @@ func _on_back_requested(can_quit: bool = true) -> void:
 		return
 	if _log_card.visible:
 		_log_card.visible = false
+		return
+	if _perf_card.visible:
+		_perf_card.visible = false
 		return
 	if _settings_panel.visible or _info_panel.visible or _tray.visible:
 		_settings_panel.visible = false

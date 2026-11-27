@@ -565,7 +565,11 @@ araba durur.
   (300 / 800 / 1.500), yağmur-kar parçacıkları ve doku detayı değişir.
 - Ekran yenileme hızına göre FPS kilidi otomatik ayarlanır. GPU yetişemezse 3B
   çözünürlük kendiliğinden düşer.
-- Sol alttaki satır FPS, GPU ve CPU süresini gösterir.
+- Sol alttaki satır FPS, GPU ve CPU süresini gösterir (Ayarlar → FPS göster).
+  - **Satıra dokununca Performans kartı açılır:** her sistemin saniyede kaç ms
+    harcadığını büyükten küçüğe listeler.
+  - FPS düşükse bu kartın ekran görüntüsünü gönder, neyin yavaşlattığı oradan
+    anlaşılır.
 - **Gölgeler sakin:** gökyüzü renkleri saate göre değişir ama gölgeler gün
   boyu öğle güneşinin etrafında dar bir yayda, çok yavaş döner; yakınlaştırıp
   uzaklaştırırken de gölge alanı sık sık değişmez, böylece titremezler.

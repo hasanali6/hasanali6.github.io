@@ -29,6 +29,12 @@ func _apply_preset(_preset: String) -> void:
 
 
 func _process(_delta: float) -> void:
+	PerfMeter.begin("weather_fx")
+	_frame_work(_delta)
+	PerfMeter.end("weather_fx")
+
+
+func _frame_work(_delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null or _cap <= 0:
 		_rain.emitting = false

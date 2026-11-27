@@ -502,3 +502,6 @@ NOTIFY_PHOTO_FAILED,Fotoğraf kaydedilemedi.,Could not save the picture.
 MOVE_BUILDING,Binayı taşı,Move building
 NOTIFY_MOVED,Bina taşındı. Geri al ile eski yerine döner.,Building moved. Undo puts it back.
 UNDO_DONE_MOVE,Bina eski yerine taşındı,Building moved back
+PERF_TITLE,Performans,Performance
+PERF_HINT,"Bu kartın ekran görüntüsünü Claude'a gönder. Satırlar: saniyede toplam ms, çağrı başına ms (son saniyelerin en kötüsü), sistem.","Send a screenshot of this card. Rows: ms per second, ms per call (worst lately), system."
+PERF_HEAD,"FPS %d · GPU %.1f ms · betik %.1f ms · 3B %%%d · %d çizim · %d bin üçgen · %s","FPS %d · GPU %.1f ms · script %.1f ms · 3D %%%d · %d draws · %d k triangles · %s"

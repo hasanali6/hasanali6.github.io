@@ -154,6 +154,12 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("vehicles")
+	_frame_work(delta)
+	PerfMeter.end("vehicles")
+
+
+func _frame_work(delta: float) -> void:
 	var mult := float(_speed_mult[TimeSystem.get_speed_index()])
 	_time += delta * mult
 	RenderingServer.global_shader_parameter_set("traffic_time", _time)
@@ -614,9 +620,11 @@ func _plan_next(v: int) -> void:
 
 func _connector_speed(cpid: int, lane_speed: float) -> float:
 	var lg: LaneGeometry = _traffic.lanes
+	# Rain and snow slow turns through junctions too, not only the lanes.
+	var weather := WeatherSystem.speed
 	if TrafficRules.turn_of(lg.piece_dir_in[cpid], lg.piece_dir_out[cpid]) != 0:
-		return minf(float(_veh["turn_speed_ms"]), lane_speed)
-	return minf(float(_veh["straight_speed_ms"]), lane_speed)
+		return minf(float(_veh["turn_speed_ms"]) * weather, lane_speed)
+	return minf(float(_veh["straight_speed_ms"]) * weather, lane_speed)
 
 
 # --- Events -------------------------------------------------------------------------

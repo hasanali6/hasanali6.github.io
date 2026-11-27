@@ -114,6 +114,12 @@ func set_volume(bus: String, linear: float, persist: bool = true) -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("audio")
+	_frame_work(delta)
+	PerfMeter.end("audio")
+
+
+func _frame_work(delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	var height := 400.0 if cam == null else cam.global_position.y
 	var near := 1.0 - smoothstep(float(_cfg["near_height_m"]), float(_cfg["far_height_m"]), height)

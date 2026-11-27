@@ -82,6 +82,12 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("camera")
+	_frame_work(delta)
+	PerfMeter.end("camera")
+
+
+func _frame_work(delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam != null:
 		# Shaders hide small far details by distance to the player's camera

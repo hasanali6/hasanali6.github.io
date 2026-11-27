@@ -45,6 +45,12 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	PerfMeter.begin("pedestrians")
+	_frame_work(_delta)
+	PerfMeter.end("pedestrians")
+
+
+func _frame_work(_delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam != null:
 		var near := cam.global_position.y < SHOW_BELOW_M

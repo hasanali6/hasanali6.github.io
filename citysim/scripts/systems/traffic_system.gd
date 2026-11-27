@@ -136,6 +136,12 @@ func _exit_tree() -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("traffic")
+	_frame_work(delta)
+	PerfMeter.end("traffic")
+
+
+func _frame_work(delta: float) -> void:
 	if TimeSystem.get_speed_index() > 0:
 		_since_run += delta
 	if _task_id >= 0:

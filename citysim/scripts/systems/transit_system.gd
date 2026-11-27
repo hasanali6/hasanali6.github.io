@@ -104,6 +104,12 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("transit")
+	_frame_work(delta)
+	PerfMeter.end("transit")
+
+
+func _frame_work(delta: float) -> void:
 	_move_trains(delta)
 	_check_timer += delta
 	if _check_timer < CHECK_SECONDS:

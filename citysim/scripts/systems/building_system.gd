@@ -117,6 +117,12 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("buildings")
+	_frame_work(delta)
+	PerfMeter.end("buildings")
+
+
+func _frame_work(delta: float) -> void:
 	if _rising.is_empty():
 		return
 	# Construction runs on game time: it stops while paused and goes faster
@@ -1706,6 +1712,12 @@ func _render_all() -> void:
 
 
 func _render_now() -> void:
+	PerfMeter.begin("buildings_render")
+	_render_now_body()
+	PerfMeter.end("buildings_render")
+
+
+func _render_now_body() -> void:
 	_render_queued = false
 	# Parts of finished buildings are cached (they only change when a building
 	# levels up, changes style or is abandoned) and each MultiMesh is filled

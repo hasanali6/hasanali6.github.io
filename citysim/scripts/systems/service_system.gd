@@ -124,6 +124,12 @@ func _mark_dirty(urgent: bool) -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("services")
+	_frame_work(delta)
+	PerfMeter.end("services")
+
+
+func _frame_work(delta: float) -> void:
 	_since_pass += delta
 	if not _cov_queue.is_empty():
 		_step_coverage(COVERAGE_BUDGET_US)

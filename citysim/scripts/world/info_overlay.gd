@@ -96,6 +96,12 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("overlay")
+	_frame_work(delta)
+	PerfMeter.end("overlay")
+
+
+func _frame_work(delta: float) -> void:
 	var target := 0.0 if current == "" else 1.0
 	if not is_equal_approx(_dim, target):
 		_dim = move_toward(_dim, target, delta * DIM_SPEED)

@@ -124,6 +124,12 @@ func apply_preset(preset: String, persist: bool = true) -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("graphics")
+	_frame_work(delta)
+	PerfMeter.end("graphics")
+
+
+func _frame_work(delta: float) -> void:
 	if not _dyn_enabled:
 		return
 	_check_timer += delta

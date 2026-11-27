@@ -9,12 +9,31 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("sim_ticks")
 	var due := clock.pending_ticks(delta)
 	for i in due:
 		var new_month := clock.step()
-		EventBus.sim_tick.emit(clock.tick_count)
+		_broadcast(EventBus.sim_tick, clock.tick_count, "tick ")
 		if new_month:
-			EventBus.month_changed.emit(clock.month_index)
+			PerfMeter.begin("month_end")
+			_broadcast(EventBus.month_changed, clock.month_index, "month ")
+			PerfMeter.end("month_end")
+	PerfMeter.end("sim_ticks")
+
+
+## Emits the signal; while the performance card is open each listener is
+## called one by one instead, so its own time shows up (same order).
+func _broadcast(sig: Signal, value: int, prefix: String) -> void:
+	if not PerfMeter.detailed:
+		sig.emit(value)
+		return
+	for c: Dictionary in sig.get_connections():
+		var callable: Callable = c["callable"]
+		var obj: Object = callable.get_object()
+		var key: String = prefix + (str((obj as Node).name) if obj is Node else "?") + "." + str(callable.get_method())
+		var t0 := Time.get_ticks_usec()
+		callable.call(value)
+		PerfMeter.add(key, float(Time.get_ticks_usec() - t0) / 1000.0)
 
 
 func set_speed_index(index: int) -> void:

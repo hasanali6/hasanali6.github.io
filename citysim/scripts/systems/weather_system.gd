@@ -48,6 +48,12 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	PerfMeter.begin("weather")
+	_frame_work(_delta)
+	PerfMeter.end("weather")
+
+
+func _frame_work(_delta: float) -> void:
 	var c: SimClock = TimeSystem.clock
 	var abs_hour := c.month_index * 24.0 + c.minute_of_day / 60.0
 	if _last_abs_hour < 0.0:

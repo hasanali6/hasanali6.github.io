@@ -433,6 +433,8 @@ func _apply_graphics_to(entry: Dictionary) -> void:
 			mmi.visibility_range_begin_margin = 40.0
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		elif pass_k >= SHADOW_OFFSET:
+			# Nothing casts shadows beyond the shadow distance: skip those chunks.
+			mmi.visibility_range_end = minf(dist, float(GraphicsSettings.get_value("shadow_max_distance_m")) + 300.0)
 			mmi.visible = shadows
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 		else:

@@ -388,6 +388,12 @@ func is_burning(id: int) -> bool:
 
 
 func _process(delta: float) -> void:
+	PerfMeter.begin("city_life")
+	_frame_work(delta)
+	PerfMeter.end("city_life")
+
+
+func _frame_work(delta: float) -> void:
 	if _shake_left > 0.0:
 		_shake_left -= delta
 	if _fires_dirty:
