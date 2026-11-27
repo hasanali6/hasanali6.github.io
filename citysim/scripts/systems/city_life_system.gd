@@ -72,6 +72,7 @@ func _ready() -> void:
 	_roads = get_node("../RoadNetwork")
 	_build_visuals()
 	EventBus.month_changed.connect(_on_month)
+	EventBus.traffic_accident.connect(_on_accident)
 	EventBus.buildings_changed.connect(func() -> void: _cache.clear())
 	EventBus.overlay_selected.connect(func(key: String) -> void:
 		if key != "":
@@ -352,6 +353,20 @@ func dispatch(category: String, b: Dictionary) -> Vector2i:
 			# A road path exists but the street is packed right now: try again.
 			return sent if sent.x >= 0 else DISPATCH_PENDING
 	return Vector2i(-1, -1)
+
+
+## A crash or breakdown: police and an ambulance drive there (the lane
+## opens again when its time is up).
+func _on_accident(pos: Vector2, seg: int, started: bool) -> void:
+	EventBus.notification_located.emit(pos)
+	if not started:
+		EventBus.notification_posted.emit("traffic", tr("NOTIFY_ACCIDENT_CLEARED"))
+		return
+	var spot := {"centre": pos, "segment": seg, "cells": PackedInt32Array(), "abandoned": false}
+	dispatch("police", spot)
+	dispatch("health", spot)
+	EventBus.notification_posted.emit("traffic", tr("NOTIFY_ACCIDENT"))
+	EventBus.sfx_requested.emit("error")
 
 
 ## Streets a building can be reached from (at most 3): its own, then the

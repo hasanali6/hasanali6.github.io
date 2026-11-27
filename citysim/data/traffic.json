@@ -34,6 +34,14 @@
     "through_per_day": 240.0,
     "raw_per_extractor": 6.0
   },
+  "accidents": {
+    "chance_per_month": 0.3,
+    "min_queue": 3,
+    "duration_s": 75.0
+  },
+  "junction_yield": {
+    "max_wait_s": 6.0
+  },
   "lights": {
     "min_legs": 3,
     "always_from_legs": 99,

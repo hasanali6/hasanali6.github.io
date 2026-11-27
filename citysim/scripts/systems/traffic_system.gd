@@ -92,7 +92,7 @@ var _trip_exit := PackedInt32Array()
 var _trip_heavy := PackedByteArray()
 var _commute: Dictionary = {}            # Vector2i(home seg id, job seg id) -> minutes by car
 var _od_minutes: Dictionary = {}         # Vector2i(seg id, seg id) -> minutes by car (person trips)
-var _transit_mix: Dictionary = {}        # Vector2i(home seg id, job seg id) -> Vector2(transit share, minutes)
+var _transit_mix: Dictionary = {}        # Vector2i(home seg id, job seg id) -> Vector4(transit share, minutes, line, second line)
 # Mode choice of the demand round being gathered.
 var _next_mix: Dictionary = {}
 var _pairs: Dictionary = {}              # Vector2i -> Vector2(transit share, parking fee) this round
@@ -220,8 +220,8 @@ func _car_minutes(o: int, d: int) -> float:
 
 
 ## Transit share and parking fee of a round trip between two roads.
-## Pairs a line serves are also kept in _next_mix as Vector3(share, transit
-## minutes, line id).
+## Pairs a line serves are also kept in _next_mix as Vector4(share, transit
+## minutes, line id, second line id or -1).
 func _mode_split(o: int, d: int) -> Vector2:
 	var key := Vector2i(o, d)
 	if _pairs.has(key):
@@ -231,11 +231,14 @@ func _mode_split(o: int, d: int) -> Vector2:
 		fee = float(_districts.parking_fee(d))
 	var share := 0.0
 	if _transit != null and _transit.has_service():
-		var t: Vector3 = _transit.transit_minutes(o, d)
+		var t: Vector4 = _transit.transit_minutes(o, d)
 		if t.x >= 0.0:
 			var car := _car_minutes(o, d) + float(_mode_cfg["car_extra_minutes"]) + fee / float(_mode_cfg["money_per_minute"])
-			share = TransitRules.transit_share(car, t.x, _mode_cfg) * float(_transit.crowding(int(t.y)))
-			_next_mix[key] = Vector3(share, t.z, t.y)
+			var crowd := float(_transit.crowding(int(t.y)))
+			if t.w >= 0.0:
+				crowd = minf(crowd, float(_transit.crowding(int(t.w))))
+			share = TransitRules.transit_share(car, t.x, _mode_cfg) * crowd
+			_next_mix[key] = Vector4(share, t.z, t.y, t.w)
 	var out := Vector2(share, fee)
 	_pairs[key] = out
 	return out
@@ -249,11 +252,12 @@ func _person_trip(o: int, d: int, out_kind: int, back_kind: int, count: float) -
 	var split := _mode_split(o, d)
 	_person_trips += count * 2.0
 	if split.x > 0.0:
-		var entry: Vector3 = _next_mix[Vector2i(o, d)]
-		var line := int(entry.z)
-		var raw := split.x / maxf(float(_transit.crowding(line)), 0.001)
-		_raw_riders[line] = float(_raw_riders.get(line, 0.0)) + raw * count * 2.0
-		_riders[line] = float(_riders.get(line, 0.0)) + split.x * count * 2.0
+		var entry: Vector4 = _next_mix[Vector2i(o, d)]
+		# With a change of line both lines carry the rider.
+		for line: int in ([int(entry.z)] if entry.w < 0.0 else [int(entry.z), int(entry.w)]):
+			var raw := split.x / maxf(float(_transit.crowding(line)), 0.001)
+			_raw_riders[line] = float(_raw_riders.get(line, 0.0)) + raw * count * 2.0
+			_riders[line] = float(_riders.get(line, 0.0)) + split.x * count * 2.0
 	var cars := count * (1.0 - split.x)
 	_parking += cars * split.y
 	_add_trip(o, d, out_kind, NO_CATEGORY, cars)
@@ -540,7 +544,7 @@ func commute_minutes(home_seg: int, job_seg: int) -> float:
 	var car := float(_commute.get(key, -1.0))
 	if not _transit_mix.has(key):
 		return car
-	var mix: Vector3 = _transit_mix[key]
+	var mix: Vector4 = _transit_mix[key]
 	return mix.y if car < 0.0 else lerpf(car, mix.y, mix.x)
 
 

@@ -22,6 +22,7 @@ var _info: Label
 var _lines_row: HBoxContainer
 var _ticket_label: Label
 var _detail: HBoxContainer
+var _open_button: Button
 var _detail_label: Label
 var _vehicle_label: Label
 var _selected: int = -1
@@ -61,9 +62,11 @@ func _init(transit: Node, font_size: int, min_touch: float, on_close: Callable) 
 	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	top.add_child(_info)
 	var open := _action("TRANSIT_OPEN", UiStyle.GREEN, 150)
+	_open_button = open
 	open.pressed.connect(func() -> void:
+		var was_editing: int = _transit.editing
 		if _transit.finish_draft():
-			_selected = int((_transit.lines.back() as Dictionary)["id"])
+			_selected = was_editing if was_editing >= 0 else int((_transit.lines.back() as Dictionary)["id"])
 			_refresh())
 	top.add_child(open)
 	var clear := _action("TRANSIT_CLEAR", UiStyle.SLATE, 120)
@@ -117,6 +120,12 @@ func _init(transit: Node, font_size: int, min_touch: float, on_close: Callable) 
 	var more := _small("+")
 	more.pressed.connect(func() -> void: _change_vehicles(1))
 	_detail.add_child(more)
+	# Change the stops of the selected line: they load into the draft.
+	var stops := _action("TRANSIT_EDIT_STOPS", UiStyle.BLUE, 170)
+	stops.pressed.connect(func() -> void:
+		if _selected >= 0:
+			_transit.edit_line(_selected))
+	_detail.add_child(stops)
 	var trash := UiStyle.round_button("trash-2", UiStyle.RED, min_touch * 0.66)
 	trash.pressed.connect(func() -> void:
 		if _selected >= 0:
@@ -174,6 +183,7 @@ func _change_vehicles(delta: int) -> void:
 func _on_draft(info: Dictionary) -> void:
 	if not panel.visible:
 		return
+	_open_button.text = "TRANSIT_SAVE_STOPS" if bool(info.get("editing", false)) else "TRANSIT_OPEN"
 	var error := str(info.get("error", ""))
 	var stops := int(info.get("stops", 0))
 	if error != "":

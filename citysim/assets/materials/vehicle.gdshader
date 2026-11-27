@@ -102,6 +102,9 @@ void fragment() {
 	} else if (m == 3) {
 		col = vec3(0.5, 0.05, 0.05);
 		emit = vec3(1.0, 0.08, 0.06) * (night_factor * 0.9 + v_brake * 1.6);
+		// Beacon 2 = broken down / crashed: hazard lights blink amber.
+		float hazard = step(1.5, v_beacon) * step(0.0, sin(TIME * 6.0));
+		emit = mix(emit, vec3(1.0, 0.55, 0.05) * 3.0, hazard);
 	} else if (m == 4) {
 		col = vec3(0.05, 0.05, 0.055);
 		rough = 0.9;

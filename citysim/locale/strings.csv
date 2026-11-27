@@ -508,3 +508,8 @@ PERF_HEAD,"FPS %d · GPU %.1f ms · betik %.1f ms · 3B %%%d · %d çizim · %d 
 SETTINGS_CITY_NAME,Şehrin adı,City name
 INFO_EMPTY,Boşalt (%s para),Empty it (%s money)
 NOTIFY_EMPTIED,%s boşaltıldı; yeniden hizmet veriyor.,%s emptied; it serves again.
+NOTIFY_ACCIDENT,Kaza! Bir şerit kapandı; polis ve ambulans yolda.,Accident! A lane is blocked; police and an ambulance are on the way.
+NOTIFY_ACCIDENT_CLEARED,Kaza yeri temizlendi; yol açıldı.,The accident is cleared; the road is open.
+TRANSIT_EDIT_STOPS,Durakları düzenle,Edit stops
+TRANSIT_SAVE_STOPS,Kaydet,Save
+NOTIFY_LINE_EDITED,%s hattının durakları güncellendi.,Stops of line %s updated.

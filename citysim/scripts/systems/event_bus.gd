@@ -113,6 +113,9 @@ signal ground_long_pressed(world_pos: Vector3)
 signal building_held(id: int)
 ## The player renamed the city.
 signal city_renamed(name: String)
+## A vehicle broke down or crashed at pos on road segment seg (started), or
+## the lane opened again (started = false, seg -1).
+signal traffic_accident(pos: Vector2, seg: int, started: bool)
 ## Dragging a held building (GestureTracker.Pointer phase, finger position).
 signal building_drag(phase: int, screen_pos: Vector2, id: int)
 

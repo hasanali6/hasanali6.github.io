@@ -104,6 +104,13 @@ var _ev_ver := PackedInt32Array()
 # Lanes and junctions.
 var _fifo: Dictionary = {}         # lane piece id -> Array of vehicle ids, head first
 var _blocked: Dictionary = {}      # vehicle id -> true while the lane ahead is full
+# Junctions without lights: who is crossing, and who waits for whom.
+var _yield_nodes: Dictionary = {}  # road node id -> true (3+ legs, no lights)
+var _conn_occ: Dictionary = {}     # road node id -> Array of vehicle ids on its connectors
+var _yield_since: Dictionary = {}  # vehicle id -> traffic time it started waiting at a junction
+var _conflicts: Dictionary = {}    # Vector2i(connector, connector) -> bool
+# Breakdowns and crashes: vehicle id -> traffic time the lane opens again.
+var _accidents: Dictionary = {}
 var _seg_lanes: Dictionary = {}    # segment id -> lanes per direction
 var _seg_end: Dictionary = {}      # segment id -> Vector2i(node a, node b)
 var _junctions: Array = []         # {legs, groups, phase, state, next, slots}
@@ -150,6 +157,9 @@ func _ready() -> void:
 	_apply_preset(GraphicsSettings.current_preset)
 	EventBus.lanes_rebuilt.connect(_on_lanes_rebuilt)
 	EventBus.graphics_preset_changed.connect(_apply_preset)
+	EventBus.month_changed.connect(func(_m: int) -> void:
+		if _rng.randf() < float((_cfg["accidents"] as Dictionary)["chance_per_month"]):
+			start_accident())
 	_on_lanes_rebuilt()
 
 
@@ -172,6 +182,7 @@ func _frame_work(delta: float) -> void:
 	if _blocked_timer > 0.3:
 		_blocked_timer = 0.0
 		_retry_blocked()
+		_clear_accidents()
 	_spawn_some()
 	if _time > REBASE_AFTER:
 		_rebase_time()
@@ -186,6 +197,7 @@ func advance(seconds: float, step: float = 0.1) -> void:
 		_update_lights()
 		_process_events()
 		_retry_blocked()
+		_clear_accidents()
 		_spawn_some()
 	RenderingServer.global_shader_parameter_set("traffic_time", _time)
 
@@ -266,9 +278,19 @@ func _on_lanes_rebuilt() -> void:
 	for seg: RoadGraph.RoadSegment in rg.segments.values():
 		_seg_lanes[seg.id] = int(types[seg.type]["lanes_per_dir"])
 		_seg_end[seg.id] = Vector2i(seg.a, seg.b)
+	_yield_nodes.clear()
+	_conflicts.clear()
+	var tg: TrafficGraph = _traffic.graph
+	for node: RoadGraph.RoadNode in rg.nodes.values():
+		var ni: int = tg.node_index.get(node.id, -1) if tg != null else -1
+		var lit := ni >= 0 and tg.node_lit[ni] == 1
+		if node.segments.size() >= 3 and not lit:
+			_yield_nodes[node.id] = true
 	# Keep the vehicles whose roads still exist, on the rebuilt pieces.
 	_fifo.clear()
 	_blocked.clear()
+	_conn_occ.clear()
+	_yield_since.clear()
 	var by_lane := {}
 	for v in _alive.size():
 		if _alive[v] == 0:
@@ -280,6 +302,8 @@ func _on_lanes_rebuilt() -> void:
 			continue
 		_piece[v] = pid
 		_wait[v] = 0
+		if _on_conn[v] == 1:
+			_occupy(v, pid)
 		if _on_conn[v] == 0:
 			if not by_lane.has(pid):
 				by_lane[pid] = []
@@ -501,6 +525,8 @@ func _resolve(pid: int) -> void:
 		elif _line[v] >= 0 and _dwell_s[v] >= 0.0:
 			want = _dwell_s[v]
 		var s_now := _pos(v)
+		if _accidents.has(v):
+			want = minf(want, s_now)   # broken down / crashed: it stays put
 		var limit := FREE
 		var at_line := false
 		if prev_stop < FREE:
@@ -538,6 +564,110 @@ func _set_stop(v: int, want: float, rank: int) -> int:
 	return released
 
 
+# --- Junctions without lights ------------------------------------------------------
+
+## A vehicle about to take connector c waits while a vehicle whose path
+## crosses or merges with c is still inside that junction. Junctions with
+## lights are left to the lights. After max_wait_s it goes anyway (no
+## gridlock from a stuck neighbour).
+func _junction_busy(v: int, c: int) -> bool:
+	if c < 0:
+		return false
+	var lg: LaneGeometry = _traffic.lanes
+	var key: Variant = lg.piece_key[c] if c < lg.piece_key.size() else null
+	if not key is Vector3i:
+		return false
+	var nid: int = (key as Vector3i).x
+	if not _yield_nodes.has(nid):
+		return false
+	for w: int in _conn_occ.get(nid, []):
+		if w == v or _alive[w] == 0 or _on_conn[w] == 0:
+			continue
+		if _connectors_conflict(c, _piece[w]):
+			if not _yield_since.has(v):
+				_yield_since[v] = _time
+			return _time - float(_yield_since[v]) < float((_cfg["junction_yield"] as Dictionary)["max_wait_s"])
+	return false
+
+
+func _connectors_conflict(a: int, b: int) -> bool:
+	if a == b:
+		return false
+	var k := Vector2i(mini(a, b), maxi(a, b))
+	if _conflicts.has(k):
+		return _conflicts[k]
+	var lg: LaneGeometry = _traffic.lanes
+	var ka: Vector3i = lg.piece_key[a]
+	var kb: Vector3i = lg.piece_key[b]
+	var hit := TrafficRules.paths_conflict(lg.points(a), lg.points(b), LaneGeometry.key_segment(ka.z) == LaneGeometry.key_segment(kb.z)
+		and LaneGeometry.key_dir(ka.z) == LaneGeometry.key_dir(kb.z))
+	_conflicts[k] = hit
+	return hit
+
+
+func _occupy(v: int, c: int) -> void:
+	var key: Variant = (_traffic.lanes as LaneGeometry).piece_key[c]
+	if not key is Vector3i or not _yield_nodes.has((key as Vector3i).x):
+		return
+	var nid: int = (key as Vector3i).x
+	if not _conn_occ.has(nid):
+		_conn_occ[nid] = []
+	(_conn_occ[nid] as Array).append(v)
+
+
+func _leave_junction(v: int) -> void:
+	var key: Variant = _pkey[v]
+	if key is Vector3i and _conn_occ.has((key as Vector3i).x):
+		(_conn_occ[(key as Vector3i).x] as Array).erase(v)
+
+
+# --- Accidents ---------------------------------------------------------------------
+
+## A car breaks down or crashes at the head of a busy lane and blocks it for
+## accidents.duration_s; police and an ambulance are sent
+## (EventBus.traffic_accident). Returns the vehicle id, or -1 if no lane
+## was busy enough.
+func start_accident() -> int:
+	var cfg: Dictionary = _cfg["accidents"]
+	var lanes := _fifo.keys()
+	if lanes.is_empty():
+		return -1
+	var best := -1
+	var best_n := int(cfg["min_queue"]) - 1
+	for k in mini(lanes.size(), 60):
+		var pid: int = lanes[_rng.randi_range(0, lanes.size() - 1)]
+		var fifo: Array = _fifo[pid]
+		if fifo.size() > best_n and _line[fifo[0]] < 0 and _beacon[fifo[0]] == 0 and not _accidents.has(fifo[0]):
+			best_n = fifo.size()
+			best = pid
+	if best < 0:
+		return -1
+	var v: int = _fifo[best][0]
+	_accidents[v] = _time + float(cfg["duration_s"])
+	_beacon[v] = 2   # hazard lights
+	_resolve(best)
+	_write(v)
+	var p: Variant = vehicle_position(Vector2i(v, _life[v]))
+	if p != null:
+		EventBus.traffic_accident.emit(p, int(_pkey[v]) >> 4, true)
+	return v
+
+
+func _clear_accidents() -> void:
+	for v: int in _accidents.keys():
+		if _alive[v] == 1 and _time < float(_accidents[v]):
+			continue
+		_accidents.erase(v)
+		if _alive[v] == 1:
+			_beacon[v] = 0
+			_write(v)
+			if _on_conn[v] == 0:
+				_resolve(_piece[v])
+			var p: Variant = vehicle_position(Vector2i(v, _life[v]))
+			if p != null:
+				EventBus.traffic_accident.emit(p, -1, false)
+
+
 func _lane_full(pid: int) -> bool:
 	var fifo: Array = _fifo.get(pid, [])
 	if fifo.is_empty():
@@ -558,7 +688,7 @@ func _retry_blocked() -> void:
 			continue
 		var nk := _next_index(v)
 		var ahead := _lane_piece(_route[v][nk], _nlane[v]) if nk >= 0 else -1
-		if ahead < 0 or not _lane_full(ahead):
+		if ahead < 0 or (not _lane_full(ahead) and not _junction_busy(v, _npiece[v])):
 			_blocked.erase(v)
 			_wait[v] = 0
 			_resolve(_piece[v])
@@ -690,11 +820,13 @@ func _advance(v: int) -> void:
 		if ahead < 0:
 			_despawn(v)
 			return
-		if _lane_full(ahead):
+		if _lane_full(ahead) or _junction_busy(v, c):
 			_wait[v] = 1
 			_blocked[v] = true
 			_resolve(pid)
 			return
+		_yield_since.erase(v)
+		_occupy(v, c)
 		var overflow := maxf(_pos(v) - length, 0.0)
 		var next_entry := route[nk]
 		_rebase(v, overflow, _connector_speed(c, _traffic.lane_speed(next_entry >> 1, next_entry & 1)), 0.0)
@@ -713,6 +845,7 @@ func _advance(v: int) -> void:
 		if ahead < 0:
 			_despawn(v)
 			return
+		_leave_junction(v)
 		_leg[v] = nk
 		_lane[v] = _nlane[v]
 		_enter_lane(v, ahead, overflow)
@@ -1019,6 +1152,10 @@ func _despawn(v: int, resolve: bool = true) -> void:
 		return
 	var pid := _piece[v]
 	var on_lane := _on_conn[v] == 0
+	if not on_lane:
+		_leave_junction(v)
+	_yield_since.erase(v)
+	_accidents.erase(v)
 	if on_lane:
 		_fifo_remove(v, pid)
 	_blocked.erase(v)
@@ -1134,6 +1271,10 @@ func _rebase_time() -> void:
 		_ev_t[i] -= shift
 	for j: Dictionary in _junctions:
 		j["next"] = float(j["next"]) - shift
+	for v: int in _yield_since:
+		_yield_since[v] = float(_yield_since[v]) - shift
+	for v: int in _accidents:
+		_accidents[v] = float(_accidents[v]) - shift
 	for v in _alive.size():
 		if _alive[v] == 1:
 			_write(v)

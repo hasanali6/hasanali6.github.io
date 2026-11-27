@@ -179,6 +179,23 @@ static func turn_of(d_in: Vector2, d_out: Vector2) -> int:
 	return 1 if d_in.x * d_out.y - d_in.y * d_out.x > 0.0 else -1
 
 
+## Whether two paths through a junction (connector polylines) can collide:
+## they end on the same lane (merging) or they cross. Paths leaving the same
+## lane are a queue, not a conflict.
+static func paths_conflict(a: PackedVector2Array, b: PackedVector2Array, same_out: bool) -> bool:
+	if a.size() < 2 or b.size() < 2:
+		return false
+	if a[0].distance_to(b[0]) < 0.5:
+		return false
+	if same_out:
+		return true
+	for i in a.size() - 1:
+		for j in b.size() - 1:
+			if Geometry2D.segment_intersects_segment(a[i], a[i + 1], b[j], b[j + 1]) != null:
+				return true
+	return false
+
+
 ## Lane to take for the next turn: rightmost for a right turn, leftmost for
 ## a left turn, keep the lane (clamped) when going straight. Lane 0 is the
 ## one next to the centre line.

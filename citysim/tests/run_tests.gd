@@ -20,6 +20,7 @@ func _initialize() -> void:
 	_test_map_grid()
 	_test_gesture_capture()
 	_test_gesture_hold_drag()
+	_test_junction_conflicts()
 	_test_road_types()
 	_test_road_straight()
 	_test_road_crossing()
@@ -1116,3 +1117,14 @@ func _test_save_files() -> void:
 	_check(SaveFormat.read_state(dir + "/missing.save", 1).is_empty(), "save: a missing file is refused")
 	for name in DirAccess.get_files_at(dir):
 		DirAccess.remove_absolute(dir + "/" + name)
+
+
+func _test_junction_conflicts() -> void:
+	var straight_ns := PackedVector2Array([Vector2(0, -6), Vector2(0, 0), Vector2(0, 6)])
+	var straight_we := PackedVector2Array([Vector2(-6, 1), Vector2(0, 1), Vector2(6, 1)])
+	var right_turn := PackedVector2Array([Vector2(-6, 3), Vector2(-4, 4), Vector2(-3, 6)])
+	_check(TrafficRules.paths_conflict(straight_ns, straight_we, false), "crossing paths through a junction conflict")
+	_check(not TrafficRules.paths_conflict(straight_ns, right_turn, false), "a tight right turn clear of a straight path does not")
+	_check(TrafficRules.paths_conflict(right_turn, PackedVector2Array([Vector2(5, 3), Vector2(-3, 6)]), true), "paths merging into the same lane conflict")
+	var same_lane := PackedVector2Array([Vector2(0, -6), Vector2(2, 0), Vector2(6, 2)])
+	_check(not TrafficRules.paths_conflict(straight_ns, same_lane, false), "paths leaving the same lane are a queue, not a conflict")

@@ -57,6 +57,10 @@ var _colors: Array = []
 var _by_id: Dictionary = {}        # line id -> line
 var _next_id: int = 1
 var _cover: Dictionary = {}        # segment id -> {line id: Vector2(stop index, walk m)}
+var _transfers: Dictionary = {}   # Vector2i(line a, line b) -> [Vector3(stop on a, stop on b, walk m)]
+var editing: int = -1                # line whose stops are being changed (-1: drawing a new one)
+var _edit_original: Array = []
+var _edit_length: float = 0.0
 var _riders: Dictionary = {}       # line id -> rides per day (latest round)
 var _raw: Dictionary = {}          # line id -> rides wanted before crowding
 var _check_timer: float = 0.0
@@ -381,6 +385,7 @@ func _spawn_on(line: Dictionary, stop: int) -> void:
 
 ## Walking distance from every road near a stop to the nearest stop of each line.
 func _rebuild_cover() -> void:
+	_rebuild_transfers()
 	_cover = {}
 	var g: TrafficGraph = _traffic.graph
 	var radius := float(_cfg["walk_radius_m"])
@@ -407,14 +412,17 @@ func _rebuild_cover() -> void:
 					entry[id] = Vector2(i, d)
 
 
-## Best transit trip between two roads: Vector3(generalised minutes incl. the
-## ticket, line id, travel minutes), or x = -1 when no line serves both.
-func transit_minutes(o: int, d: int) -> Vector3:
-	var best := Vector3(-1.0, -1.0, -1.0)
+## Best transit trip between two roads: Vector4(generalised minutes incl.
+## the tickets, first line id, travel minutes, second line id or -1), or
+## x = -1 when no line, or no two lines with a transfer, serve both ends.
+func transit_minutes(o: int, d: int) -> Vector4:
+	var best := Vector4(-1.0, -1.0, -1.0, -1.0)
 	var co: Dictionary = _cover.get(o, {})
 	if co.is_empty():
 		return best
 	var cd: Dictionary = _cover.get(d, {})
+	if cd.is_empty():
+		return best
 	var walk_speed := float(_cfg["walk_speed_ms"])
 	var money := ticket_price / float(_cfg["mode_choice"]["money_per_minute"])
 	for id: int in co:
@@ -427,20 +435,71 @@ func transit_minutes(o: int, d: int) -> Vector3:
 		var line: Dictionary = _by_id[id]
 		if int(line["vehicles"]) <= 0:
 			continue
-		var t: Dictionary = _types[line["type"]]
-		var dist: PackedFloat32Array = line["stop_dist"]
-		var n := dist.size()
-		var ride := TransitRules.along(dist[int(a.x)], dist[int(b.x)], float(line["length"]))
-		var hops := posmod(int(b.x) - int(a.x), n)
-		if _open_line(line["type"]):
-			ride = TransitRules.shuttle(dist[int(a.x)], dist[int(b.x)])
-			hops = absi(int(b.x) - int(a.x))
-		var seconds := (a.y + b.y) / walk_speed + headway_s(line) * 0.5 \
-			+ ride / (float(t["speed_ms"]) * SPEED_FACTOR) + maxi(hops - 1, 0) * float(t["dwell_s"])
+		var seconds := (a.y + b.y) / walk_speed + headway_s(line) * 0.5 + _ride_seconds(line, int(a.x), int(b.x))
 		var minutes := seconds / 60.0
 		if best.x < 0.0 or minutes + money < best.x:
-			best = Vector3(minutes + money, id, minutes)
+			best = Vector4(minutes + money, id, minutes, -1)
+	# One change of line at stops a short walk apart (two tickets and a
+	# penalty for the change, so a direct line wins when there is one).
+	var penalty := float(_cfg["transfer_penalty_minutes"])
+	for id_a: int in co:
+		var line_a: Dictionary = _by_id[id_a]
+		if int(line_a["vehicles"]) <= 0:
+			continue
+		var a: Vector2 = co[id_a]
+		for id_b: int in cd:
+			if id_b == id_a or not _transfers.has(Vector2i(id_a, id_b)):
+				continue
+			var line_b: Dictionary = _by_id[id_b]
+			if int(line_b["vehicles"]) <= 0:
+				continue
+			var b: Vector2 = cd[id_b]
+			for x: Vector3 in _transfers[Vector2i(id_a, id_b)]:
+				if int(x.x) == int(a.x) or int(x.y) == int(b.x):
+					continue
+				var seconds := (a.y + b.y + x.z) / walk_speed + (headway_s(line_a) + headway_s(line_b)) * 0.5 \
+					+ _ride_seconds(line_a, int(a.x), int(x.x)) + _ride_seconds(line_b, int(x.y), int(b.x))
+				var minutes := seconds / 60.0 + penalty
+				if best.x < 0.0 or minutes + money * 2.0 < best.x:
+					best = Vector4(minutes + money * 2.0, id_a, minutes, id_b)
 	return best
+
+
+## Seconds riding a line from stop i to stop j (one way round a loop, or
+## back and forth on an open line), with the stops on the way.
+func _ride_seconds(line: Dictionary, i: int, j: int) -> float:
+	var t: Dictionary = _types[line["type"]]
+	var dist: PackedFloat32Array = line["stop_dist"]
+	var n := dist.size()
+	var ride := TransitRules.along(dist[i], dist[j], float(line["length"]))
+	var hops := posmod(j - i, n)
+	if _open_line(line["type"]):
+		ride = TransitRules.shuttle(dist[i], dist[j])
+		hops = absi(j - i)
+	return ride / (float(t["speed_ms"]) * SPEED_FACTOR) + maxi(hops - 1, 0) * float(t["dwell_s"])
+
+
+## Stops of two different lines within transfer_radius_m of each other:
+## _transfers[Vector2i(a, b)] = [Vector3(stop on a, stop on b, walk m)].
+func _rebuild_transfers() -> void:
+	_transfers = {}
+	var radius := float(_cfg["transfer_radius_m"])
+	for la: Dictionary in lines:
+		if not la["ok"]:
+			continue
+		for lb: Dictionary in lines:
+			if int(lb["id"]) == int(la["id"]) or not lb["ok"]:
+				continue
+			var found := []
+			var pa: Array = la["points"]
+			var pb: Array = lb["points"]
+			for i in pa.size():
+				for j in pb.size():
+					var w := (pa[i] as Vector2).distance_to(pb[j]) * WALK_DETOUR
+					if w <= radius:
+						found.append(Vector3(i, j, w))
+			if not found.is_empty():
+				_transfers[Vector2i(la["id"], lb["id"])] = found
 
 
 ## 0..1: how close a road is to a stop (transit overlay).
@@ -478,6 +537,8 @@ func delete_line(id: int) -> void:
 	var line: Dictionary = _by_id.get(id, {})
 	if line.is_empty():
 		return
+	if editing == id:
+		cancel_draft()
 	_vehicles.despawn_line(id)
 	lines.erase(line)
 	_by_id.erase(id)
@@ -502,6 +563,8 @@ func finish_draft() -> bool:
 			_draft_info["error"] = "TRANSIT_ERR_STOPS"
 		EventBus.transit_draft_changed.emit(_draft_info)
 		return false
+	if editing >= 0:
+		return _finish_edit()
 	if lines.size() >= int(_cfg["max_lines"]):
 		_draft_info["error"] = "TRANSIT_ERR_MAX_LINES"
 		EventBus.transit_draft_changed.emit(_draft_info)
@@ -530,6 +593,7 @@ func finish_draft() -> bool:
 
 func cancel_draft() -> void:
 	_draft = []
+	editing = -1
 	_update_draft()
 
 
@@ -585,6 +649,89 @@ func _on_pointer(phase: int, screen_pos: Vector2) -> void:
 
 
 ## Adds a stop at the road nearest to p, or removes the draft stop there.
+## Loads a line's stops into the draft to change them: taps add a stop
+## where it fits best along the line or remove one; finish_draft() saves.
+func edit_line(id: int) -> void:
+	var line: Dictionary = _by_id.get(id, {})
+	if line.is_empty():
+		return
+	editing = id
+	_draft_type = line["type"]
+	_draft = (line["points"] as Array).duplicate()
+	_edit_original = (line["points"] as Array).duplicate()
+	_edit_length = float(line.get("length", 0.0))
+	_update_draft()
+
+
+## Price of an edit: the stops added and any extra track or tunnel.
+func _edit_cost(length: float) -> int:
+	var t: Dictionary = _types[_draft_type]
+	var added := 0
+	for p: Vector2 in _draft:
+		var known := false
+		for q: Vector2 in _edit_original:
+			if p.distance_to(q) < 1.0:
+				known = true
+		if not known:
+			added += 1
+	var per_m := float(t.get("track_cost_per_m", t.get("tunnel_cost_per_m", 0.0)))
+	return added * int(t["stop_cost"]) + int(maxf(length - _edit_length, 0.0) * per_m)
+
+
+func _finish_edit() -> bool:
+	var line: Dictionary = _by_id.get(editing, {})
+	if line.is_empty():
+		editing = -1
+		return false
+	var cost := _edit_cost(float(_draft_info.get("length", 0.0)))
+	if not EconomySystem.try_spend(cost):
+		_draft_info["error"] = "ROAD_ERR_MONEY"
+		EventBus.transit_draft_changed.emit(_draft_info)
+		return false
+	_vehicles.despawn_line(int(line["id"]))
+	line["points"] = _draft.duplicate()
+	_route_line(line, _traffic.graph, _net.graph, _traffic.lanes)
+	line["spawned"] = 0
+	if line["ok"]:
+		_respawn(line)
+	editing = -1
+	_draft = []
+	_update_draft()
+	_rebuild_cover()
+	_rebuild_visuals()
+	EventBus.transit_changed.emit()
+	EventBus.sfx_requested.emit("build_place")
+	EventBus.notification_posted.emit("transit", tr("NOTIFY_LINE_EDITED") % line_name(line))
+	return true
+
+
+## Where a new stop goes while editing: between the two stops it adds the
+## least detour to (closing the loop for bus and tram lines).
+func _insert_index(p: Vector2) -> int:
+	var n := _draft.size()
+	if n < 2:
+		return n
+	var loop := not _open_line(_draft_type)
+	var best := n
+	var best_cost := INF
+	var last := n if loop else n - 1
+	for i in last:
+		var a: Vector2 = _draft[i]
+		var b: Vector2 = _draft[(i + 1) % n]
+		var c := a.distance_to(p) + p.distance_to(b) - a.distance_to(b)
+		if c < best_cost:
+			best_cost = c
+			best = i + 1
+	if not loop:
+		# Open lines can also grow at either end.
+		if (_draft[0] as Vector2).distance_to(p) < best_cost:
+			best = 0
+			best_cost = (_draft[0] as Vector2).distance_to(p)
+		if (_draft[n - 1] as Vector2).distance_to(p) < best_cost:
+			best = n
+	return best
+
+
 func toggle_stop(p: Vector2) -> void:
 	var spacing := float((_types[_draft_type] as Dictionary).get("min_stop_spacing_m", _cfg["min_stop_spacing_m"]))
 	for i in _draft.size():
@@ -614,7 +761,10 @@ func toggle_stop(p: Vector2) -> void:
 		EventBus.sfx_requested.emit("error")
 		EventBus.transit_draft_changed.emit(_draft_info)
 		return
-	_draft.append(hit["point"])
+	if editing >= 0:
+		_draft.insert(_insert_index(hit["point"]), hit["point"])
+	else:
+		_draft.append(hit["point"])
 	EventBus.sfx_requested.emit("ui_click")
 	_update_draft()
 
@@ -654,6 +804,9 @@ func _update_draft() -> void:
 			route_pts = _route_polyline(ids)
 		else:
 			info["error"] = res.get("error", "TRANSIT_ERR_ROUTE")
+	if editing >= 0:
+		info["editing"] = true
+		info["cost"] = _edit_cost(float(info["length"]))
 	_draft_info = info
 	_rebuild_draft_mesh(route_pts)
 	EventBus.transit_draft_changed.emit(info)
